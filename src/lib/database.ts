@@ -14,20 +14,30 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+// Helper tạo ID ngắn giống trên database khi offline (ví dụ: p_3a4b5c)
+export const generateShortId = (prefix: string): string => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = prefix;
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
 // Dữ liệu mẫu khởi tạo cho Mock DB
 const MOCK_CATEGORIES = [
-  { id: 'c1111111-1111-1111-1111-111111111111', name: 'Cà phê' },
-  { id: 'c2222222-2222-2222-2222-222222222222', name: 'Thức uống khác' },
-  { id: 'c3333333-3333-3333-3333-333333333333', name: 'Trà' },
-  { id: 'c4444444-4444-4444-4444-444444444444', name: 'Yaourt' },
-  { id: 'c5555555-5555-5555-5555-555555555555', name: 'Soda' }
+  { id: 'c_caphe', name: 'Cà phê' },
+  { id: 'c_douongkhac', name: 'Thức uống khác' },
+  { id: 'c_tra', name: 'Trà' },
+  { id: 'c_yaourt', name: 'Yaourt' },
+  { id: 'c_soda', name: 'Soda' }
 ];
 
 const MOCK_PRODUCTS = [
   // Cà phê (CP)
   {
-    id: 'd1111111-1111-1111-1111-111111111111',
-    category_id: 'c1111111-1111-1111-1111-111111111111',
+    id: 'CP001',
+    category_id: 'c_caphe',
     name: 'Cà phê đen',
     price: 15000,
     cost_price: 5000,
@@ -35,8 +45,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd1111111-1111-1111-1111-111111111112',
-    category_id: 'c1111111-1111-1111-1111-111111111111',
+    id: 'CP002',
+    category_id: 'c_caphe',
     name: 'Cà phê sữa',
     price: 17000,
     cost_price: 6000,
@@ -44,8 +54,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd1111111-1111-1111-1111-111111111113',
-    category_id: 'c1111111-1111-1111-1111-111111111111',
+    id: 'CP003',
+    category_id: 'c_caphe',
     name: 'Cà phê sữa tươi',
     price: 22000,
     cost_price: 8000,
@@ -53,8 +63,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd1111111-1111-1111-1111-111111111114',
-    category_id: 'c1111111-1111-1111-1111-111111111111',
+    id: 'CP004',
+    category_id: 'c_caphe',
     name: 'Cà phê muối',
     price: 22000,
     cost_price: 8000,
@@ -62,8 +72,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd1111111-1111-1111-1111-111111111115',
-    category_id: 'c1111111-1111-1111-1111-111111111111',
+    id: 'CP005',
+    category_id: 'c_caphe',
     name: 'Bạc xiu',
     price: 22000,
     cost_price: 8000,
@@ -72,8 +82,8 @@ const MOCK_PRODUCTS = [
   },
   // Thức uống khác (TUK)
   {
-    id: 'd2222222-2222-2222-2222-222222222221',
-    category_id: 'c2222222-2222-2222-2222-222222222222',
+    id: 'TUK001',
+    category_id: 'c_douongkhac',
     name: 'Cacao',
     price: 20000,
     cost_price: 7000,
@@ -81,8 +91,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd2222222-2222-2222-2222-222222222222',
-    category_id: 'c2222222-2222-2222-2222-222222222222',
+    id: 'TUK002',
+    category_id: 'c_douongkhac',
     name: 'Cacao kem muối',
     price: 25000,
     cost_price: 9000,
@@ -90,8 +100,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd2222222-2222-2222-2222-222222222223',
-    category_id: 'c2222222-2222-2222-2222-222222222222',
+    id: 'TUK003',
+    category_id: 'c_douongkhac',
     name: 'Matcha Latte',
     price: 25000,
     cost_price: 9000,
@@ -99,8 +109,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd2222222-2222-2222-2222-222222222224',
-    category_id: 'c2222222-2222-2222-2222-222222222222',
+    id: 'TUK004',
+    category_id: 'c_douongkhac',
     name: 'Matcha Latte kem muối',
     price: 30000,
     cost_price: 11000,
@@ -109,8 +119,8 @@ const MOCK_PRODUCTS = [
   },
   // Trà (T)
   {
-    id: 'd3333333-3333-3333-3333-333333333331',
-    category_id: 'c3333333-3333-3333-3333-333333333333',
+    id: 'T001',
+    category_id: 'c_tra',
     name: 'Trà tắc',
     price: 15000,
     cost_price: 5000,
@@ -118,8 +128,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd3333333-3333-3333-3333-333333333332',
-    category_id: 'c3333333-3333-3333-3333-333333333333',
+    id: 'T002',
+    category_id: 'c_tra',
     name: 'Trà dâu',
     price: 25000,
     cost_price: 9000,
@@ -127,8 +137,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd3333333-3333-3333-3333-333333333333',
-    category_id: 'c3333333-3333-3333-3333-333333333333',
+    id: 'T003',
+    category_id: 'c_tra',
     name: 'Trà đào',
     price: 25000,
     cost_price: 9000,
@@ -136,8 +146,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd3333333-3333-3333-3333-333333333334',
-    category_id: 'c3333333-3333-3333-3333-333333333333',
+    id: 'T004',
+    category_id: 'c_tra',
     name: 'Trà vải',
     price: 25000,
     cost_price: 9000,
@@ -146,8 +156,8 @@ const MOCK_PRODUCTS = [
   },
   // Yaourt (Y)
   {
-    id: 'd4444444-4444-4444-4444-444444444441',
-    category_id: 'c4444444-4444-4444-4444-444444444444',
+    id: 'Y001',
+    category_id: 'c_yaourt',
     name: 'Yaourt đá',
     price: 20000,
     cost_price: 7000,
@@ -155,8 +165,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd4444444-4444-4444-4444-444444444442',
-    category_id: 'c4444444-4444-4444-4444-444444444444',
+    id: 'Y002',
+    category_id: 'c_yaourt',
     name: 'Yaourt dâu',
     price: 25000,
     cost_price: 9000,
@@ -164,8 +174,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd4444444-4444-4444-4444-444444444443',
-    category_id: 'c4444444-4444-4444-4444-444444444444',
+    id: 'Y003',
+    category_id: 'c_yaourt',
     name: 'Yaourt việt quất',
     price: 25000,
     cost_price: 9000,
@@ -174,8 +184,8 @@ const MOCK_PRODUCTS = [
   },
   // Soda (S)
   {
-    id: 'd5555555-5555-5555-5555-555555555551',
-    category_id: 'c5555555-5555-5555-5555-555555555555',
+    id: 'S001',
+    category_id: 'c_soda',
     name: 'Soda dâu',
     price: 25000,
     cost_price: 9000,
@@ -183,8 +193,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd5555555-5555-5555-5555-555555555552',
-    category_id: 'c5555555-5555-5555-5555-555555555555',
+    id: 'S002',
+    category_id: 'c_soda',
     name: 'Soda đào',
     price: 25000,
     cost_price: 9000,
@@ -192,8 +202,8 @@ const MOCK_PRODUCTS = [
     status: 'Còn hàng' as const
   },
   {
-    id: 'd5555555-5555-5555-5555-555555555553',
-    category_id: 'c5555555-5555-5555-5555-555555555555',
+    id: 'S003',
+    category_id: 'c_soda',
     name: 'Soda việt quất',
     price: 25000,
     cost_price: 9000,
@@ -203,19 +213,19 @@ const MOCK_PRODUCTS = [
 ];
 
 const MOCK_TABLES: Array<{ id: string; table_name: string; capacity: number; status: 'Trống' | 'Đang phục vụ' }> = [
-  { id: 't1', table_name: 'Bàn 1', capacity: 4, status: 'Trống' },
-  { id: 't2', table_name: 'Bàn 2', capacity: 4, status: 'Trống' },
-  { id: 't3', table_name: 'Bàn 3', capacity: 2, status: 'Trống' },
-  { id: 't4', table_name: 'Bàn 4', capacity: 2, status: 'Trống' },
-  { id: 't5', table_name: 'Bàn 5', capacity: 6, status: 'Trống' },
-  { id: 't6', table_name: 'Bàn 6', capacity: 6, status: 'Trống' },
-  { id: 't7', table_name: 'Khách mang về', capacity: 99, status: 'Trống' }
+  { id: 'tb1', table_name: 'Bàn 1', capacity: 4, status: 'Trống' },
+  { id: 'tb2', table_name: 'Bàn 2', capacity: 4, status: 'Trống' },
+  { id: 'tb3', table_name: 'Bàn 3', capacity: 2, status: 'Trống' },
+  { id: 'tb4', table_name: 'Bàn 4', capacity: 2, status: 'Trống' },
+  { id: 'tb5', table_name: 'Bàn 5', capacity: 6, status: 'Trống' },
+  { id: 'tb6', table_name: 'Bàn 6', capacity: 6, status: 'Trống' },
+  { id: 'tb7', table_name: 'Khách mang về', capacity: 99, status: 'Trống' }
 ];
 
 const MOCK_USERS = [
-  { id: 'u1', email: 'admin@avacoffee.com', full_name: 'Lê Sơn (Admin)', role: 'Admin' as const, created_at: new Date().toISOString() },
-  { id: 'u2', email: 'nhanvien1@avacoffee.com', full_name: 'Nguyễn Văn Minh', role: 'User' as const, created_at: new Date().toISOString() },
-  { id: 'u3', email: 'nhanvien2@avacoffee.com', full_name: 'Trần Thị Thuỷ', role: 'User' as const, created_at: new Date().toISOString() }
+  { id: 'admin', username: 'admin', password: '123456', email: 'admin@avacoffee.com', full_name: 'Lê Sơn (Admin)', role: 'Admin' as const, created_at: new Date().toISOString() },
+  { id: 'nv001', username: 'nv001', password: '123456', email: 'nhanvien1@avacoffee.com', full_name: 'Nguyễn Văn Minh', role: 'User' as const, created_at: new Date().toISOString() },
+  { id: 'nv002', username: 'nv002', password: '123456', email: 'nhanvien2@avacoffee.com', full_name: 'Trần Thị Thuỷ', role: 'User' as const, created_at: new Date().toISOString() }
 ];
 
 // Helper lấy/ghi LocalStorage
@@ -267,26 +277,50 @@ export const mockDb = {
 };
 
 // Cấu hình tài khoản đăng nhập hiện tại mặc định
-export const getCurrentUser = (): typeof MOCK_USERS[0] => {
-  if (typeof window === 'undefined') return MOCK_USERS[0];
+export const getCurrentUser = (): typeof MOCK_USERS[0] | null => {
+  if (typeof window === 'undefined') return null;
   const user = localStorage.getItem('ava_current_user');
   if (!user) {
-    // Mặc định cho ban đầu là u1 (Admin) để dễ review
-    localStorage.setItem('ava_current_user', JSON.stringify(MOCK_USERS[0]));
-    return MOCK_USERS[0];
+    return null; // Không có đăng nhập mặc định nữa, bắt buộc login
   }
-  return JSON.parse(user);
+  try {
+    return JSON.parse(user);
+  } catch (e) {
+    return null;
+  }
 };
 
-export const setCurrentUser = (user: typeof MOCK_USERS[0]) => {
+export const setCurrentUser = (user: typeof MOCK_USERS[0] | null) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('ava_current_user', JSON.stringify(user));
+    if (user === null) {
+      localStorage.removeItem('ava_current_user');
+    } else {
+      localStorage.setItem('ava_current_user', JSON.stringify(user));
+    }
   }
 };
 
 // UNIFIED DATABASE SERVICE
 export const db = {
   // --- USERS ---
+  async login(username: string, password: string) {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password);
+      
+      if (!error && data && data.length > 0) {
+        return data[0];
+      }
+    }
+    // Fallback to local storage mock users
+    const users = mockDb.getUsers();
+    const user = users.find(u => u.username === username && u.password === password);
+    return user || null;
+  },
+
   async getUsers() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('users').select('*');
@@ -296,14 +330,15 @@ export const db = {
   },
 
   async createUser(user: any) {
+    const newUser = { id: user.id || generateShortId('u_'), ...user };
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('users').insert([user]).select();
+      const { data, error } = await supabase.from('users').insert([newUser]).select();
       if (!error) return data?.[0];
     }
     const users = mockDb.getUsers();
-    users.push(user);
+    users.push(newUser);
     mockDb.setUsers(users);
-    return user;
+    return newUser;
   },
 
   async updateUser(id: string, updates: any) {
@@ -362,7 +397,7 @@ export const db = {
       if (!error) return data?.[0];
     }
     const tables = mockDb.getTables();
-    const newTable = { id: `t_${Date.now()}`, ...table };
+    const newTable = { id: generateShortId('tb_'), ...table };
     tables.push(newTable);
     mockDb.setTables(tables);
     return newTable;
@@ -393,7 +428,7 @@ export const db = {
       if (!error) return data?.[0];
     }
     const categories = mockDb.getCategories();
-    const newCat = { id: `c_${Date.now()}`, name };
+    const newCat = { id: generateShortId('c_'), name };
     categories.push(newCat);
     mockDb.setCategories(categories);
     return newCat;
@@ -424,7 +459,7 @@ export const db = {
       if (!error) return data?.[0];
     }
     const products = mockDb.getProducts();
-    const newProd = { id: `p_${Date.now()}`, ...product };
+    const newProd = { id: generateShortId('p_'), ...product };
     products.push(newProd);
     mockDb.setProducts(products);
     return newProd;
@@ -502,7 +537,7 @@ export const db = {
 
   async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; items: any[] }) {
     const { table_id, staff_id, total_amount, items } = orderData;
-    const orderId = `o_${Date.now()}`;
+    const orderId = generateShortId('ord_');
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
@@ -562,7 +597,7 @@ export const db = {
     // Insert chi tiết
     const orderItems = mockDb.getOrderItems();
     const newItems = items.map((item, idx) => ({
-      id: `oi_${Date.now()}_${idx}`,
+      id: generateShortId('item_'),
       order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
@@ -676,7 +711,7 @@ export const db = {
 
   async createTimeLog(log: { user_id: string; check_in_time: string; latitude: number; longitude: number; location_address: string }) {
     const newLog = {
-      id: `tl_${Date.now()}`,
+      id: generateShortId('log_'),
       ...log,
       submitted_at: new Date().toISOString(),
       status: 'Chờ duyệt' as const
@@ -730,7 +765,7 @@ export const db = {
 
   async createLeaveRequest(req: { user_id: string; start_date: string; end_date: string; reason: string; latitude: number; longitude: number; location_address: string }) {
     const newReq = {
-      id: `lr_${Date.now()}`,
+      id: generateShortId('lv_'),
       ...req,
       submitted_at: new Date().toISOString(),
       status: 'Chờ duyệt' as const

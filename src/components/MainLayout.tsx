@@ -15,9 +15,11 @@ import {
   X, 
   UserCheck, 
   Globe, 
-  WifiOff 
+  WifiOff,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
-import { getCurrentUser, setCurrentUser, isSupabaseConfigured, mockDb } from '@/lib/database';
+import { getCurrentUser, setCurrentUser, isSupabaseConfigured, mockDb, db } from '@/lib/database';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -31,11 +33,43 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Trạng thái Form đăng nhập
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     setUser(getCurrentUser());
     setAvailableUsers(mockDb.getUsers());
   }, []);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+    try {
+      const user = await db.login(loginUsername, loginPassword);
+      if (user) {
+        setCurrentUser(user);
+        setUser(user);
+        window.location.reload();
+      } else {
+        setLoginError('Mã đăng nhập hoặc mật khẩu không chính xác!');
+      }
+    } catch (err) {
+      setLoginError('Có lỗi xảy ra khi kết nối cơ sở dữ liệu!');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setUser(null);
+    window.location.reload();
+  };
 
   if (!mounted) {
     return (
@@ -43,6 +77,105 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="flex flex-col items-center space-y-4">
           <Coffee className="w-12 h-12 text-coffee-primary animate-bounce" />
           <span className="text-coffee-dark font-medium">Đang tải AVA Coffee...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // MÀN HÌNH ĐĂNG NHẬP BẮT BUỘC NẾU CHƯA CÓ SESSION
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#2C1D11] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+        {/* Lớp nền radial gradient ấm áp */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(74,53,37,0.5),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(44,29,17,0.8),transparent_60%)]" />
+        
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-coffee-accent/20 z-10 relative">
+          <div className="flex flex-col items-center mb-8">
+            <img 
+              src="/logo.jpg" 
+              alt="AVA Coffee Logo" 
+              className="w-24 h-24 rounded-2xl shadow-md border-2 border-coffee-accent/40 object-cover mb-4" 
+            />
+            <h1 className="text-2xl font-black text-coffee-dark tracking-wider">AVA COFFEE</h1>
+            <p className="text-xs text-coffee-medium font-semibold uppercase tracking-wider mt-1">POS & Quản Lý Cửa Hàng</p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-coffee-dark mb-1.5 uppercase tracking-wide">
+                Mã đăng nhập (User ID)
+              </label>
+              <input 
+                type="text" 
+                required
+                placeholder="Ví dụ: admin, nv001..." 
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-coffee-accent/30 focus:border-coffee-primary focus:ring-2 focus:ring-coffee-primary/20 outline-none text-sm text-coffee-dark bg-[#FAF6F0] transition-all"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-coffee-dark mb-1.5 uppercase tracking-wide">
+                Mật khẩu
+              </label>
+              <input 
+                type="password" 
+                required
+                placeholder="Nhập mật khẩu..." 
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-coffee-accent/30 focus:border-coffee-primary focus:ring-2 focus:ring-coffee-primary/20 outline-none text-sm text-coffee-dark bg-[#FAF6F0] transition-all"
+              />
+            </div>
+
+            {loginError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex items-center space-x-2 animate-pulse">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-all shadow-md flex items-center justify-center space-x-2 disabled:opacity-70"
+            >
+              {loginLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang xác thực...</span>
+                </>
+              ) : (
+                <span>Đăng nhập hệ thống</span>
+              )}
+            </button>
+          </form>
+
+          {/* Hộp thông tin tài khoản demo */}
+          <div className="mt-8 pt-6 border-t border-coffee-light text-center text-xs text-coffee-medium">
+            <p className="font-semibold mb-1.5">Tài khoản thử nghiệm hệ thống:</p>
+            <div className="grid grid-cols-2 gap-2 text-left bg-[#FAF6F0] p-3 rounded-xl border border-coffee-accent/10">
+              <div>
+                <p className="font-bold text-coffee-dark">Quyền Admin:</p>
+                <p className="font-mono text-[10px]">ID: <span className="font-bold">admin</span></p>
+                <p className="font-mono text-[10px]">Pass: <span className="font-bold">123456</span></p>
+              </div>
+              <div>
+                <p className="font-bold text-coffee-dark">Quyền Nhân viên:</p>
+                <p className="font-mono text-[10px]">ID: <span className="font-bold">nv001</span></p>
+                <p className="font-mono text-[10px]">Pass: <span className="font-bold">123456</span></p>
+              </div>
+            </div>
+            <div className="mt-3 text-[10px]">
+              Chế độ kết nối: {isSupabaseConfigured ? (
+                <span className="text-green-600 font-bold">Supabase Online</span>
+              ) : (
+                <span className="text-amber-600 font-bold">Mock DB Offline</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -229,61 +362,31 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </button>
 
             {isUserDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-coffee-accent/40 py-2 z-50">
-                <div className="px-4 py-1.5 border-b border-coffee-light text-[10px] font-semibold text-coffee-medium uppercase tracking-wider">
-                  Chuyển tài khoản (Test)
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-coffee-accent/40 py-1.5 z-50">
+                <div className="px-4 py-2 border-b border-coffee-light text-left">
+                  <p className="text-xs font-bold text-coffee-dark truncate">{currentUser?.full_name}</p>
+                  <p className="text-[10px] text-coffee-medium truncate">{currentUser?.email}</p>
                 </div>
-                {availableUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserChange(user)}
-                    className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-coffee-light transition-all ${
-                      currentUser?.id === user.id ? 'bg-coffee-accent/20 font-bold' : ''
-                    }`}
-                  >
-                    <div>
-                      <p className="text-coffee-dark font-medium">{user.full_name}</p>
-                      <p className="text-[10px] text-coffee-medium">{user.email}</p>
-                    </div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                      user.role === 'Admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </button>
-                ))}
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2.5 text-xs text-red-600 font-bold hover:bg-red-50 transition-all flex items-center space-x-2"
+                >
+                  <span>Đăng xuất</span>
+                </button>
               </div>
             )}
           </div>
         </header>
 
-        {/* USER SWITCHER FOR MOBILE */}
+        {/* MOBILE SESSION INFO */}
         <div className="md:hidden bg-white border-b border-coffee-light px-4 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-coffee-medium">Chế độ: <strong>{!isSupabaseConfigured ? 'Mock DB Offline' : 'Supabase Online'}</strong></span>
-          
-          <div className="relative">
-            <button 
-              onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-              className="text-xs text-coffee-primary font-bold underline flex items-center space-x-1"
-            >
-              <span>{currentUser?.full_name}</span>
-            </button>
-
-            {isUserDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-coffee-accent/40 py-2 z-50">
-                {availableUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserChange(user)}
-                    className="w-full text-left px-4 py-2 text-xs hover:bg-coffee-light transition-all"
-                  >
-                    <p className="text-coffee-dark font-medium">{user.full_name}</p>
-                    <p className="text-[10px] text-coffee-medium">{user.role}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <span className="text-[11px] text-coffee-medium">Nhân viên: <strong className="text-coffee-dark">{currentUser?.full_name}</strong></span>
+          <button 
+            onClick={handleLogout}
+            className="text-xs text-red-600 font-bold hover:underline"
+          >
+            Đăng xuất
+          </button>
         </div>
 
         {/* Scrollable Page Wrapper */}
