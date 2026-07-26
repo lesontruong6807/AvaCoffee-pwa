@@ -17,7 +17,8 @@ import {
   Globe, 
   WifiOff,
   AlertCircle,
-  Loader2
+  Loader2,
+  BarChart3
 } from 'lucide-react';
 import { getCurrentUser, setCurrentUser, isSupabaseConfigured, mockDb, db } from '@/lib/database';
 
@@ -193,6 +194,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Bán hàng (POS)', path: '/pos', icon: ShoppingBag },
     { name: 'Hóa đơn chưa thanh toán', path: '/payment', icon: CreditCard },
+    { name: 'Báo cáo ca trực', path: '/daily-report', icon: BarChart3 },
     { name: 'Thực đơn (Menu)', path: '/menu', icon: Coffee },
     { name: 'Chấm công', path: '/time-log', icon: Clock },
     { name: 'Xin nghỉ phép', path: '/leave', icon: CalendarDays },
@@ -336,6 +338,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {pathname === '/' && 'Trang Tổng Quan'}
               {pathname.startsWith('/pos') && 'Màn Hình Bán Hàng (POS)'}
               {pathname.startsWith('/payment') && 'Xử Lý Thanh Toán'}
+              {pathname.startsWith('/daily-report') && 'Báo Cáo Doanh Thu Ca Trực'}
               {pathname.startsWith('/menu') && 'Thực Đơn Cửa Hàng'}
               {pathname.startsWith('/time-log') && 'Ghi Nhận Chấm Công'}
               {pathname.startsWith('/leave') && 'Đăng Ký Nghỉ Phép'}

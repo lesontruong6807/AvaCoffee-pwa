@@ -264,7 +264,16 @@ export default function AdminPage() {
   };
 
   // --- LÓGIC BÁO CÁO DOANH THU ---
-  const paidOrders = orders.filter(o => o.payment_status === 'Đã thanh toán');
+  // Lọc theo tháng hiện tại của năm hiện tại (Tự động reset sang tháng mới dựa vào Now())
+  const currentMonthDate = new Date();
+  const currentYear = currentMonthDate.getFullYear();
+  const currentMonthNum = currentMonthDate.getMonth(); // 0-indexed
+
+  const paidOrders = orders.filter(o => {
+    if (o.payment_status !== 'Đã thanh toán') return false;
+    const orderDate = new Date(o.created_at);
+    return orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonthNum;
+  });
   const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
@@ -510,6 +519,17 @@ export default function AdminPage() {
       {/* 2. TAB BÁO CÁO DOANH THU */}
       {adminTab === 'reports' && (
         <div className="space-y-6">
+          {/* Header Báo Cáo Doanh Thu Tháng */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+            <div>
+              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Doanh thu tháng này</h3>
+              <p className="text-xs text-coffee-medium mt-1">Tổng hợp và so sánh kết quả kinh doanh của **Tháng {(new Date().getMonth() + 1)}/{new Date().getFullYear()}**.</p>
+            </div>
+            <span className="text-[10px] font-extrabold px-3 py-1.5 bg-coffee-light text-coffee-primary rounded-xl uppercase tracking-wider">
+              Lũy kế tháng
+            </span>
+          </div>
+
           {/* Dashboard Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
