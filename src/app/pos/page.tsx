@@ -6,6 +6,7 @@ import {
   getCurrentUser, 
   isSupabaseConfigured 
 } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { 
   Coffee, 
   Users, 
@@ -142,23 +143,18 @@ export default function PosPage() {
         origin: { y: 0.6 }
       });
 
-      setOrderSuccess(true);
+      toast.success(`Đặt món thành công cho ${selectedTable.table_name}!`);
       clearCart();
       
       // Reload bàn
       const updatedTables = await db.getTables();
       setTables(updatedTables);
 
-      // Chuyển về màn hình chọn bàn sau 2 giây
-      setTimeout(() => {
-        setOrderSuccess(false);
-        setSelectedTable(null);
-        setPosStep('table');
-      }, 2000);
-
+      setSelectedTable(null);
+      setPosStep('table');
     } catch (e) {
       console.error('Lỗi lưu đơn hàng:', e);
-      alert('Không thể lưu đơn hàng. Vui lòng thử lại!');
+      toast.error('Không thể lưu đơn hàng. Vui lòng thử lại!');
     } finally {
       setSavingOrder(false);
     }
@@ -175,20 +171,6 @@ export default function PosPage() {
 
   return (
     <div className="w-full space-y-6">
-      {/* THÔNG BÁO THÀNH CÔNG */}
-      {orderSuccess && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl flex flex-col items-center text-center space-y-4 border border-coffee-accent/40 animate-scaleIn">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-              <CheckCircle className="w-10 h-10" />
-            </div>
-            <h3 className="font-bold text-2xl text-coffee-dark">Đặt món thành công!</h3>
-            <p className="text-sm text-coffee-medium">
-              Đơn hàng của <strong>{selectedTable?.table_name}</strong> đã được tạo dưới trạng thái <strong>Chưa thanh toán</strong>.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* TÊN BÀN ĐANG ĐƯỢC CHỌN (BREADCRUMB) */}
       {selectedTable && (

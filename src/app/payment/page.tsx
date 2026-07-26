@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { 
   CreditCard, 
   Printer, 
@@ -88,10 +89,10 @@ export default function PaymentPage() {
       // Reload danh sách
       await loadOrders();
       
-      alert(`Thanh toán thành công qua phương thức: ${method}`);
+      toast.success(`Thanh toán thành công qua phương thức: ${method}`);
     } catch (e) {
       console.error('Lỗi thanh toán:', e);
-      alert('Gặp lỗi khi xử lý thanh toán.');
+      toast.error('Gặp lỗi khi xử lý thanh toán.');
     } finally {
       setSubmittingPayment(false);
     }

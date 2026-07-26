@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, getCurrentUser } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { 
   CalendarDays, 
   User,
@@ -56,7 +57,7 @@ export default function LeaveRequestPage() {
     e.preventDefault();
 
     if (new Date(startDate) > new Date(endDate)) {
-      alert('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
+      toast.error('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
       return;
     }
 
@@ -80,10 +81,10 @@ export default function LeaveRequestPage() {
       
       // Load lại lịch sử
       await loadRequests(currentUser.id);
-      alert('Gửi đơn xin nghỉ phép thành công! Vui lòng đợi Admin duyệt.');
+      toast.success('Gửi đơn xin nghỉ phép thành công! Vui lòng đợi Admin duyệt.');
     } catch (err) {
       console.error(err);
-      alert('Gửi đơn thất bại.');
+      toast.error('Gửi đơn thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +112,7 @@ export default function LeaveRequestPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                   required
                 />
               </div>
@@ -123,7 +124,7 @@ export default function LeaveRequestPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                   required
                 />
               </div>

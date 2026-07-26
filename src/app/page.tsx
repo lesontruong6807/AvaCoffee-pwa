@@ -176,8 +176,8 @@ export default function Home() {
 
   return (
     <div className="space-y-6 pb-12 font-sans">
-      {/* BANNER CHÀO MỪNG */}
-      <div className="bg-gradient-to-r from-coffee-primary to-coffee-dark rounded-3xl p-5 md:p-6 text-white shadow-lg relative overflow-hidden">
+      {/* BANNER CHÀO MỪNG TỔNG HỢP THÔNG TIN */}
+      <div className="bg-gradient-to-br from-coffee-primary to-coffee-dark rounded-3xl p-6 text-white shadow-lg relative overflow-hidden space-y-6">
         <div className="absolute right-0 bottom-0 translate-x-12 translate-y-12 w-64 h-64 bg-coffee-medium/10 rounded-full blur-xl pointer-events-none" />
         <div className="absolute left-1/3 top-0 -translate-y-16 w-32 h-32 bg-coffee-accent/10 rounded-full blur-lg pointer-events-none" />
 
@@ -187,54 +187,54 @@ export default function Home() {
             <h2 className="text-xl md:text-2xl font-black tracking-tight">
               {currentUser?.full_name || 'Nhân viên AVA Coffee'}
             </h2>
-            <p className="text-[11px] text-coffee-light/90 max-w-md leading-normal">
-              Chào mừng bạn đến với AVA Coffee. Chọn chức năng dưới đây để bắt đầu làm việc.
+            <p className="text-[11px] text-coffee-light/95 max-w-md leading-normal">
+              Chào mừng bạn đến với AVA Coffee. Chọn chức năng bên dưới để bắt đầu ca làm việc của mình.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md border border-white/10 p-3 rounded-2xl flex items-center space-x-2.5 self-start sm:self-auto shrink-0">
-            <div className="p-1.5 bg-coffee-accent text-coffee-dark rounded-lg">
-              <UserCheck className="w-4 h-4" />
+          {/* Ngày giờ đơn giản */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-2xl flex items-center space-x-3 self-start sm:self-auto shrink-0 shadow-sm">
+            <div className="text-right">
+              <p className="text-sm font-black text-coffee-accent leading-none">
+                {(typeof window !== 'undefined') ? new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '00:00'}
+              </p>
+              <p className="text-[9px] font-bold text-coffee-light/80 leading-none mt-1">
+                {(typeof window !== 'undefined') ? new Date().toLocaleDateString('vi-VN') : ''}
+              </p>
             </div>
-            <div className="text-[10px]">
-              <p className="text-coffee-accent font-bold leading-none mb-0.5">Quyền hạn</p>
-              <p className="font-semibold text-white leading-none">{currentUser?.role === 'Admin' ? 'Quản trị viên (Admin)' : 'Nhân viên (User)'}</p>
+          </div>
+        </div>
+
+        {/* QUICK STATS SUMMARY GRID INSIDE BANNER */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+          {/* Bàn phục vụ (ĐẶC BIỆT NỔI BẬT) */}
+          <div className="bg-amber-500/30 backdrop-blur-sm border border-amber-400/40 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-md">
+            <span className="text-[9px] font-black text-amber-200 uppercase tracking-wider">Bàn phục vụ</span>
+            <div className="flex items-end justify-between">
+              <h4 className="font-black text-lg text-white leading-none">{stats.servingTables} / {stats.totalTables}</h4>
+              <span className="text-[8px] font-bold text-amber-100 bg-amber-500/45 px-1.5 py-0.5 rounded-md uppercase tracking-wider scale-90 origin-right">Đang mở</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* QUICK STATS SUMMARY CARD */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-coffee-light shadow-sm flex flex-col justify-between h-24">
-          <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Bàn phục vụ</span>
-          <div className="flex items-end justify-between">
-            <h4 className="font-black text-xl text-coffee-dark">{stats.servingTables} / {stats.totalTables}</h4>
-            <span className="text-[8px] font-semibold text-coffee-medium bg-coffee-light px-2 py-0.5 rounded-full">Đang mở</span>
+          {/* Hóa đơn chờ (ĐẶC BIỆT NỔI BẬT) */}
+          <div className="bg-orange-500/30 backdrop-blur-sm border border-orange-400/40 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-md">
+            <span className="text-[9px] font-black text-orange-200 uppercase tracking-wider">Hóa đơn chờ</span>
+            <div className="flex items-end justify-between">
+              <h4 className="font-black text-lg text-white leading-none">{stats.unpaidBills} HĐ</h4>
+              <span className="text-[8px] font-bold text-orange-100 bg-orange-500/45 px-1.5 py-0.5 rounded-md uppercase tracking-wider scale-90 origin-right">Chưa trả</span>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-coffee-light shadow-sm flex flex-col justify-between h-24">
-          <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Hóa đơn chờ</span>
-          <div className="flex items-end justify-between">
-            <h4 className="font-black text-xl text-amber-700">{stats.unpaidBills} HĐ</h4>
-            <span className="text-[8px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chưa trả</span>
+          {/* Yêu cầu chờ duyệt */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-sm">
+            <span className="text-[9px] font-bold text-coffee-light/80 uppercase tracking-wider">Chờ phê duyệt</span>
+            <h4 className="font-black text-base text-white leading-none">{stats.pendingApprovals} đơn</h4>
           </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-coffee-light shadow-sm flex flex-col justify-between h-24">
-          <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Yêu cầu chờ duyệt</span>
-          <div className="flex items-end justify-between">
-            <h4 className="font-black text-xl text-coffee-primary">{stats.pendingApprovals} đơn</h4>
-            <span className="text-[8px] font-semibold text-coffee-medium bg-coffee-light px-2 py-0.5 rounded-full">Nhân sự</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-coffee-light shadow-sm flex flex-col justify-between h-24">
-          <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Múi giờ làm việc</span>
-          <div className="flex items-end justify-between">
-            <h4 className="font-bold text-xs text-coffee-dark">{(typeof window !== 'undefined') ? new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '00:00'} ICT</h4>
-            <span className="text-[8px] font-semibold text-coffee-medium bg-coffee-light px-2 py-0.5 rounded-full">{(typeof window !== 'undefined') ? new Date().toLocaleDateString('vi-VN') : ''}</span>
+          {/* Trạng thái ca trực */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-sm">
+            <span className="text-[9px] font-bold text-coffee-light/80 uppercase tracking-wider">Trạng thái ca</span>
+            <h4 className="font-bold text-[10px] text-coffee-accent truncate leading-none">Đang hoạt động</h4>
           </div>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function Home() {
       <div className="space-y-6">
         {/* Nhóm Nhiệm vụ mỗi ngày */}
         <div className="space-y-3">
-          <h3 className="font-black text-xs text-coffee-medium uppercase tracking-wider border-l-4 border-coffee-primary pl-2">Nhiệm vụ mỗi ngày</h3>
+          <h3 className="font-black text-sm md:text-base text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-primary pl-2">Nhiệm vụ mỗi ngày</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {dailyCards.map((card) => {
               const Icon = card.icon;
@@ -279,7 +279,7 @@ export default function Home() {
 
         {/* Nhóm Tính năng Khác */}
         <div className="space-y-3">
-          <h3 className="font-black text-xs text-coffee-medium uppercase tracking-wider border-l-4 border-coffee-medium pl-2">Khác</h3>
+          <h3 className="font-black text-sm md:text-base text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-medium pl-2">Khác</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {otherCards.map((card) => {
               const Icon = card.icon;

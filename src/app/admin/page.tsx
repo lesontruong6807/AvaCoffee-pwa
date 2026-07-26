@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, getCurrentUser } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { 
   ShieldCheck, 
   Clock, 
@@ -127,9 +128,9 @@ export default function AdminPage() {
       await db.approveTimeLog(id, status);
       confetti({ particleCount: 50, spread: 40 });
       loadAllData();
-      alert(`Đã cập nhật trạng thái chấm công thành: ${status}`);
+      toast.success(`Đã cập nhật trạng thái chấm công thành: ${status}`);
     } catch (e) {
-      alert('Không thể phê duyệt chấm công.');
+      toast.error('Không thể phê duyệt chấm công.');
     }
   };
 
@@ -138,9 +139,9 @@ export default function AdminPage() {
       await db.approveLeaveRequest(id, status);
       confetti({ particleCount: 50, spread: 40 });
       loadAllData();
-      alert(`Đã cập nhật trạng thái nghỉ phép thành: ${status}`);
+      toast.success(`Đã cập nhật trạng thái nghỉ phép thành: ${status}`);
     } catch (e) {
-      alert('Không thể phê duyệt đơn nghỉ phép.');
+      toast.error('Không thể phê duyệt đơn nghỉ phép.');
     }
   };
 
@@ -181,15 +182,15 @@ export default function AdminPage() {
     try {
       if (editingProduct) {
         await db.updateProduct(editingProduct.id, productPayload);
-        alert('Cập nhật món ăn thành công!');
+        toast.success('Cập nhật món ăn thành công!');
       } else {
         await db.createProduct(productPayload);
-        alert('Thêm món ăn mới thành công!');
+        toast.success('Thêm món ăn mới thành công!');
       }
       setIsProductModalOpen(false);
       loadAllData();
     } catch (err) {
-      alert('Lỗi lưu món ăn.');
+      toast.error('Lỗi lưu món ăn.');
     }
   };
 
@@ -197,10 +198,10 @@ export default function AdminPage() {
     if (confirm('Bạn có chắc chắn muốn xoá món ăn này không?')) {
       try {
         await db.deleteProduct(id);
-        alert('Đã xoá món ăn.');
+        toast.success('Đã xoá món ăn.');
         loadAllData();
       } catch (err) {
-        alert('Không thể xoá món ăn.');
+        toast.error('Không thể xoá món ăn.');
       }
     }
   };
@@ -233,32 +234,32 @@ export default function AdminPage() {
     try {
       if (editingStaff) {
         await db.updateUser(editingStaff.id, staffPayload);
-        alert('Cập nhật nhân viên thành công!');
+        toast.success('Cập nhật nhân viên thành công!');
       } else {
         // Mock ID nhân viên mới
         const newId = `u_${Date.now()}`;
         await db.createUser({ id: newId, ...staffPayload });
-        alert('Thêm nhân viên mới thành công!');
+        toast.success('Thêm nhân viên mới thành công!');
       }
       setIsStaffModalOpen(false);
       loadAllData();
     } catch (err) {
-      alert('Lỗi lưu nhân viên.');
+      toast.error('Lỗi lưu nhân viên.');
     }
   };
 
   const handleDeleteStaff = async (id: string) => {
     if (id === currentUser.id) {
-      alert('Bạn không thể xoá tài khoản Admin của chính mình!');
+      toast.error('Bạn không thể xoá tài khoản Admin của chính mình!');
       return;
     }
     if (confirm('Bạn có chắc chắn muốn xoá nhân viên này không?')) {
       try {
         await db.deleteUser(id);
-        alert('Đã xoá nhân viên.');
+        toast.success('Đã xoá nhân viên.');
         loadAllData();
       } catch (err) {
-        alert('Không thể xoá nhân viên.');
+        toast.error('Không thể xoá nhân viên.');
       }
     }
   };

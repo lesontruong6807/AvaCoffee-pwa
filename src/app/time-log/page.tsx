@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, getCurrentUser } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { 
   Clock, 
   MapPin, 
@@ -107,7 +108,7 @@ export default function TimeLogPage() {
   // Hàm lấy vị trí GPS & dịch tọa độ ra địa chỉ
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      alert('Trình duyệt của bạn không hỗ trợ định vị GPS.');
+      toast.error('Trình duyệt của bạn không hỗ trợ định vị GPS.');
       return;
     }
 
@@ -151,7 +152,7 @@ export default function TimeLogPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!coords) {
-      alert('Vui lòng lấy tọa độ vị trí của bạn trước khi chấm công!');
+      toast.error('Vui lòng lấy tọa độ vị trí của bạn trước khi chấm công!');
       return;
     }
 
@@ -179,11 +180,11 @@ export default function TimeLogPage() {
           origin: { y: 0.8 }
         });
 
-        alert('Chấm công VÀO ca thành công! Ca trực của bạn đã bắt đầu.');
+        toast.success('Chấm công VÀO ca thành công! Ca trực của bạn đã bắt đầu.');
       } else {
         // Chấm công RA ca
         if (!activeLog) {
-          alert('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
+          toast.error('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
           setSubmitting(false);
           return;
         }
@@ -203,7 +204,7 @@ export default function TimeLogPage() {
           origin: { y: 0.8 }
         });
 
-        alert('Chấm công RA ca thành công! Đơn chấm công đã được chuyển đến Admin phê duyệt.');
+        toast.success('Chấm công RA ca thành công! Đơn chấm công đã được chuyển đến Admin phê duyệt.');
       }
 
       // Reset form
@@ -215,7 +216,7 @@ export default function TimeLogPage() {
       await loadLogs(currentUser.id);
     } catch (err) {
       console.error(err);
-      alert('Giao dịch chấm công thất bại.');
+      toast.error('Giao dịch chấm công thất bại.');
     } finally {
       setSubmitting(false);
     }
@@ -285,7 +286,7 @@ export default function TimeLogPage() {
                     <select
                       value={shift}
                       onChange={(e) => setShift(e.target.value)}
-                      className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                      className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                     >
                       <option>Ca sáng (06:00 - 14:00)</option>
                       <option>Ca chiều (14:00 - 22:00)</option>
@@ -294,7 +295,7 @@ export default function TimeLogPage() {
                 ) : (
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-coffee-medium uppercase block">Ca trực đang kết thúc</label>
-                    <div className="w-full bg-coffee-light/20 px-4 py-3 rounded-2xl text-xs font-bold text-coffee-dark border border-coffee-light">
+                    <div className="w-full h-11 bg-coffee-light/20 px-4 rounded-2xl text-xs font-bold text-coffee-dark border border-coffee-light flex items-center">
                       {activeLog?.shift}
                     </div>
                   </div>
@@ -309,7 +310,7 @@ export default function TimeLogPage() {
                     type="time"
                     value={timeInput}
                     onChange={(e) => setTimeInput(e.target.value)}
-                    className="w-full bg-[#FAF6F0] px-3 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block min-w-0"
+                    className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block min-w-0"
                     required
                   />
                 </div>
@@ -323,7 +324,7 @@ export default function TimeLogPage() {
                   placeholder={logType === 'in' ? "Ví dụ: Đi làm đúng giờ, xin vào ca trễ do kẹt xe..." : "Ví dụ: Đã bàn giao ca trực đầy đủ, tổng kết tiền mặt..."}
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/70"
+                  className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/70 block"
                 />
               </div>
 
