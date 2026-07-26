@@ -41,7 +41,7 @@ const MOCK_PRODUCTS = [
     name: 'Cà phê đen',
     price: 15000,
     cost_price: 5000,
-    image_url: 'https://i.pinimg.com/vwebp/736x/fa/21/eb/fa21eb28c29f08f40bd7f44e9d21f27d.webp',
+    image_url: '/products/CP001.png',
     status: 'Còn hàng' as const
   },
   {
@@ -50,7 +50,7 @@ const MOCK_PRODUCTS = [
     name: 'Cà phê sữa',
     price: 17000,
     cost_price: 6000,
-    image_url: 'https://i.pinimg.com/vwebp/736x/25/f1/c4/25f1c44880e288b19afcc6c747567405a.webp',
+    image_url: '/products/CP002.png',
     status: 'Còn hàng' as const
   },
   {
@@ -59,7 +59,7 @@ const MOCK_PRODUCTS = [
     name: 'Cà phê sữa tươi',
     price: 22000,
     cost_price: 8000,
-    image_url: 'https://i.pinimg.com/736x/02/15/55/0215554e3cf993469d0625ab1921b98a.jpg',
+    image_url: '/products/CP003.png',
     status: 'Còn hàng' as const
   },
   {
@@ -68,16 +68,16 @@ const MOCK_PRODUCTS = [
     name: 'Cà phê muối',
     price: 22000,
     cost_price: 8000,
-    image_url: 'https://i.pinimg.com/736x/d7/65/9c/d7659c0e02595551e771e7b2edab17e.jpg',
+    image_url: '/products/CP004.png',
     status: 'Còn hàng' as const
   },
   {
     id: 'CP005',
     category_id: 'c_caphe',
-    name: 'Bạc xiu',
+    name: 'Bạc xìu',
     price: 22000,
     cost_price: 8000,
-    image_url: 'https://i.pinimg.com/736x/be/8d/41/be8d413f945e09c6236f726ec3b95f5f.jpg',
+    image_url: '/products/CP005.png',
     status: 'Còn hàng' as const
   },
   // Thức uống khác (TUK)
@@ -87,7 +87,7 @@ const MOCK_PRODUCTS = [
     name: 'Cacao',
     price: 20000,
     cost_price: 7000,
-    image_url: 'https://i.pinimg.com/736x/d6/f5/a1/d6f5a103292180b1943c83b35325bdf2.jpg',
+    image_url: '/products/TUK001.png',
     status: 'Còn hàng' as const
   },
   {
@@ -96,7 +96,7 @@ const MOCK_PRODUCTS = [
     name: 'Cacao kem muối',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/b2/6e/8d/b26e8d7ed1495873ee9fd936df9d0532.jpg',
+    image_url: '/products/TUK002.png',
     status: 'Còn hàng' as const
   },
   {
@@ -105,7 +105,7 @@ const MOCK_PRODUCTS = [
     name: 'Matcha Latte',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/1200x/2e/ac/ae/2eacae2f52c4ac369ae5192bf17ea1b4.jpg',
+    image_url: '/products/TUK003.png',
     status: 'Còn hàng' as const
   },
   {
@@ -114,7 +114,7 @@ const MOCK_PRODUCTS = [
     name: 'Matcha Latte kem muối',
     price: 30000,
     cost_price: 11000,
-    image_url: 'https://i.pinimg.com/736x/39/22/2c/39222cae47d07268215d1751a0b6c6c.jpg',
+    image_url: '/products/TUK004.png',
     status: 'Còn hàng' as const
   },
   // Trà (T)
@@ -124,7 +124,7 @@ const MOCK_PRODUCTS = [
     name: 'Trà tắc',
     price: 15000,
     cost_price: 5000,
-    image_url: 'https://i.pinimg.com/736x/14/91/f4/1491f4c34770937dfd4190da0da8556b2f.jpg',
+    image_url: '/products/T001.png',
     status: 'Còn hàng' as const
   },
   {
@@ -133,7 +133,7 @@ const MOCK_PRODUCTS = [
     name: 'Trà dâu',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/1200x/bf/f2/6d/bff26dce28c30a6ff849e87252726293.jpg',
+    image_url: '/products/T002.png',
     status: 'Còn hàng' as const
   },
   {
@@ -142,7 +142,7 @@ const MOCK_PRODUCTS = [
     name: 'Trà đào',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/9e/b2/b0/9eb2b01ea2306476b37454f4b8b8b0a4.jpg',
+    image_url: '/products/T003.png',
     status: 'Còn hàng' as const
   },
   {
@@ -151,7 +151,7 @@ const MOCK_PRODUCTS = [
     name: 'Trà vải',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/0f/c1/a3/0fc1a3f9275c4dc68a0e7394d4fce71f.jpg',
+    image_url: '/products/T004.png',
     status: 'Còn hàng' as const
   },
   // Yaourt (Y)
@@ -161,7 +161,7 @@ const MOCK_PRODUCTS = [
     name: 'Yaourt đá',
     price: 20000,
     cost_price: 7000,
-    image_url: 'https://i.pinimg.com/vwebp/1200x/e3/0e/0a/e30e0a3070bae2b2ec7a9a6101c85b7b.webp',
+    image_url: '/products/Y001.png',
     status: 'Còn hàng' as const
   },
   {
@@ -170,7 +170,7 @@ const MOCK_PRODUCTS = [
     name: 'Yaourt dâu',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/1200x/27/34/33/27343309543e0cc6b1348302c2a379e5.jpg',
+    image_url: '/products/Y002.png',
     status: 'Còn hàng' as const
   },
   {
@@ -179,7 +179,7 @@ const MOCK_PRODUCTS = [
     name: 'Yaourt việt quất',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/5e/83/e5/5e83e5ad1b5c4ab983b09caf1b5e1ac2.jpg',
+    image_url: '/products/Y003.png',
     status: 'Còn hàng' as const
   },
   // Soda (S)
@@ -189,7 +189,7 @@ const MOCK_PRODUCTS = [
     name: 'Soda dâu',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/4f/7a/60/4f7a608bd5384c201a6d707b16263616.jpg',
+    image_url: '/products/S001.png',
     status: 'Còn hàng' as const
   },
   {
@@ -198,7 +198,7 @@ const MOCK_PRODUCTS = [
     name: 'Soda đào',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/1200x/e2/1e/02/e21e0287ce4f1e1cfaf1a0cd8d9d729a.webp',
+    image_url: '/products/S002.png',
     status: 'Còn hàng' as const
   },
   {
@@ -207,7 +207,7 @@ const MOCK_PRODUCTS = [
     name: 'Soda việt quất',
     price: 25000,
     cost_price: 9000,
-    image_url: 'https://i.pinimg.com/736x/3f/54/43/3f54439327709c6236f726ec3b95f5f.jpg',
+    image_url: '/products/S003.png',
     status: 'Còn hàng' as const
   }
 ];

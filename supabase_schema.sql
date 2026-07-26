@@ -187,33 +187,33 @@ ON CONFLICT (ten_danh_muc) DO NOTHING;
 -- 4. Thêm sản phẩm mẫu (SanPham - 19 món khớp 100% hình ảnh thực đơn)
 INSERT INTO public.sanpham (id, id_danh_muc, ten_san_pham, don_vi_tinh, don_gia, gia_von, hinh_anh, trang_thai) VALUES
 -- Cà phê (CP)
-('CP001', 'c_caphe', 'Cà phê đen', 'Ly', 15000, 5000, 'https://i.pinimg.com/vwebp/736x/fa/21/eb/fa21eb28c29f08f40bd7f44e9d21f27d.webp', 'Còn hàng'),
-('CP002', 'c_caphe', 'Cà phê sữa', 'Ly', 17000, 6000, 'https://i.pinimg.com/vwebp/736x/25/f1/c4/25f1c44880e288b19afcc6c747567405a.webp', 'Còn hàng'),
-('CP003', 'c_caphe', 'Cà phê sữa tươi', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/02/15/55/0215554e3cf993469d0625ab1921b98a.jpg', 'Còn hàng'),
-('CP004', 'c_caphe', 'Cà phê muối', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/d7/65/9c/d7659c0e02595551e771e7b2edab17e.jpg', 'Còn hàng'),
-('CP005', 'c_caphe', 'Bạc xiu', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/be/8d/41/be8d413f945e09c6236f726ec3b95f5f.jpg', 'Còn hàng'),
+('CP001', 'c_caphe', 'Cà phê đen', 'Ly', 15000, 5000, '/products/CP001.png', 'Còn hàng'),
+('CP002', 'c_caphe', 'Cà phê sữa', 'Ly', 17000, 6000, '/products/CP002.png', 'Còn hàng'),
+('CP003', 'c_caphe', 'Cà phê sữa tươi', 'Ly', 22000, 8000, '/products/CP003.png', 'Còn hàng'),
+('CP004', 'c_caphe', 'Cà phê muối', 'Ly', 22000, 8000, '/products/CP004.png', 'Còn hàng'),
+('CP005', 'c_caphe', 'Bạc xìu', 'Ly', 22000, 8000, '/products/CP005.png', 'Còn hàng'),
 
 -- Thức uống khác (TUK)
-('TUK001', 'c_douongkhac', 'Cacao', 'Ly', 20000, 7000, 'https://i.pinimg.com/736x/d6/f5/a1/d6f5a103292180b1943c83b35325bdf2.jpg', 'Còn hàng'),
-('TUK002', 'c_douongkhac', 'Cacao kem muối', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/b2/6e/8d/b26e8d7ed1495873ee9fd936df9d0532.jpg', 'Còn hàng'),
-('TUK003', 'c_douongkhac', 'Matcha Latte', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/2e/ac/ae/2eacae2f52c4ac369ae5192bf17ea1b4.jpg', 'Còn hàng'),
-('TUK004', 'c_douongkhac', 'Matcha Latte kem muối', 'Ly', 30000, 11000, 'https://i.pinimg.com/736x/39/22/2c/39222cae47d07268215d1751a0b6c6c.jpg', 'Còn hàng'),
+('TUK001', 'c_douongkhac', 'Cacao', 'Ly', 20000, 7000, '/products/TUK001.png', 'Còn hàng'),
+('TUK002', 'c_douongkhac', 'Cacao kem muối', 'Ly', 25000, 9000, '/products/TUK002.png', 'Còn hàng'),
+('TUK003', 'c_douongkhac', 'Matcha Latte', 'Ly', 25000, 9000, '/products/TUK003.png', 'Còn hàng'),
+('TUK004', 'c_douongkhac', 'Matcha Latte kem muối', 'Ly', 30000, 11000, '/products/TUK004.png', 'Còn hàng'),
 
 -- Trà (T)
-('T001', 'c_tra', 'Trà tắc', 'Ly', 15000, 5000, 'https://i.pinimg.com/736x/14/91/f4/1491f4c34770937dfd4190da0da8556b2f.jpg', 'Còn hàng'),
-('T002', 'c_tra', 'Trà dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/bf/f2/6d/bff26dce28c30a6ff849e87252726293.jpg', 'Còn hàng'),
-('T003', 'c_tra', 'Trà đào', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/9e/b2/b0/9eb2b01ea2306476b37454f4b8b8b0a4.jpg', 'Còn hàng'),
-('T004', 'c_tra', 'Trà vải', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/0f/c1/a3/0fc1a3f9275c4dc68a0e7394d4fce71f.jpg', 'Còn hàng'),
+('T001', 'c_tra', 'Trà tắc', 'Ly', 15000, 5000, '/products/T001.png', 'Còn hàng'),
+('T002', 'c_tra', 'Trà dâu', 'Ly', 25000, 9000, '/products/T002.png', 'Còn hàng'),
+('T003', 'c_tra', 'Trà đào', 'Ly', 25000, 9000, '/products/T003.png', 'Còn hàng'),
+('T004', 'c_tra', 'Trà vải', 'Ly', 25000, 9000, '/products/T004.png', 'Còn hàng'),
 
 -- Yaourt (Y)
-('Y001', 'c_yaourt', 'Yaourt đá', 'Ly', 20000, 7000, 'https://i.pinimg.com/vwebp/1200x/e3/0e/0a/e30e0a3070bae2b2ec7a9a6101c85b7b.webp', 'Còn hàng'),
-('Y002', 'c_yaourt', 'Yaourt dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/27/34/33/27343309543e0cc6b1348302c2a379e5.jpg', 'Còn hàng'),
-('Y003', 'c_yaourt', 'Yaourt việt quất', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/5e/83/e5/5e83e5ad1b5c4ab983b09caf1b5e1ac2.jpg', 'Còn hàng'),
+('Y001', 'c_yaourt', 'Yaourt đá', 'Ly', 20000, 7000, '/products/Y001.png', 'Còn hàng'),
+('Y002', 'c_yaourt', 'Yaourt dâu', 'Ly', 25000, 9000, '/products/Y002.png', 'Còn hàng'),
+('Y003', 'c_yaourt', 'Yaourt việt quất', 'Ly', 25000, 9000, '/products/Y003.png', 'Còn hàng'),
 
 -- Soda (S)
-('S001', 'c_soda', 'Soda dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/4f/7a/60/4f7a608bd5384c201a6d707b16263616.jpg', 'Còn hàng'),
-('S002', 'c_soda', 'Soda đào', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/e2/1e/02/e21e0287ce4f1e1cfaf1a0cd8d9d729a.webp', 'Còn hàng'),
-('S003', 'c_soda', 'Soda việt quất', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/3f/54/43/3f54439327709c6236f726ec3b95f5f.jpg', 'Còn hàng')
+('S001', 'c_soda', 'Soda dâu', 'Ly', 25000, 9000, '/products/S001.png', 'Còn hàng'),
+('S002', 'c_soda', 'Soda đào', 'Ly', 25000, 9000, '/products/S002.png', 'Còn hàng'),
+('S003', 'c_soda', 'Soda việt quất', 'Ly', 25000, 9000, '/products/S003.png', 'Còn hàng')
 ON CONFLICT (id) DO UPDATE 
 SET ten_san_pham = EXCLUDED.ten_san_pham, 
     don_gia = EXCLUDED.don_gia, 
