@@ -264,7 +264,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </aside>
 
       {/* MOBILE HEADER */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-coffee-primary text-white flex items-center justify-between px-4 z-40 shadow-md">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] bg-coffee-primary text-white flex items-center justify-between px-4 z-40 shadow-md">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 bg-black rounded-lg overflow-hidden flex items-center justify-center border border-coffee-accent/40 shadow-inner shrink-0">
             <img src="/logo.jpg" alt="AVA Coffee Logo" className="w-full h-full object-cover" />
@@ -294,7 +294,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       >
         <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
         <aside 
-          className={`relative flex flex-col w-72 max-w-xs bg-coffee-primary text-white p-6 pt-20 z-40 shadow-xl transform transition-transform duration-300 ease-in-out ${
+          className={`relative flex flex-col w-72 max-w-xs bg-coffee-primary text-white p-6 pt-[calc(5rem+env(safe-area-inset-top,0px))] z-40 shadow-xl transform transition-transform duration-300 ease-in-out ${
             isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -344,7 +344,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 md:pl-0 pt-16 md:pt-0">
+      <div className="flex-1 flex flex-col min-w-0 md:pl-0 pt-[calc(4rem+env(safe-area-inset-top,0px))] md:pt-0">
         {/* TOP BAR / HEADER (DESKTOP) */}
         <header className="hidden md:flex h-16 bg-white border-b border-coffee-light items-center justify-between px-8 z-10">
           <div className="flex items-center space-x-2">

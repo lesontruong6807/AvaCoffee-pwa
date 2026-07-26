@@ -526,9 +526,8 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* MOBILE FLOATING ACTION BAR */}
         {cart.length > 0 && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 py-3 flex items-center justify-between z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-between z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
             <div>
               <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable.table_name}</span>
               <span className="font-extrabold text-sm text-coffee-primary">
@@ -548,7 +547,7 @@ export default function PosPage() {
         {isMobileCartOpen && (
           <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center">
             <div className="fixed inset-0 bg-black/60" onClick={() => setIsMobileCartOpen(false)} />
-            <div className="relative bg-white w-full rounded-t-[32px] max-h-[80vh] flex flex-col shadow-2xl p-6 pt-5 z-50 transition-all duration-300">
+            <div className="relative bg-white w-full rounded-t-[32px] max-h-[80vh] flex flex-col shadow-2xl p-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] z-50 transition-all duration-300">
               <div className="w-12 h-1.5 bg-coffee-light rounded-full mx-auto mb-5 shrink-0" onClick={() => setIsMobileCartOpen(false)} />
               
               <h3 className="font-bold text-base text-coffee-dark border-b border-coffee-light pb-3 flex items-center justify-between shrink-0">
