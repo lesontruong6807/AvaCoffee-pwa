@@ -8,6 +8,7 @@ export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeShiftFilter, setActiveShiftFilter] = useState<'morning' | 'afternoon' | 'both'>('both');
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
@@ -76,7 +77,7 @@ export default function DailyReportPage() {
   }
 
   return (
-    <div className="w-full space-y-8 font-sans">
+    <div className="w-full space-y-6 font-sans">
       {/* Tiêu đề & Ngày */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-coffee-light">
         <div>
@@ -92,9 +93,72 @@ export default function DailyReportPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* --- CA SÁNG --- */}
-        <div className="space-y-6">
+      {/* Bộ lọc chọn Ca */}
+      <div className="flex bg-white p-1 rounded-2xl border border-coffee-light w-fit shadow-sm gap-1 overflow-x-auto max-w-full">
+        <button
+          onClick={() => setActiveShiftFilter('both')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
+            activeShiftFilter === 'both'
+              ? 'bg-coffee-primary text-white shadow-sm'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          Cả hai ca
+        </button>
+        <button
+          onClick={() => setActiveShiftFilter('morning')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
+            activeShiftFilter === 'morning'
+              ? 'bg-coffee-primary text-white shadow-sm'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          Ca Sáng (6h - 14h)
+        </button>
+        <button
+          onClick={() => setActiveShiftFilter('afternoon')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 ${
+            activeShiftFilter === 'afternoon'
+              ? 'bg-coffee-primary text-white shadow-sm'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          Ca Chiều (14h - 22h)
+        </button>
+      </div>
+
+      {activeShiftFilter === 'both' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* --- CA SÁNG --- */}
+          <div className="space-y-6">
+            <div className="bg-coffee-primary text-white p-5 rounded-3xl shadow flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-lg">Ca Sáng</h3>
+                <p className="text-xs text-coffee-accent/80 font-medium">Khung giờ hoạt động: 06:00 - 14:00</p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
+                {morning.orders.length} Đơn hàng
+              </span>
+            </div>
+            <ShiftMetricsSection metrics={morning} />
+          </div>
+
+          {/* --- CA CHIỀU --- */}
+          <div className="space-y-6">
+            <div className="bg-coffee-dark text-white p-5 rounded-3xl shadow flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-lg">Ca Chiều</h3>
+                <p className="text-xs text-coffee-accent/80 font-medium">Khung giờ hoạt động: 14:00 - 22:00</p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
+                {afternoon.orders.length} Đơn hàng
+              </span>
+            </div>
+            <ShiftMetricsSection metrics={afternoon} />
+          </div>
+        </div>
+      ) : activeShiftFilter === 'morning' ? (
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-coffee-primary text-white p-5 rounded-3xl shadow flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-lg">Ca Sáng</h3>
@@ -106,9 +170,8 @@ export default function DailyReportPage() {
           </div>
           <ShiftMetricsSection metrics={morning} />
         </div>
-
-        {/* --- CA CHIỀU --- */}
-        <div className="space-y-6">
+      ) : (
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-coffee-dark text-white p-5 rounded-3xl shadow flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-lg">Ca Chiều</h3>
@@ -120,7 +183,7 @@ export default function DailyReportPage() {
           </div>
           <ShiftMetricsSection metrics={afternoon} />
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -215,26 +278,36 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
               <thead>
                 <tr className="border-b border-coffee-light text-coffee-medium font-bold">
                   <th className="py-2">Mã HĐ</th>
+                  <th className="py-2">Giờ</th>
                   <th className="py-2">Bàn</th>
                   <th className="py-2">Thanh toán</th>
                   <th className="py-2 text-right">Tổng tiền</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-coffee-light/40">
-                {metrics.orders.slice(0, 5).map((order: any) => (
-                  <tr key={order.id}>
-                    <td className="py-2 font-mono text-[10px] text-coffee-dark">{order.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="py-2 font-semibold text-coffee-dark">{order.tables?.table_name || 'Khách mang về'}</td>
-                    <td className="py-2">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                        order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {order.payment_method}
-                      </span>
-                    </td>
-                    <td className="py-2 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
-                  </tr>
-                ))}
+                {metrics.orders.slice(0, 5).map((order: any) => {
+                  const date = new Date(order.created_at);
+                  const hh = String(date.getHours()).padStart(2, '0');
+                  const mm = String(date.getMinutes()).padStart(2, '0');
+                  const dd = String(date.getDate()).padStart(2, '0');
+                  const mMonth = String(date.getMonth() + 1).padStart(2, '0');
+                  const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
+                  return (
+                    <tr key={order.id}>
+                      <td className="py-2 font-mono text-[9px] text-coffee-dark uppercase">{order.id.substring(0, 6)}</td>
+                      <td className="py-2 font-mono text-[9px] text-coffee-medium">{timeFormatted}</td>
+                      <td className="py-2 font-semibold text-coffee-dark truncate max-w-[80px]">{order.tables?.table_name || 'Khách mang về'}</td>
+                      <td className="py-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {order.payment_method}
+                        </span>
+                      </td>
+                      <td className="py-2 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {metrics.orders.length > 5 && (

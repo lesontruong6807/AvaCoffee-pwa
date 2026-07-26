@@ -287,47 +287,53 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* MOBILE DRAWER */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-30 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="relative flex flex-col w-72 max-w-xs bg-coffee-primary text-white p-6 pt-20 z-40 shadow-xl">
-            <nav className="flex-1 space-y-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
-                return (
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                      isActive
-                        ? 'bg-coffee-accent text-coffee-dark font-semibold shadow-md'
-                        : 'text-coffee-light hover:bg-coffee-medium/40 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="mt-auto border-t border-coffee-medium pt-4 text-xs space-y-2">
-              <div className="flex items-center justify-between text-coffee-light">
-                <span>Database:</span>
-                {isSupabaseConfigured ? (
-                  <span className="text-green-400 font-semibold">Supabase</span>
-                ) : (
-                  <span className="text-amber-400 font-semibold">Mock DB (Offline)</span>
-                )}
-              </div>
-              <div className="text-[10px] text-coffee-accent/70">
-                Nhân viên: {currentUser?.full_name} ({currentUser?.role})
-              </div>
+      <div 
+        className={`md:hidden fixed inset-0 z-30 flex transition-opacity duration-300 ${
+          isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+        <aside 
+          className={`relative flex flex-col w-72 max-w-xs bg-coffee-primary text-white p-6 pt-20 z-40 shadow-xl transform transition-transform duration-300 ease-in-out ${
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <nav className="flex-1 space-y-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                    isActive
+                      ? 'bg-coffee-accent text-coffee-dark font-semibold shadow-md'
+                      : 'text-coffee-light hover:bg-coffee-medium/40 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="mt-auto border-t border-coffee-medium pt-4 text-xs space-y-2">
+            <div className="flex items-center justify-between text-coffee-light">
+              <span>Database:</span>
+              {isSupabaseConfigured ? (
+                <span className="text-green-400 font-semibold">Supabase</span>
+              ) : (
+                <span className="text-amber-400 font-semibold">Mock DB (Offline)</span>
+              )}
             </div>
-          </aside>
-        </div>
-      )}
+            <div className="text-[10px] text-coffee-accent/70">
+              Nhân viên: {currentUser?.full_name} ({currentUser?.role})
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 md:pl-0 pt-16 md:pt-0">
