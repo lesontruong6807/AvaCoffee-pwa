@@ -367,7 +367,7 @@ const mapTimeLogToClient = (tl: any) => tl ? {
   shift: tl.ca_lam,
   check_in_time: tl.gio_vao,
   check_out_time: tl.gio_ra,
-  submitted_at: tl.ngay_nop,
+  submitted_at: tl.thoi_gian_thuc_vao,
   real_check_out_time: tl.thoi_gian_thuc_ra,
   latitude: Number(tl.vi_do),
   longitude: Number(tl.kinh_do),
@@ -837,7 +837,7 @@ export const db = {
           *,
           nguoidung (ho_ten, email)
         `)
-        .order('ngay_nop', { ascending: false });
+        .order('thoi_gian_thuc_vao', { ascending: false });
       if (!error && data) return data.map(mapTimeLogToClient).filter(Boolean) as any[];
     }
     const logs = mockDb.getTimeLogs();
@@ -880,7 +880,7 @@ export const db = {
         ca_lam: log.shift,
         gio_vao: log.check_in_time,
         gio_ra: null,
-        ngay_nop: newLog.submitted_at,
+        thoi_gian_thuc_vao: newLog.submitted_at,
         thoi_gian_thuc_ra: null,
         vi_do: log.latitude,
         kinh_do: log.longitude,

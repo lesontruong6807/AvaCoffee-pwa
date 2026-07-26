@@ -106,7 +106,7 @@ CREATE TABLE public.chamcong (
     ca_lam TEXT NOT NULL DEFAULT 'Ca sáng (06:00 - 14:00)',
     gio_vao TIMESTAMP WITH TIME ZONE NOT NULL,
     gio_ra TIMESTAMP WITH TIME ZONE,
-    ngay_nop TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    thoi_gian_thuc_vao TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     thoi_gian_thuc_ra TIMESTAMP WITH TIME ZONE,
     vi_do NUMERIC NOT NULL,
     kinh_do NUMERIC NOT NULL,
