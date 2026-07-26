@@ -355,6 +355,9 @@ export default function PosPage() {
                           src={prod.image_url}
                           alt={prod.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/logo.jpg';
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-coffee-medium">

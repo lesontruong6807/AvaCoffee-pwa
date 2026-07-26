@@ -643,7 +643,10 @@ export const db = {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from('hoadondetail')
-        .select('*')
+        .select(`
+          *,
+          sanpham (hinh_anh)
+        `)
         .eq('idhoadon', orderId);
       if (!error && data) return data.map(mapOrderItemToClient).filter(Boolean) as any[];
     }
@@ -693,7 +696,7 @@ export const db = {
             idsp: item.product_id,
             ten_san_pham: prod ? prod.name : 'Sản phẩm',
             don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
-            don_gia: item.unit_price,
+            don_gia: item.unit_price || item.price,
             so_luong: item.quantity,
             thanh_tien: item.subtotal,
             ghi_chu: item.notes || ''
@@ -737,7 +740,7 @@ export const db = {
         ten_san_pham: prod ? prod.name : 'Sản phẩm',
         don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
         quantity: item.quantity,
-        unit_price: item.unit_price,
+        unit_price: item.unit_price || item.price,
         subtotal: item.subtotal,
         ghi_chu: item.notes || ''
       };

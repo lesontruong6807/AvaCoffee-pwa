@@ -654,7 +654,14 @@ export default function AdminPage() {
               <div key={prod.id} className="bg-white rounded-3xl overflow-hidden border border-coffee-light flex flex-col shadow-sm">
                 <div className="relative h-40 bg-coffee-light">
                   {prod.image_url ? (
-                    <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover" />
+                    <img 
+                      src={prod.image_url} 
+                      alt={prod.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/logo.jpg';
+                      }}
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-coffee-medium">
                       <Clock className="w-12 h-12" />

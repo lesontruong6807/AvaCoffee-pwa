@@ -285,6 +285,9 @@ export default function PaymentPage() {
                               src={item.products.image_url}
                               alt={item.products.name}
                               className="w-12 h-12 rounded-xl object-cover border border-coffee-light"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/logo.jpg';
+                              }}
                             />
                           )}
                           <div>
