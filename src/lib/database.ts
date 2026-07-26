@@ -366,10 +366,14 @@ const mapTimeLogToClient = (tl: any) => tl ? {
   user_id: tl.id_nhan_vien,
   shift: tl.ca_lam,
   check_in_time: tl.gio_vao,
+  check_out_time: tl.gio_ra,
   submitted_at: tl.ngay_nop,
+  real_check_out_time: tl.thoi_gian_thuc_ra,
   latitude: Number(tl.vi_do),
   longitude: Number(tl.kinh_do),
   location_address: tl.dia_chi,
+  ghi_chu_vao: tl.ghi_chu_vao || '',
+  ghi_chu_ra: tl.ghi_chu_ra || '',
   status: tl.trang_thai,
   users: tl.nguoidung ? { full_name: tl.nguoidung.ho_ten, email: tl.nguoidung.email } : null
 } : null;
@@ -847,21 +851,46 @@ export const db = {
     })).sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
   },
 
-  async createTimeLog(log: { user_id: string; check_in_time: string; latitude: number; longitude: number; location_address: string }) {
+  async createTimeLog(log: { 
+    user_id: string; 
+    shift: string; 
+    check_in_time: string; 
+    latitude: number; 
+    longitude: number; 
+    location_address: string;
+    ghi_chu_vao?: string;
+  }) {
     const newLog = {
       id: generateShortId('log_'),
-      ...log,
+      user_id: log.user_id,
+      shift: log.shift,
+      check_in_time: log.check_in_time,
+      check_out_time: null,
       submitted_at: new Date().toISOString(),
-      status: 'Chờ duyệt' as const
+      real_check_out_time: null,
+      latitude: log.latitude,
+      longitude: log.longitude,
+      location_address: log.location_address,
+      ghi_chu_vao: log.ghi_chu_vao || '',
+      ghi_chu_ra: '',
+      status: 'Đang trong ca' as const
     };
 
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('chamcong').insert([{
+        id: newLog.id,
         id_nhan_vien: log.user_id,
+        ca_lam: log.shift,
         gio_vao: log.check_in_time,
+        gio_ra: null,
+        ngay_nop: newLog.submitted_at,
+        thoi_gian_thuc_ra: null,
         vi_do: log.latitude,
         kinh_do: log.longitude,
-        dia_chi: log.location_address
+        dia_chi: log.location_address,
+        ghi_chu_vao: log.ghi_chu_vao || null,
+        ghi_chu_ra: null,
+        trang_thai: 'Đang trong ca'
       }]).select();
       if (!error && data) return mapTimeLogToClient(data[0]);
     }
@@ -870,6 +899,48 @@ export const db = {
     logs.push(newLog);
     mockDb.setTimeLogs(logs);
     return newLog;
+  },
+
+  async checkOutTimeLog(logId: string, checkOutData: {
+    check_out_time: string;
+    latitude: number;
+    longitude: number;
+    location_address: string;
+    ghi_chu_ra?: string;
+  }) {
+    const realCheckOut = new Date().toISOString();
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('chamcong')
+        .update({
+          gio_ra: checkOutData.check_out_time,
+          thoi_gian_thuc_ra: realCheckOut,
+          vi_do: checkOutData.latitude,
+          kinh_do: checkOutData.longitude,
+          dia_chi: checkOutData.location_address,
+          ghi_chu_ra: checkOutData.ghi_chu_ra || null,
+          trang_thai: 'Chờ duyệt'
+        })
+        .eq('id', logId)
+        .select();
+      if (!error && data) return mapTimeLogToClient(data[0]);
+    }
+
+    const logs = mockDb.getTimeLogs();
+    const idx = logs.findIndex(l => l.id === logId);
+    if (idx !== -1) {
+      logs[idx].check_out_time = checkOutData.check_out_time;
+      logs[idx].real_check_out_time = realCheckOut;
+      logs[idx].latitude = checkOutData.latitude;
+      logs[idx].longitude = checkOutData.longitude;
+      logs[idx].location_address = checkOutData.location_address;
+      logs[idx].ghi_chu_ra = checkOutData.ghi_chu_ra || '';
+      logs[idx].status = 'Chờ duyệt';
+      mockDb.setTimeLogs(logs);
+      return logs[idx];
+    }
+    return null;
   },
 
   async approveTimeLog(id: string, status: 'Đã duyệt' | 'Từ chối') {

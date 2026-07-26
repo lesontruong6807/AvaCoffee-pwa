@@ -364,69 +364,125 @@ export default function AdminPage() {
           {/* DUYỆT CHẤM CÔNG */}
           {approvalSubTab === 'time' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {timeLogs.filter(l => l.status === 'Chờ duyệt').map((log) => (
-                <div key={log.id} className="bg-white rounded-3xl p-6 border border-coffee-light shadow-sm flex flex-col justify-between space-y-4">
-                  <div className="flex items-center justify-between border-b border-coffee-light pb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-9 h-9 bg-coffee-light rounded-xl flex items-center justify-center text-coffee-primary font-bold text-xs">
-                        {log.users?.full_name?.charAt(0).toUpperCase()}
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').map((log) => {
+                const formatTime = (dStr: any) => {
+                  if (!dStr) return 'Chưa ra ca';
+                  return new Date(dStr).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+                };
+                const formatDate = (dStr: any) => {
+                  if (!dStr) return '';
+                  return new Date(dStr).toLocaleDateString('vi-VN');
+                };
+
+                const isWorking = log.status === 'Đang trong ca';
+
+                return (
+                  <div key={log.id} className="bg-white rounded-3xl p-6 border border-coffee-light shadow-sm flex flex-col justify-between space-y-4">
+                    <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-9 h-9 bg-coffee-light rounded-xl flex items-center justify-center text-coffee-primary font-bold text-xs">
+                          {log.users?.full_name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm text-coffee-dark">{log.users?.full_name}</h4>
+                          <p className="text-[10px] text-coffee-medium">{log.users?.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-coffee-dark">{log.users?.full_name}</h4>
-                        <p className="text-[10px] text-coffee-medium">{log.users?.email}</p>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        isWorking ? 'bg-blue-100 text-blue-805 text-blue-700' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-3">
+                      <p className="font-extrabold text-coffee-dark text-xs bg-coffee-light/30 px-2 py-1 rounded w-fit">
+                        Ca trực: {log.shift}
+                      </p>
+                      
+                      <div className="grid grid-cols-2 gap-3 bg-[#FAF6F0] p-3 rounded-2xl border border-coffee-light/60">
+                        {/* Chi tiết Vào ca */}
+                        <div className="space-y-0.5">
+                          <p className="text-[9px] font-extrabold text-coffee-primary uppercase">Vào ca</p>
+                          <p className="text-coffee-dark">Khai báo: <strong>{formatTime(log.check_in_time)}</strong></p>
+                          <p className="text-[10px] text-coffee-medium">Thực tế: {formatTime(log.submitted_at)}</p>
+                        </div>
+
+                        {/* Chi tiết Ra ca */}
+                        <div className="space-y-0.5 border-l border-coffee-light pl-3">
+                          <p className="text-[9px] font-extrabold text-teal-700 uppercase">Ra ca</p>
+                          {log.check_out_time ? (
+                            <>
+                              <p className="text-coffee-dark">Khai báo: <strong>{formatTime(log.check_out_time)}</strong></p>
+                              <p className="text-[10px] text-coffee-medium">Thực tế: {formatTime(log.real_check_out_time)}</p>
+                            </>
+                          ) : (
+                            <p className="text-[10px] text-blue-600 font-bold italic animate-pulse">Đang làm...</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-coffee-medium">Ngày chấm công: <strong>{formatDate(log.check_in_time)}</strong></p>
+                        {log.ghi_chu_vao && (
+                          <p className="text-[10px] text-coffee-medium">Ghi chú vào: <span className="italic">"{log.ghi_chu_vao}"</span></p>
+                        )}
+                        {log.ghi_chu_ra && (
+                          <p className="text-[10px] text-coffee-medium">Ghi chú ra: <span className="italic">"{log.ghi_chu_ra}"</span></p>
+                        )}
+                        <p className="text-coffee-medium flex items-start text-[10px] pt-1">
+                          <MapPin className="w-3.5 h-3.5 mr-1 text-coffee-primary shrink-0 mt-0.5" />
+                          <span>Vị trí cuối: {log.location_address || `Tọa độ: ${log.latitude}, ${log.longitude}`}</span>
+                        </p>
                       </div>
                     </div>
-                    <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full uppercase">
-                      Chờ duyệt
-                    </span>
-                  </div>
 
-                  <div className="text-xs space-y-2">
-                    <p>Giờ chấm công: <strong>{new Date(log.check_in_time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}</strong></p>
-                    <p className="text-coffee-medium">Ngày chấm: {new Date(log.check_in_time).toLocaleDateString('vi-VN')}</p>
-                    <p className="text-coffee-medium flex items-start">
-                      <MapPin className="w-3.5 h-3.5 mr-1.5 text-coffee-primary shrink-0 mt-0.5" />
-                      <span>Vị trí: {log.location_address || `Tọa độ: ${log.latitude}, ${log.longitude}`}</span>
-                    </p>
-                  </div>
-
-                  {/* Định vị bằng tọa độ số & Nút mở Google Maps */}
-                  <div className="bg-coffee-cream/35 border border-coffee-accent/60 rounded-2xl p-4 space-y-3 shadow-sm text-xs">
-                    <div className="flex justify-between font-mono text-[10px] text-coffee-medium">
-                      <span>Vĩ độ: {log.latitude.toFixed(6)}</span>
-                      <span>Kinh độ: {log.longitude.toFixed(6)}</span>
+                    {/* Định vị bằng tọa độ số & Nút mở Google Maps */}
+                    <div className="bg-coffee-cream/35 border border-coffee-accent/60 rounded-2xl p-4 space-y-3 shadow-sm text-xs">
+                      <div className="flex justify-between font-mono text-[10px] text-coffee-medium">
+                        <span>Vĩ độ: {log.latitude.toFixed(6)}</span>
+                        <span>Kinh độ: {log.longitude.toFixed(6)}</span>
+                      </div>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${log.latitude},${log.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2.5 bg-[#1A73E8] hover:bg-[#1557b0] text-white font-bold text-[10px] rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                      >
+                        <Map className="w-3.5 h-3.5" />
+                        <span>Mở vị trí chấm công trên Google Maps 🗺️</span>
+                      </a>
                     </div>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${log.latitude},${log.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 bg-[#1A73E8] hover:bg-[#1557b0] text-white font-bold text-[10px] rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
-                    >
-                      <Map className="w-3.5 h-3.5" />
-                      <span>Mở vị trí chấm công trên Google Maps 🗺️</span>
-                    </a>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <button
-                      onClick={() => handleApproveTime(log.id, 'Từ chối')}
-                      className="py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Từ chối</span>
-                    </button>
-                    <button
-                      onClick={() => handleApproveTime(log.id, 'Đã duyệt')}
-                      className="py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Phê duyệt</span>
-                    </button>
+                    <div className="pt-2">
+                      {isWorking ? (
+                        <div className="p-2.5 bg-blue-55 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-center font-bold text-[10px] animate-pulse">
+                          ⚠️ Nhân viên đang trong ca làm. Chỉ phê duyệt sau khi chấm công ra ca.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => handleApproveTime(log.id, 'Từ chối')}
+                            className="py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Từ chối</span>
+                          </button>
+                          <button
+                            onClick={() => handleApproveTime(log.id, 'Đã duyệt')}
+                            className="py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Phê duyệt</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              {timeLogs.filter(l => l.status === 'Chờ duyệt').length === 0 && (
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').length === 0 && (
                 <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                   <p className="font-bold">Tuyệt vời! Không còn yêu cầu chấm công nào chờ duyệt</p>

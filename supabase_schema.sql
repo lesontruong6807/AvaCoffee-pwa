@@ -103,13 +103,17 @@ CREATE TABLE public.hoadondetail (
 CREATE TABLE public.chamcong (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('log_'),
     id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE CASCADE NOT NULL,
-    ca_lam TEXT NOT NULL DEFAULT 'Ca sáng (07:00 - 12:00)',
+    ca_lam TEXT NOT NULL DEFAULT 'Ca sáng (06:00 - 14:00)',
     gio_vao TIMESTAMP WITH TIME ZONE NOT NULL,
+    gio_ra TIMESTAMP WITH TIME ZONE,
     ngay_nop TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    thoi_gian_thuc_ra TIMESTAMP WITH TIME ZONE,
     vi_do NUMERIC NOT NULL,
     kinh_do NUMERIC NOT NULL,
     dia_chi TEXT,
-    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt'
+    ghi_chu_vao TEXT,
+    ghi_chu_ra TEXT,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Đang trong ca', 'Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Đang trong ca'
 );
 
 -- 8. BẢNG XIN NGHỈ PHÉP (nghiphep)
