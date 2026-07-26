@@ -276,12 +276,11 @@ export const mockDb = {
   setLeaveRequests: (requests: any[]) => setStorageItem('ava_leave_requests', requests)
 };
 
-// Cấu hình tài khoản đăng nhập hiện tại mặc định
 export const getCurrentUser = (): typeof MOCK_USERS[0] | null => {
   if (typeof window === 'undefined') return null;
   const user = localStorage.getItem('ava_current_user');
   if (!user) {
-    return null; // Không có đăng nhập mặc định nữa, bắt buộc login
+    return null; 
   }
   try {
     return JSON.parse(user);
@@ -300,22 +299,110 @@ export const setCurrentUser = (user: typeof MOCK_USERS[0] | null) => {
   }
 };
 
+// --- DATA MAPPER FUNCTIONS (MAPPING BETWEEN FRONTEND AND VIETNAMESE DB COLUMNS) ---
+const mapUserToClient = (u: any) => u ? {
+  id: u.id,
+  username: u.username,
+  password: u.password,
+  email: u.email,
+  full_name: u.ho_ten,
+  role: u.vai_tro,
+  created_at: u.ngay_tao
+} : null;
+
+const mapTableToClient = (t: any) => t ? {
+  id: t.id,
+  table_name: t.ten_ban,
+  capacity: t.suc_chua,
+  status: t.trang_thai
+} : null;
+
+const mapCategoryToClient = (c: any) => c ? {
+  id: c.id,
+  name: c.ten_danh_muc
+} : null;
+
+const mapProductToClient = (p: any) => p ? {
+  id: p.id,
+  category_id: p.id_danh_muc,
+  name: p.ten_san_pham,
+  price: Number(p.don_gia),
+  cost_price: Number(p.gia_von),
+  image_url: p.hinh_anh,
+  status: p.trang_thai,
+  don_vi_tinh: p.don_vi_tinh || 'Ly',
+  mo_ta: p.mo_ta || ''
+} : null;
+
+const mapOrderToClient = (o: any) => o ? {
+  id: o.id,
+  table_id: o.id_ban,
+  staff_id: o.id_nhan_vien,
+  total_amount: Number(o.tong_tien),
+  payment_status: o.trang_thai_thanh_toan,
+  payment_method: o.phuong_thuc_thanh_toan,
+  created_at: o.ngay_tao,
+  paid_at: o.ngay_thanh_toan,
+  tables: o.danhsachban ? { table_name: o.danhsachban.ten_ban } : null,
+  users: o.nguoidung ? { full_name: o.nguoidung.ho_ten } : null
+} : null;
+
+const mapOrderItemToClient = (oi: any) => oi ? {
+  id: oi.id,
+  order_id: oi.idhoadon,
+  product_id: oi.idsp,
+  quantity: oi.so_luong,
+  unit_price: Number(oi.don_gia),
+  subtotal: Number(oi.thanh_tien),
+  ghi_chu: oi.ghi_chu || '',
+  products: {
+    name: oi.ten_san_pham,
+    image_url: oi.sanpham?.hinh_anh || ''
+  }
+} : null;
+
+const mapTimeLogToClient = (tl: any) => tl ? {
+  id: tl.id,
+  user_id: tl.id_nhan_vien,
+  shift: tl.ca_lam,
+  check_in_time: tl.gio_vao,
+  submitted_at: tl.ngay_nop,
+  latitude: Number(tl.vi_do),
+  longitude: Number(tl.kinh_do),
+  location_address: tl.dia_chi,
+  status: tl.trang_thai,
+  users: tl.nguoidung ? { full_name: tl.nguoidung.ho_ten, email: tl.nguoidung.email } : null
+} : null;
+
+const mapLeaveRequestToClient = (lr: any) => lr ? {
+  id: lr.id,
+  user_id: lr.id_nhan_vien,
+  start_date: lr.ngay_bat_dau,
+  end_date: lr.ngay_ket_thuc,
+  reason: lr.ly_do,
+  submitted_at: lr.ngay_nop,
+  latitude: Number(lr.vi_do),
+  longitude: Number(lr.kinh_do),
+  location_address: lr.dia_chi,
+  status: lr.trang_thai,
+  users: lr.nguoidung ? { full_name: lr.nguoidung.ho_ten, email: lr.nguoidung.email } : null
+} : null;
+
 // UNIFIED DATABASE SERVICE
 export const db = {
-  // --- USERS ---
+  // --- USERS (nguoidung) ---
   async login(username: string, password: string) {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
-        .from('users')
+        .from('nguoidung')
         .select('*')
         .eq('username', username)
         .eq('password', password);
       
       if (!error && data && data.length > 0) {
-        return data[0];
+        return mapUserToClient(data[0]);
       }
     }
-    // Fallback to local storage mock users
     const users = mockDb.getUsers();
     const user = users.find(u => u.username === username && u.password === password);
     return user || null;
@@ -323,8 +410,8 @@ export const db = {
 
   async getUsers() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('users').select('*');
-      if (!error) return data;
+      const { data, error } = await supabase.from('nguoidung').select('*');
+      if (!error && data) return data.map(mapUserToClient).filter(Boolean) as any[];
     }
     return mockDb.getUsers();
   },
@@ -332,8 +419,16 @@ export const db = {
   async createUser(user: any) {
     const newUser = { id: user.id || generateShortId('u_'), ...user };
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('users').insert([newUser]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('nguoidung').insert([{
+        id: newUser.id,
+        username: newUser.username,
+        password: newUser.password,
+        email: newUser.email,
+        ho_ten: newUser.full_name,
+        vai_tro: newUser.role,
+        ngay_tao: newUser.created_at || new Date().toISOString()
+      }]).select();
+      if (!error && data) return mapUserToClient(data[0]);
     }
     const users = mockDb.getUsers();
     users.push(newUser);
@@ -343,8 +438,15 @@ export const db = {
 
   async updateUser(id: string, updates: any) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('users').update(updates).eq('id', id).select();
-      if (!error) return data?.[0];
+      const dbUpdates: any = {};
+      if (updates.username !== undefined) dbUpdates.username = updates.username;
+      if (updates.password !== undefined) dbUpdates.password = updates.password;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.full_name !== undefined) dbUpdates.ho_ten = updates.full_name;
+      if (updates.role !== undefined) dbUpdates.vai_tro = updates.role;
+
+      const { data, error } = await supabase.from('nguoidung').update(dbUpdates).eq('id', id).select();
+      if (!error && data) return mapUserToClient(data[0]);
     }
     const users = mockDb.getUsers();
     const index = users.findIndex(u => u.id === id);
@@ -358,7 +460,7 @@ export const db = {
 
   async deleteUser(id: string) {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('users').delete().eq('id', id);
+      const { error } = await supabase.from('nguoidung').delete().eq('id', id);
       if (!error) return true;
     }
     const users = mockDb.getUsers();
@@ -367,19 +469,19 @@ export const db = {
     return true;
   },
 
-  // --- TABLES ---
+  // --- TABLES (danhsachban) ---
   async getTables() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('tables').select('*').order('table_name');
-      if (!error) return data;
+      const { data, error } = await supabase.from('danhsachban').select('*');
+      if (!error && data) return data.map(mapTableToClient).filter(Boolean).sort((a: any, b: any) => a.table_name.localeCompare(b.table_name)) as any[];
     }
     return mockDb.getTables().sort((a, b) => a.table_name.localeCompare(b.table_name));
   },
 
   async updateTableStatus(id: string, status: 'Trống' | 'Đang phục vụ') {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('tables').update({ status }).eq('id', id).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('danhsachban').update({ trang_thai: status }).eq('id', id).select();
+      if (!error && data) return mapTableToClient(data[0]);
     }
     const tables = mockDb.getTables();
     const idx = tables.findIndex(t => t.id === id);
@@ -393,8 +495,12 @@ export const db = {
 
   async createTable(table: any) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('tables').insert([table]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('danhsachban').insert([{
+        ten_ban: table.table_name,
+        suc_chua: table.capacity,
+        trang_thai: table.status
+      }]).select();
+      if (!error && data) return mapTableToClient(data[0]);
     }
     const tables = mockDb.getTables();
     const newTable = { id: generateShortId('tb_'), ...table };
@@ -405,7 +511,7 @@ export const db = {
 
   async deleteTable(id: string) {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('tables').delete().eq('id', id);
+      const { error } = await supabase.from('danhsachban').delete().eq('id', id);
       if (!error) return true;
     }
     const tables = mockDb.getTables();
@@ -413,19 +519,19 @@ export const db = {
     return true;
   },
 
-  // --- CATEGORIES ---
+  // --- CATEGORIES (danhmuc) ---
   async getCategories() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('categories').select('*').order('name');
-      if (!error) return data;
+      const { data, error } = await supabase.from('danhmuc').select('*');
+      if (!error && data) return data.map(mapCategoryToClient).filter(Boolean).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
     }
     return mockDb.getCategories().sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async createCategory(name: string) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('categories').insert([{ name }]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('danhmuc').insert([{ ten_danh_muc: name }]).select();
+      if (!error && data) return mapCategoryToClient(data[0]);
     }
     const categories = mockDb.getCategories();
     const newCat = { id: generateShortId('c_'), name };
@@ -436,7 +542,7 @@ export const db = {
 
   async deleteCategory(id: string) {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('categories').delete().eq('id', id);
+      const { error } = await supabase.from('danhmuc').delete().eq('id', id);
       if (!error) return true;
     }
     const categories = mockDb.getCategories();
@@ -444,19 +550,29 @@ export const db = {
     return true;
   },
 
-  // --- PRODUCTS ---
+  // --- PRODUCTS (sanpham) ---
   async getProducts() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('products').select('*');
-      if (!error) return data;
+      const { data, error } = await supabase.from('sanpham').select('*');
+      if (!error && data) return data.map(mapProductToClient).filter(Boolean) as any[];
     }
     return mockDb.getProducts();
   },
 
   async createProduct(product: any) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('products').insert([product]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('sanpham').insert([{
+        id: product.id || generateShortId('p_'),
+        id_danh_muc: product.category_id,
+        ten_san_pham: product.name,
+        don_vi_tinh: product.don_vi_tinh || 'Ly',
+        don_gia: product.price,
+        gia_von: product.cost_price,
+        hinh_anh: product.image_url,
+        mo_ta: product.mo_ta || '',
+        trang_thai: product.status
+      }]).select();
+      if (!error && data) return mapProductToClient(data[0]);
     }
     const products = mockDb.getProducts();
     const newProd = { id: generateShortId('p_'), ...product };
@@ -467,8 +583,18 @@ export const db = {
 
   async updateProduct(id: string, updates: any) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('products').update(updates).eq('id', id).select();
-      if (!error) return data?.[0];
+      const dbUpdates: any = {};
+      if (updates.category_id !== undefined) dbUpdates.id_danh_muc = updates.category_id;
+      if (updates.name !== undefined) dbUpdates.ten_san_pham = updates.name;
+      if (updates.don_vi_tinh !== undefined) dbUpdates.don_vi_tinh = updates.don_vi_tinh;
+      if (updates.price !== undefined) dbUpdates.don_gia = updates.price;
+      if (updates.cost_price !== undefined) dbUpdates.gia_von = updates.cost_price;
+      if (updates.image_url !== undefined) dbUpdates.hinh_anh = updates.image_url;
+      if (updates.mo_ta !== undefined) dbUpdates.mo_ta = updates.mo_ta;
+      if (updates.status !== undefined) dbUpdates.trang_thai = updates.status;
+
+      const { data, error } = await supabase.from('sanpham').update(dbUpdates).eq('id', id).select();
+      if (!error && data) return mapProductToClient(data[0]);
     }
     const products = mockDb.getProducts();
     const idx = products.findIndex(p => p.id === id);
@@ -482,7 +608,7 @@ export const db = {
 
   async deleteProduct(id: string) {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase.from('sanpham').delete().eq('id', id);
       if (!error) return true;
     }
     const products = mockDb.getProducts();
@@ -490,20 +616,19 @@ export const db = {
     return true;
   },
 
-  // --- ORDERS & ORDER ITEMS ---
+  // --- ORDERS & ORDER ITEMS (hoadon & hoadondetail) ---
   async getOrders() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
-        .from('orders')
+        .from('hoadon')
         .select(`
           *,
-          tables (table_name),
-          users (full_name)
+          danhsachban (ten_ban),
+          nguoidung (ho_ten)
         `)
-        .order('created_at', { ascending: false });
-      if (!error) return data;
+        .order('ngay_tao', { ascending: false });
+      if (!error && data) return data.map(mapOrderToClient).filter(Boolean) as any[];
     }
-    // Mock join
     const orders = mockDb.getOrders();
     const tables = mockDb.getTables();
     const users = mockDb.getUsers();
@@ -517,13 +642,10 @@ export const db = {
   async getOrderItems(orderId: string) {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          products (name, image_url)
-        `)
-        .eq('order_id', orderId);
-      if (!error) return data;
+        .from('hoadondetail')
+        .select('*')
+        .eq('idhoadon', orderId);
+      if (!error && data) return data.map(mapOrderItemToClient).filter(Boolean) as any[];
     }
     const items = mockDb.getOrderItems();
     const products = mockDb.getProducts();
@@ -541,33 +663,44 @@ export const db = {
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // Bắt đầu insert hóa đơn
+      // 1. Ghi hóa đơn chính (hoadon)
       const { data: order, error: orderErr } = await supabase
-        .from('orders')
+        .from('hoadon')
         .insert([{
-          table_id,
-          staff_id,
-          total_amount,
-          payment_status: 'Chưa thanh toán',
-          created_at: createdAt
+          id: orderId,
+          id_ban: table_id,
+          id_nhan_vien: staff_id,
+          tong_tien: total_amount,
+          trang_thai_thanh_toan: 'Chưa thanh toán',
+          ngay_tao: createdAt
         }])
         .select()
         .single();
 
       if (!orderErr && order) {
-        // Cập nhật trạng thái bàn sang "Đang phục vụ"
-        await supabase.from('tables').update({ status: 'Đang phục vụ' }).eq('id', table_id);
+        // 2. Chuyển trạng thái bàn sang Đang phục vụ
+        await supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id);
 
-        // Insert chi tiết hóa đơn
-        const orderItemsToInsert = items.map(item => ({
-          order_id: order.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          subtotal: item.subtotal
-        }));
-        await supabase.from('order_items').insert(orderItemsToInsert);
-        return order;
+        // Lấy thông tin sản phẩm để ghi trực tiếp (Tên món, Đơn vị tính) vào chi tiết hóa đơn
+        const products = await this.getProducts();
+
+        // 3. Ghi chi tiết hóa đơn (hoadondetail)
+        const orderItemsToInsert = items.map(item => {
+          const prod = products.find(p => p.id === item.product_id);
+          return {
+            id: generateShortId('item_'),
+            idhoadon: orderId,
+            idsp: item.product_id,
+            ten_san_pham: prod ? prod.name : 'Sản phẩm',
+            don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
+            don_gia: item.unit_price,
+            so_luong: item.quantity,
+            thanh_tien: item.subtotal,
+            ghi_chu: item.notes || ''
+          };
+        });
+        await supabase.from('hoadondetail').insert(orderItemsToInsert);
+        return mapOrderToClient(order);
       }
     }
 
@@ -586,7 +719,6 @@ export const db = {
     orders.push(newOrder);
     mockDb.setOrders(orders);
 
-    // Cập nhật bàn sang "Đang phục vụ"
     const tables = mockDb.getTables();
     const tIdx = tables.findIndex(t => t.id === table_id);
     if (tIdx !== -1) {
@@ -594,16 +726,22 @@ export const db = {
       mockDb.setTables(tables);
     }
 
-    // Insert chi tiết
     const orderItems = mockDb.getOrderItems();
-    const newItems = items.map((item, idx) => ({
-      id: generateShortId('item_'),
-      order_id: orderId,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      subtotal: item.subtotal
-    }));
+    const products = mockDb.getProducts();
+    const newItems = items.map((item) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        id: generateShortId('item_'),
+        order_id: orderId,
+        product_id: item.product_id,
+        ten_san_pham: prod ? prod.name : 'Sản phẩm',
+        don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        ghi_chu: item.notes || ''
+      };
+    });
     mockDb.setOrderItems([...orderItems, ...newItems]);
 
     return newOrder;
@@ -613,28 +751,25 @@ export const db = {
     const paidAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // Lấy thông tin hóa đơn để biết table_id
-      const { data: order } = await supabase.from('orders').select('table_id').eq('id', orderId).single();
+      const { data: order } = await supabase.from('hoadon').select('id_ban').eq('id', orderId).single();
       
       const { data: updatedOrder, error } = await supabase
-        .from('orders')
+        .from('hoadon')
         .update({
-          payment_status: 'Đã thanh toán',
-          payment_method: paymentMethod,
-          paid_at: paidAt
+          trang_thai_thanh_toan: 'Đã thanh toán',
+          phuong_thuc_thanh_toan: paymentMethod,
+          ngay_thanh_toan: paidAt
         })
         .eq('id', orderId)
         .select()
         .single();
 
-      if (!error && updatedOrder && order?.table_id) {
-        // Trả trạng thái bàn về "Trống"
-        await supabase.from('tables').update({ status: 'Trống' }).eq('id', order.table_id);
-        return updatedOrder;
+      if (!error && updatedOrder && order?.id_ban) {
+        await supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban);
+        return mapOrderToClient(updatedOrder);
       }
     }
 
-    // Mock DB Fallback
     const orders = mockDb.getOrders();
     const oIdx = orders.findIndex(o => o.id === orderId);
     if (oIdx !== -1) {
@@ -657,17 +792,17 @@ export const db = {
 
   async cancelOrder(orderId: string) {
     if (isSupabaseConfigured && supabase) {
-      const { data: order } = await supabase.from('orders').select('table_id').eq('id', orderId).single();
+      const { data: order } = await supabase.from('hoadon').select('id_ban').eq('id', orderId).single();
       const { data: updatedOrder, error } = await supabase
-        .from('orders')
-        .update({ payment_status: 'Đã hủy' })
+        .from('hoadon')
+        .update({ trang_thai_thanh_toan: 'Đã hủy' })
         .eq('id', orderId)
         .select()
         .single();
 
-      if (!error && updatedOrder && order?.table_id) {
-        await supabase.from('tables').update({ status: 'Trống' }).eq('id', order.table_id);
-        return updatedOrder;
+      if (!error && updatedOrder && order?.id_ban) {
+        await supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban);
+        return mapOrderToClient(updatedOrder);
       }
     }
 
@@ -689,17 +824,17 @@ export const db = {
     return null;
   },
 
-  // --- TIME LOGS ---
+  // --- TIME LOGS (chamcong) ---
   async getTimeLogs() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
-        .from('time_logs')
+        .from('chamcong')
         .select(`
           *,
-          users (full_name, email)
+          nguoidung (ho_ten, email)
         `)
-        .order('submitted_at', { ascending: false });
-      if (!error) return data;
+        .order('ngay_nop', { ascending: false });
+      if (!error && data) return data.map(mapTimeLogToClient).filter(Boolean) as any[];
     }
     const logs = mockDb.getTimeLogs();
     const users = mockDb.getUsers();
@@ -718,8 +853,14 @@ export const db = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('time_logs').insert([log]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('chamcong').insert([{
+        id_nhan_vien: log.user_id,
+        gio_vao: log.check_in_time,
+        vi_do: log.latitude,
+        kinh_do: log.longitude,
+        dia_chi: log.location_address
+      }]).select();
+      if (!error && data) return mapTimeLogToClient(data[0]);
     }
 
     const logs = mockDb.getTimeLogs();
@@ -730,8 +871,8 @@ export const db = {
 
   async approveTimeLog(id: string, status: 'Đã duyệt' | 'Từ chối') {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('time_logs').update({ status }).eq('id', id).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('chamcong').update({ trang_thai: status }).eq('id', id).select();
+      if (!error && data) return mapTimeLogToClient(data[0]);
     }
     const logs = mockDb.getTimeLogs();
     const idx = logs.findIndex(l => l.id === id);
@@ -743,17 +884,17 @@ export const db = {
     return null;
   },
 
-  // --- LEAVE REQUESTS ---
+  // --- LEAVE REQUESTS (nghiphep) ---
   async getLeaveRequests() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
-        .from('leave_requests')
+        .from('nghiphep')
         .select(`
           *,
-          users (full_name, email)
+          nguoidung (ho_ten, email)
         `)
-        .order('submitted_at', { ascending: false });
-      if (!error) return data;
+        .order('ngay_nop', { ascending: false });
+      if (!error && data) return data.map(mapLeaveRequestToClient).filter(Boolean) as any[];
     }
     const requests = mockDb.getLeaveRequests();
     const users = mockDb.getUsers();
@@ -772,8 +913,16 @@ export const db = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('leave_requests').insert([req]).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('nghiphep').insert([{
+        id_nhan_vien: req.user_id,
+        ngay_bat_dau: req.start_date,
+        ngay_ket_thuc: req.end_date,
+        ly_do: req.reason,
+        vi_do: req.latitude,
+        kinh_do: req.longitude,
+        dia_chi: req.location_address
+      }]).select();
+      if (!error && data) return mapLeaveRequestToClient(data[0]);
     }
 
     const requests = mockDb.getLeaveRequests();
@@ -784,8 +933,8 @@ export const db = {
 
   async approveLeaveRequest(id: string, status: 'Đã duyệt' | 'Từ chối') {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('leave_requests').update({ status }).eq('id', id).select();
-      if (!error) return data?.[0];
+      const { data, error } = await supabase.from('nghiphep').update({ trang_thai: status }).eq('id', id).select();
+      if (!error && data) return mapLeaveRequestToClient(data[0]);
     }
     const requests = mockDb.getLeaveRequests();
     const idx = requests.findIndex(r => r.id === id);

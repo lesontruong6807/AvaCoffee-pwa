@@ -1,8 +1,17 @@
 -- SCRIPT TẠO CƠ SỞ DỮ LIỆU MỚI CHO AVA COFFEE
--- Sử dụng định dạng ID ngắn, tự sinh và tích hợp tài khoản đăng nhập trực tiếp.
+-- Hỗ trợ tên bảng và tên cột bằng tiếng Việt không dấu giúp người dùng Việt dễ hiểu.
 -- Hãy chạy script này trong SQL Editor của Supabase.
 
--- Hủy bỏ các bảng cũ nếu đã tồn tại để tránh xung đột kiểu dữ liệu
+-- Hủy bỏ các bảng cũ (cả tên tiếng Anh và tiếng Việt) nếu đã tồn tại
+DROP TABLE IF EXISTS public.nghiphep CASCADE;
+DROP TABLE IF EXISTS public.chamcong CASCADE;
+DROP TABLE IF EXISTS public.hoadondetail CASCADE;
+DROP TABLE IF EXISTS public.hoadon CASCADE;
+DROP TABLE IF EXISTS public.sanpham CASCADE;
+DROP TABLE IF EXISTS public.danhmuc CASCADE;
+DROP TABLE IF EXISTS public.danhsachban CASCADE;
+DROP TABLE IF EXISTS public.nguoidung CASCADE;
+
 DROP TABLE IF EXISTS public.leave_requests CASCADE;
 DROP TABLE IF EXISTS public.time_logs CASCADE;
 DROP TABLE IF EXISTS public.order_items CASCADE;
@@ -27,131 +36,136 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 1. BẢNG NGƯỜI DÙNG (users) - Tích hợp User ID và Mật khẩu
-CREATE TABLE public.users (
+-- 1. BẢNG NGƯỜI DÙNG (nguoidung)
+CREATE TABLE public.nguoidung (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('u_'),
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL DEFAULT '123456',
     email TEXT UNIQUE NOT NULL,
-    full_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('Admin', 'User')) DEFAULT 'User',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+    ho_ten TEXT NOT NULL,
+    vai_tro TEXT NOT NULL CHECK (vai_tro IN ('Admin', 'User')) DEFAULT 'User',
+    ngay_tao TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- 2. BẢNG DANH SÁCH BÀN (tables)
-CREATE TABLE public.tables (
+-- 2. BẢNG DANH SÁCH BÀN (danhsachban)
+CREATE TABLE public.danhsachban (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('tb_'),
-    table_name TEXT NOT NULL UNIQUE,
-    capacity INTEGER NOT NULL DEFAULT 4,
-    status TEXT NOT NULL CHECK (status IN ('Trống', 'Đang phục vụ')) DEFAULT 'Trống'
+    ten_ban TEXT NOT NULL UNIQUE,
+    suc_chua INTEGER NOT NULL DEFAULT 4,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Trống', 'Đang phục vụ')) DEFAULT 'Trống'
 );
 
--- 3. BẢNG LOẠI SẢN PHẨM (categories)
-CREATE TABLE public.categories (
+-- 3. BẢNG LOẠI SẢN PHẨM (danhmuc)
+CREATE TABLE public.danhmuc (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('c_'),
-    name TEXT NOT NULL UNIQUE
+    ten_danh_muc TEXT NOT NULL UNIQUE
 );
 
--- 4. BẢNG SẢN PHẨM (products)
-CREATE TABLE public.products (
+-- 4. BẢNG SẢN PHẨM (sanpham)
+CREATE TABLE public.sanpham (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('p_'),
-    category_id TEXT REFERENCES public.categories(id) ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    price NUMERIC NOT NULL CHECK (price >= 0),
-    cost_price NUMERIC NOT NULL CHECK (cost_price >= 0) DEFAULT 0,
-    image_url TEXT,
-    status TEXT NOT NULL CHECK (status IN ('Còn hàng', 'Hết hàng')) DEFAULT 'Còn hàng'
+    id_danh_muc TEXT REFERENCES public.danhmuc(id) ON DELETE CASCADE NOT NULL,
+    ten_san_pham TEXT NOT NULL,
+    don_vi_tinh TEXT NOT NULL DEFAULT 'Ly',
+    don_gia NUMERIC NOT NULL CHECK (don_gia >= 0),
+    gia_von NUMERIC NOT NULL CHECK (gia_von >= 0) DEFAULT 0,
+    hinh_anh TEXT,
+    mo_ta TEXT,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Còn hàng', 'Hết hàng')) DEFAULT 'Còn hàng'
 );
 
--- 5. BẢNG HÓA ĐƠN (orders)
-CREATE TABLE public.orders (
+-- 5. BẢNG HÓA ĐƠN (hoadon)
+CREATE TABLE public.hoadon (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('ord_'),
-    table_id TEXT REFERENCES public.tables(id) ON DELETE SET NULL,
-    staff_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
-    total_amount NUMERIC NOT NULL CHECK (total_amount >= 0) DEFAULT 0,
-    payment_status TEXT NOT NULL CHECK (payment_status IN ('Chưa thanh toán', 'Đã thanh toán', 'Đã hủy')) DEFAULT 'Chưa thanh toán',
-    payment_method TEXT CHECK (payment_method IN ('Tiền mặt', 'Chuyển khoản')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    paid_at TIMESTAMP WITH TIME ZONE
+    id_ban TEXT REFERENCES public.danhsachban(id) ON DELETE SET NULL,
+    id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE SET NULL,
+    tong_tien NUMERIC NOT NULL CHECK (tong_tien >= 0) DEFAULT 0,
+    trang_thai_thanh_toan TEXT NOT NULL CHECK (trang_thai_thanh_toan IN ('Chưa thanh toán', 'Đã thanh toán', 'Đã hủy')) DEFAULT 'Chưa thanh toán',
+    phuong_thuc_thanh_toan TEXT CHECK (phuong_thuc_thanh_toan IN ('Tiền mặt', 'Chuyển khoản')),
+    ngay_tao TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    ngay_thanh_toan TIMESTAMP WITH TIME ZONE
 );
 
--- 6. BẢNG CHI TIẾT HÓA ĐƠN (order_items)
-CREATE TABLE public.order_items (
+-- 6. BẢNG CHI TIẾT HÓA ĐƠN (hoadondetail)
+CREATE TABLE public.hoadondetail (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('item_'),
-    order_id TEXT REFERENCES public.orders(id) ON DELETE CASCADE NOT NULL,
-    product_id TEXT REFERENCES public.products(id) ON DELETE CASCADE NOT NULL,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price NUMERIC NOT NULL CHECK (unit_price >= 0),
-    subtotal NUMERIC NOT NULL CHECK (subtotal >= 0)
+    idhoadon TEXT REFERENCES public.hoadon(id) ON DELETE CASCADE NOT NULL,
+    idsp TEXT REFERENCES public.sanpham(id) ON DELETE CASCADE NOT NULL,
+    ten_san_pham TEXT NOT NULL,
+    don_vi_tinh TEXT NOT NULL DEFAULT 'Ly',
+    don_gia NUMERIC NOT NULL CHECK (don_gia >= 0),
+    so_luong INTEGER NOT NULL CHECK (so_luong > 0),
+    thanh_tien NUMERIC NOT NULL CHECK (thanh_tien >= 0),
+    ghi_chu TEXT DEFAULT ''
 );
 
--- 7. BẢNG CHẤM CÔNG (time_logs)
-CREATE TABLE public.time_logs (
+-- 7. BẢNG CHẤM CÔNG (chamcong)
+CREATE TABLE public.chamcong (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('log_'),
-    user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-    shift TEXT NOT NULL DEFAULT 'Ca sáng (07:00 - 12:00)',
-    check_in_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    latitude NUMERIC NOT NULL,
-    longitude NUMERIC NOT NULL,
-    location_address TEXT,
-    status TEXT NOT NULL CHECK (status IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt'
+    id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE CASCADE NOT NULL,
+    ca_lam TEXT NOT NULL DEFAULT 'Ca sáng (07:00 - 12:00)',
+    gio_vao TIMESTAMP WITH TIME ZONE NOT NULL,
+    ngay_nop TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    vi_do NUMERIC NOT NULL,
+    kinh_do NUMERIC NOT NULL,
+    dia_chi TEXT,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt'
 );
 
--- 8. BẢNG XIN NGHỈ PHÉP (leave_requests)
-CREATE TABLE public.leave_requests (
+-- 8. BẢNG XIN NGHỈ PHÉP (nghiphep)
+CREATE TABLE public.nghiphep (
     id TEXT PRIMARY KEY DEFAULT public.generate_short_id('lv_'),
-    user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    reason TEXT NOT NULL,
-    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    latitude NUMERIC NOT NULL,
-    longitude NUMERIC NOT NULL,
-    location_address TEXT,
-    status TEXT NOT NULL CHECK (status IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt',
-    CONSTRAINT check_dates CHECK (end_date >= start_date)
+    id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE CASCADE NOT NULL,
+    ngay_bat_dau DATE NOT NULL,
+    ngay_ket_thuc DATE NOT NULL,
+    ly_do TEXT NOT NULL,
+    ngay_nop TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    vi_do NUMERIC NOT NULL,
+    kinh_do NUMERIC NOT NULL,
+    dia_chi TEXT,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt',
+    CONSTRAINT check_dates CHECK (ngay_ket_thuc >= ngay_bat_dau)
 );
 
 -- BẬT ROW LEVEL SECURITY (RLS)
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.time_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nguoidung ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.danhsachban ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.danhmuc ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sanpham ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hoadon ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hoadondetail ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chamcong ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nghiphep ENABLE ROW LEVEL SECURITY;
 
 -- TẠO CÁC CHÍNH SÁCH RLS (BẢN ĐƠN GIẢN CHO DEV)
-CREATE POLICY "Cho phép đọc mọi bảng công khai" ON public.users FOR SELECT USING (true);
-CREATE POLICY "Cho phép ghi đối với user đăng nhập" ON public.users FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng tables công khai" ON public.tables FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng tables công khai" ON public.tables FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng categories công khai" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng categories công khai" ON public.categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng products công khai" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng products công khai" ON public.products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng orders công khai" ON public.orders FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng orders công khai" ON public.orders FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng order_items công khai" ON public.order_items FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng order_items công khai" ON public.order_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng time_logs công khai" ON public.time_logs FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng time_logs công khai" ON public.time_logs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Cho phép đọc bảng leave_requests công khai" ON public.leave_requests FOR SELECT USING (true);
-CREATE POLICY "Cho phép cập nhật bảng leave_requests công khai" ON public.leave_requests FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc mọi bảng công khai" ON public.nguoidung FOR SELECT USING (true);
+CREATE POLICY "Cho phép ghi đối với user đăng nhập" ON public.nguoidung FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng danhsachban công khai" ON public.danhsachban FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng danhsachban công khai" ON public.danhsachban FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng danhmuc công khai" ON public.danhmuc FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng danhmuc công khai" ON public.danhmuc FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng sanpham công khai" ON public.sanpham FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng sanpham công khai" ON public.sanpham FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng hoadon công khai" ON public.hoadon FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng hoadon công khai" ON public.hoadon FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng hoadondetail công khai" ON public.hoadondetail FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng hoadondetail công khai" ON public.hoadondetail FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng chamcong công khai" ON public.chamcong FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng chamcong công khai" ON public.chamcong FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng nghiphep công khai" ON public.nghiphep FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng nghiphep công khai" ON public.nghiphep FOR ALL USING (true) WITH CHECK (true);
 
 -- CHÈN DỮ LIỆU MẪU (SEED DATA)
 
--- 1. Thêm nhân viên (Users)
-INSERT INTO public.users (id, username, password, email, full_name, role) VALUES
+-- 1. Thêm nhân viên (NguoiDung)
+INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro) VALUES
 ('admin', 'admin', '123456', 'admin@avacoffee.com', 'Lê Sơn (Admin)', 'Admin'),
 ('nv001', 'nv001', '123456', 'nhanvien1@avacoffee.com', 'Nguyễn Văn Minh', 'User'),
 ('nv002', 'nv002', '123456', 'nhanvien2@avacoffee.com', 'Trần Thị Thuỷ', 'User')
 ON CONFLICT (username) DO NOTHING;
 
--- 2. Thêm bàn
-INSERT INTO public.tables (id, table_name, capacity, status) VALUES
+-- 2. Thêm bàn (DanhSachBan)
+INSERT INTO public.danhsachban (id, ten_ban, suc_chua, trang_thai) VALUES
 ('tb1', 'Bàn 1', 4, 'Trống'),
 ('tb2', 'Bàn 2', 4, 'Trống'),
 ('tb3', 'Bàn 3', 2, 'Trống'),
@@ -159,50 +173,50 @@ INSERT INTO public.tables (id, table_name, capacity, status) VALUES
 ('tb5', 'Bàn 5', 6, 'Trống'),
 ('tb6', 'Bàn 6', 6, 'Trống'),
 ('tb7', 'Khách mang về', 99, 'Trống')
-ON CONFLICT (table_name) DO NOTHING;
+ON CONFLICT (ten_ban) DO NOTHING;
 
--- 3. Thêm danh mục món
-INSERT INTO public.categories (id, name) VALUES
+-- 3. Thêm danh mục món (DanhMuc)
+INSERT INTO public.danhmuc (id, ten_danh_muc) VALUES
 ('c_caphe', 'Cà phê'),
 ('c_douongkhac', 'Thức uống khác'),
 ('c_tra', 'Trà'),
 ('c_yaourt', 'Yaourt'),
 ('c_soda', 'Soda')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (ten_danh_muc) DO NOTHING;
 
--- 4. Thêm sản phẩm mẫu (19 món khớp 100% hình ảnh thực đơn)
-INSERT INTO public.products (id, category_id, name, price, cost_price, image_url, status) VALUES
+-- 4. Thêm sản phẩm mẫu (SanPham - 19 món khớp 100% hình ảnh thực đơn)
+INSERT INTO public.sanpham (id, id_danh_muc, ten_san_pham, don_vi_tinh, don_gia, gia_von, hinh_anh, trang_thai) VALUES
 -- Cà phê (CP)
-('CP001', 'c_caphe', 'Cà phê đen', 15000, 5000, 'https://i.pinimg.com/vwebp/736x/fa/21/eb/fa21eb28c29f08f40bd7f44e9d21f27d.webp', 'Còn hàng'),
-('CP002', 'c_caphe', 'Cà phê sữa', 17000, 6000, 'https://i.pinimg.com/vwebp/736x/25/f1/c4/25f1c44880e288b19afcc6c747567405a.webp', 'Còn hàng'),
-('CP003', 'c_caphe', 'Cà phê sữa tươi', 22000, 8000, 'https://i.pinimg.com/736x/02/15/55/0215554e3cf993469d0625ab1921b98a.jpg', 'Còn hàng'),
-('CP004', 'c_caphe', 'Cà phê muối', 22000, 8000, 'https://i.pinimg.com/736x/d7/65/9c/d7659c0e02595551e771e7b2edab17e.jpg', 'Còn hàng'),
-('CP005', 'c_caphe', 'Bạc xiu', 22000, 8000, 'https://i.pinimg.com/736x/be/8d/41/be8d413f945e09c6236f726ec3b95f5f.jpg', 'Còn hàng'),
+('CP001', 'c_caphe', 'Cà phê đen', 'Ly', 15000, 5000, 'https://i.pinimg.com/vwebp/736x/fa/21/eb/fa21eb28c29f08f40bd7f44e9d21f27d.webp', 'Còn hàng'),
+('CP002', 'c_caphe', 'Cà phê sữa', 'Ly', 17000, 6000, 'https://i.pinimg.com/vwebp/736x/25/f1/c4/25f1c44880e288b19afcc6c747567405a.webp', 'Còn hàng'),
+('CP003', 'c_caphe', 'Cà phê sữa tươi', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/02/15/55/0215554e3cf993469d0625ab1921b98a.jpg', 'Còn hàng'),
+('CP004', 'c_caphe', 'Cà phê muối', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/d7/65/9c/d7659c0e02595551e771e7b2edab17e.jpg', 'Còn hàng'),
+('CP005', 'c_caphe', 'Bạc xiu', 'Ly', 22000, 8000, 'https://i.pinimg.com/736x/be/8d/41/be8d413f945e09c6236f726ec3b95f5f.jpg', 'Còn hàng'),
 
 -- Thức uống khác (TUK)
-('TUK001', 'c_douongkhac', 'Cacao', 20000, 7000, 'https://i.pinimg.com/736x/d6/f5/a1/d6f5a103292180b1943c83b35325bdf2.jpg', 'Còn hàng'),
-('TUK002', 'c_douongkhac', 'Cacao kem muối', 25000, 9000, 'https://i.pinimg.com/736x/b2/6e/8d/b26e8d7ed1495873ee9fd936df9d0532.jpg', 'Còn hàng'),
-('TUK003', 'c_douongkhac', 'Matcha Latte', 25000, 9000, 'https://i.pinimg.com/1200x/2e/ac/ae/2eacae2f52c4ac369ae5192bf17ea1b4.jpg', 'Còn hàng'),
-('TUK004', 'c_douongkhac', 'Matcha Latte kem muối', 30000, 11000, 'https://i.pinimg.com/736x/39/22/2c/39222cae47d07268215d1751a0b6c6c.jpg', 'Còn hàng'),
+('TUK001', 'c_douongkhac', 'Cacao', 'Ly', 20000, 7000, 'https://i.pinimg.com/736x/d6/f5/a1/d6f5a103292180b1943c83b35325bdf2.jpg', 'Còn hàng'),
+('TUK002', 'c_douongkhac', 'Cacao kem muối', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/b2/6e/8d/b26e8d7ed1495873ee9fd936df9d0532.jpg', 'Còn hàng'),
+('TUK003', 'c_douongkhac', 'Matcha Latte', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/2e/ac/ae/2eacae2f52c4ac369ae5192bf17ea1b4.jpg', 'Còn hàng'),
+('TUK004', 'c_douongkhac', 'Matcha Latte kem muối', 'Ly', 30000, 11000, 'https://i.pinimg.com/736x/39/22/2c/39222cae47d07268215d1751a0b6c6c.jpg', 'Còn hàng'),
 
 -- Trà (T)
-('T001', 'c_tra', 'Trà tắc', 15000, 5000, 'https://i.pinimg.com/736x/14/91/f4/1491f4c34770937dfd4190da0da8556b2f.jpg', 'Còn hàng'),
-('T002', 'c_tra', 'Trà dâu', 25000, 9000, 'https://i.pinimg.com/1200x/bf/f2/6d/bff26dce28c30a6ff849e87252726293.jpg', 'Còn hàng'),
-('T003', 'c_tra', 'Trà đào', 25000, 9000, 'https://i.pinimg.com/736x/9e/b2/b0/9eb2b01ea2306476b37454f4b8b8b0a4.jpg', 'Còn hàng'),
-('T004', 'c_tra', 'Trà vải', 25000, 9000, 'https://i.pinimg.com/736x/0f/c1/a3/0fc1a3f9275c4dc68a0e7394d4fce71f.jpg', 'Còn hàng'),
+('T001', 'c_tra', 'Trà tắc', 'Ly', 15000, 5000, 'https://i.pinimg.com/736x/14/91/f4/1491f4c34770937dfd4190da0da8556b2f.jpg', 'Còn hàng'),
+('T002', 'c_tra', 'Trà dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/bf/f2/6d/bff26dce28c30a6ff849e87252726293.jpg', 'Còn hàng'),
+('T003', 'c_tra', 'Trà đào', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/9e/b2/b0/9eb2b01ea2306476b37454f4b8b8b0a4.jpg', 'Còn hàng'),
+('T004', 'c_tra', 'Trà vải', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/0f/c1/a3/0fc1a3f9275c4dc68a0e7394d4fce71f.jpg', 'Còn hàng'),
 
 -- Yaourt (Y)
-('Y001', 'c_yaourt', 'Yaourt đá', 20000, 7000, 'https://i.pinimg.com/vwebp/1200x/e3/0e/0a/e30e0a3070bae2b2ec7a9a6101c85b7b.webp', 'Còn hàng'),
-('Y002', 'c_yaourt', 'Yaourt dâu', 25000, 9000, 'https://i.pinimg.com/1200x/27/34/33/27343309543e0cc6b1348302c2a379e5.jpg', 'Còn hàng'),
-('Y003', 'c_yaourt', 'Yaourt việt quất', 25000, 9000, 'https://i.pinimg.com/736x/5e/83/e5/5e83e5ad1b5c4ab983b09caf1b5e1ac2.jpg', 'Còn hàng'),
+('Y001', 'c_yaourt', 'Yaourt đá', 'Ly', 20000, 7000, 'https://i.pinimg.com/vwebp/1200x/e3/0e/0a/e30e0a3070bae2b2ec7a9a6101c85b7b.webp', 'Còn hàng'),
+('Y002', 'c_yaourt', 'Yaourt dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/27/34/33/27343309543e0cc6b1348302c2a379e5.jpg', 'Còn hàng'),
+('Y003', 'c_yaourt', 'Yaourt việt quất', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/5e/83/e5/5e83e5ad1b5c4ab983b09caf1b5e1ac2.jpg', 'Còn hàng'),
 
 -- Soda (S)
-('S001', 'c_soda', 'Soda dâu', 25000, 9000, 'https://i.pinimg.com/736x/4f/7a/60/4f7a608bd5384c201a6d707b16263616.jpg', 'Còn hàng'),
-('S002', 'c_soda', 'Soda đào', 25000, 9000, 'https://i.pinimg.com/1200x/e2/1e/02/e21e0287ce4f1e1cfaf1a0cd8d9d729a.webp', 'Còn hàng'),
-('S003', 'c_soda', 'Soda việt quất', 25000, 9000, 'https://i.pinimg.com/736x/3f/54/43/3f54439327709c6236f726ec3b95f5f.jpg', 'Còn hàng')
+('S001', 'c_soda', 'Soda dâu', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/4f/7a/60/4f7a608bd5384c201a6d707b16263616.jpg', 'Còn hàng'),
+('S002', 'c_soda', 'Soda đào', 'Ly', 25000, 9000, 'https://i.pinimg.com/1200x/e2/1e/02/e21e0287ce4f1e1cfaf1a0cd8d9d729a.webp', 'Còn hàng'),
+('S003', 'c_soda', 'Soda việt quất', 'Ly', 25000, 9000, 'https://i.pinimg.com/736x/3f/54/43/3f54439327709c6236f726ec3b95f5f.jpg', 'Còn hàng')
 ON CONFLICT (id) DO UPDATE 
-SET name = EXCLUDED.name, 
-    price = EXCLUDED.price, 
-    cost_price = EXCLUDED.cost_price, 
-    image_url = EXCLUDED.image_url, 
-    status = EXCLUDED.status;
+SET ten_san_pham = EXCLUDED.ten_san_pham, 
+    don_gia = EXCLUDED.don_gia, 
+    gia_von = EXCLUDED.gia_von, 
+    hinh_anh = EXCLUDED.hinh_anh, 
+    trang_thai = EXCLUDED.trang_thai;
