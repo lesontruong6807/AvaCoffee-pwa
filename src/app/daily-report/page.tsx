@@ -273,45 +273,40 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
         {metrics.orders.length === 0 ? (
           <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa có giao dịch phát sinh trong ca này.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-coffee-light text-coffee-medium font-bold">
-                  <th className="py-2">Mã HĐ</th>
-                  <th className="py-2">Giờ</th>
-                  <th className="py-2">Bàn</th>
-                  <th className="py-2">Thanh toán</th>
-                  <th className="py-2 text-right">Tổng tiền</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-coffee-light/40">
-                {metrics.orders.slice(0, 5).map((order: any) => {
-                  const date = new Date(order.created_at);
-                  const hh = String(date.getHours()).padStart(2, '0');
-                  const mm = String(date.getMinutes()).padStart(2, '0');
-                  const dd = String(date.getDate()).padStart(2, '0');
-                  const mMonth = String(date.getMonth() + 1).padStart(2, '0');
-                  const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
-                  return (
-                    <tr key={order.id}>
-                      <td className="py-2 font-mono text-[9px] text-coffee-dark uppercase">{order.id.substring(0, 6)}</td>
-                      <td className="py-2 font-mono text-[9px] text-coffee-medium">{timeFormatted}</td>
-                      <td className="py-2 font-semibold text-coffee-dark truncate max-w-[80px]">{order.tables?.table_name || 'Khách mang về'}</td>
-                      <td className="py-2">
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+          <div className="space-y-3">
+            <div className="divide-y divide-coffee-light/60">
+              {metrics.orders.slice(0, 10).map((order: any) => {
+                const date = new Date(order.created_at);
+                const hh = String(date.getHours()).padStart(2, '0');
+                const mm = String(date.getMinutes()).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mMonth = String(date.getMonth() + 1).padStart(2, '0');
+                const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
+                return (
+                  <div key={order.id} className="py-3.5 space-y-2 text-xs">
+                    {/* Hàng 1: Mã HĐ và Giờ */}
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
+                      <span className="text-[10px] text-coffee-medium font-medium">{timeFormatted}</span>
+                    </div>
+                    {/* Hàng 2: Bàn, hình thức thanh toán, tổng tiền */}
+                    <div className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center space-x-2.5">
+                        <span className="font-semibold text-coffee-dark bg-coffee-light px-2 py-0.5 rounded">{order.tables?.table_name || 'Khách mang về'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
                           order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
                         }`}>
                           {order.payment_method}
                         </span>
-                      </td>
-                      <td className="py-2 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {metrics.orders.length > 5 && (
-              <p className="text-[10px] text-coffee-medium text-center pt-2 italic">Hiển thị 5 đơn hàng gần nhất...</p>
+                      </div>
+                      <span className="font-extrabold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {metrics.orders.length > 10 && (
+              <p className="text-[10px] text-coffee-medium text-center pt-2 italic border-t border-coffee-light/40">Hiển thị 10 hóa đơn gần nhất...</p>
             )}
           </div>
         )}

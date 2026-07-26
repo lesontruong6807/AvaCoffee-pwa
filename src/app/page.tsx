@@ -38,17 +38,30 @@ export default function Home() {
 
     async function loadStats() {
       try {
-        const [tables, orders, logs, leaves] = await Promise.all([
-          db.getTables(),
-          db.getOrders(),
-          db.getTimeLogs(),
-          db.getLeaveRequests()
-        ]);
+        const isAdmin = user && user.role === 'Admin';
 
-        const serving = tables.filter(t => t.status === 'Đang phục vụ').length;
-        const unpaid = orders.filter(o => o.payment_status === 'Chưa thanh toán').length;
-        const pendingTime = logs.filter(l => l.status === 'Chờ duyệt').length;
-        const pendingLeave = leaves.filter(r => r.status === 'Chờ duyệt').length;
+        // 1. Chỉ fetch bàn và hóa đơn dùng chung
+        const promises: Promise<any>[] = [
+          db.getTables(),
+          db.getOrders()
+        ];
+
+        // 2. Chỉ fetch logs & leaves nếu tài khoản là Admin
+        if (isAdmin) {
+          promises.push(db.getTimeLogs());
+          promises.push(db.getLeaveRequests());
+        }
+
+        const results = await Promise.all(promises);
+        const tables = results[0];
+        const orders = results[1];
+        const logs = isAdmin ? results[2] : [];
+        const leaves = isAdmin ? results[3] : [];
+
+        const serving = tables.filter((t: any) => t.status === 'Đang phục vụ').length;
+        const unpaid = orders.filter((o: any) => o.payment_status === 'Chưa thanh toán').length;
+        const pendingTime = isAdmin ? logs.filter((l: any) => l.status === 'Chờ duyệt').length : 0;
+        const pendingLeave = isAdmin ? leaves.filter((r: any) => r.status === 'Chờ duyệt').length : 0;
 
         setStats({
           totalTables: tables.length,

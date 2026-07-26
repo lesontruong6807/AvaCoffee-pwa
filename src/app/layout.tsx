@@ -16,8 +16,14 @@ const geistMono = Geist_Mono({
 import type { Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: "AVA Coffee - Hệ thống POS & Quản lý nhân viên",
-  description: "Giải pháp quản lý bán hàng và chấm công nhân sự cho AVA Coffee",
+  title: "AVA Coffee",
+  description: "Hệ thống POS & Quản lý nhân viên AVA Coffee",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "AVA Coffee",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {

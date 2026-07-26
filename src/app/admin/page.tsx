@@ -317,7 +317,7 @@ export default function AdminPage() {
           }`}
         >
           <Utensils className="w-4.5 h-4.5" />
-          <span>Quản lý món ăn</span>
+          <span>Quản lý đồ uống</span>
         </button>
         <button
           onClick={() => setAdminTab('staff')}
@@ -656,23 +656,23 @@ export default function AdminPage() {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex items-center justify-between">
             <div className="space-y-1">
-              <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Món Ăn</h3>
-              <p className="text-xs text-coffee-medium">Cập nhật giá bán, giá vốn, trạng thái còn hàng/hết hàng và thêm món mới.</p>
+              <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Đồ Uống</h3>
+              <p className="text-xs text-coffee-medium">Cập nhật giá bán, giá vốn, trạng thái còn hàng/hết hàng và thêm đồ uống mới.</p>
             </div>
             <button
               onClick={openAddProduct}
               className="px-4 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition flex items-center space-x-1.5 shadow"
             >
               <Plus className="w-4 h-4 text-coffee-accent" />
-              <span>Thêm món ăn</span>
+              <span>Thêm đồ uống</span>
             </button>
           </div>
 
           {/* Grid hiển thị sản phẩm */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
             {products.map((prod) => (
               <div key={prod.id} className="bg-white rounded-3xl overflow-hidden border border-coffee-light flex flex-col shadow-sm">
-                <div className="relative h-40 bg-coffee-light">
+                <div className="relative h-28 sm:h-40 bg-coffee-light">
                   {prod.image_url ? (
                     <img 
                       src={prod.image_url} 
@@ -684,25 +684,25 @@ export default function AdminPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-coffee-medium">
-                      <Clock className="w-12 h-12" />
+                      <Clock className="w-8 h-8 sm:w-12 sm:h-12" />
                     </div>
                   )}
-                  <span className={`absolute top-3 right-3 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                  <span className={`absolute top-2 right-2 sm:top-3 sm:right-3 text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${
                     prod.status === 'Còn hàng' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {prod.status}
                   </span>
                 </div>
 
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between space-y-2.5">
                   <div>
-                    <h4 className="font-bold text-coffee-dark text-sm line-clamp-1">{prod.name}</h4>
+                    <h4 className="font-extrabold text-coffee-dark text-xs sm:text-sm line-clamp-2 leading-tight">{prod.name}</h4>
                     <p className="text-[10px] text-coffee-medium mt-0.5">
                       Danh mục: <strong>{categories.find(c => c.id === prod.category_id)?.name || 'Khác'}</strong>
                     </p>
                   </div>
 
-                  <div className="text-xs space-y-1">
+                  <div className="text-[10px] sm:text-xs space-y-1">
                     <p className="flex justify-between">
                       <span className="text-coffee-medium">Giá bán:</span>
                       <strong className="text-coffee-primary">{prod.price.toLocaleString('vi-VN')}đ</strong>
@@ -716,14 +716,14 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-coffee-light/50">
                     <button
                       onClick={() => openEditProduct(prod)}
-                      className="py-1.5 bg-[#FAF6F0] hover:bg-coffee-accent text-coffee-primary text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1"
+                      className="py-1.5 bg-[#FAF6F0] hover:bg-coffee-accent text-coffee-primary text-[10px] sm:text-xs font-bold rounded-xl transition flex items-center justify-center space-x-0.5 sm:space-x-1"
                     >
                       <Edit className="w-3.5 h-3.5" />
                       <span>Sửa</span>
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
-                      className="py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1"
+                      className="py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] sm:text-xs font-bold rounded-xl transition flex items-center justify-center space-x-0.5 sm:space-x-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Xoá</span>
@@ -753,7 +753,45 @@ export default function AdminPage() {
             </button>
           </div>
 
-          <div className="bg-white rounded-3xl border border-coffee-light overflow-hidden shadow-sm">
+          {/* Phiên bản di động (Mobile Card List) */}
+          <div className="md:hidden space-y-4">
+            {users.map((staff) => (
+              <div key={staff.id} className="bg-white p-4 rounded-2xl border border-coffee-light shadow-sm flex items-center justify-between">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="w-9 h-9 bg-coffee-accent rounded-xl text-coffee-dark font-black flex items-center justify-center text-xs shrink-0">
+                    {staff.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-xs text-coffee-dark truncate">{staff.full_name}</h4>
+                    <p className="text-[10px] text-coffee-medium truncate">{staff.email}</p>
+                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                      staff.role === 'Admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {staff.role}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2 shrink-0">
+                  <button
+                    onClick={() => openEditStaff(staff)}
+                    className="p-2 bg-[#FAF6F0] hover:bg-coffee-accent rounded-xl text-coffee-primary transition"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteStaff(staff.id)}
+                    className="p-2 bg-red-50 hover:bg-red-100 rounded-xl text-red-600 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Phiên bản máy tính (Desktop Table) */}
+          <div className="hidden md:block bg-white rounded-3xl border border-coffee-light overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
@@ -810,7 +848,7 @@ export default function AdminPage() {
           <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
             <div className="flex items-center justify-between border-b border-coffee-light pb-4">
               <h3 className="font-extrabold text-lg text-coffee-dark">
-                {editingProduct ? 'Cập nhật món ăn' : 'Thêm món ăn mới'}
+                {editingProduct ? 'Cập nhật đồ uống' : 'Thêm đồ uống mới'}
               </h3>
               <button onClick={() => setIsProductModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium">
                 <X className="w-5 h-5" />
@@ -820,7 +858,7 @@ export default function AdminPage() {
             <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
               {/* Tên món */}
               <div className="space-y-1.5">
-                <label className="font-bold text-coffee-medium uppercase">Tên món ăn / đồ uống</label>
+                <label className="font-bold text-coffee-medium uppercase">Tên đồ uống</label>
                 <input
                   type="text"
                   value={prodName}
@@ -902,7 +940,7 @@ export default function AdminPage() {
                 type="submit"
                 className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold rounded-2xl shadow transition"
               >
-                Lưu món ăn
+                Lưu đồ uống
               </button>
             </form>
           </div>

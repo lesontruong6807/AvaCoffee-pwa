@@ -319,7 +319,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
               );
             })}
           </nav>
-          <div className="mt-auto border-t border-coffee-medium pt-4 text-xs space-y-2">
+          <div className="mt-auto border-t border-coffee-medium pt-4 text-xs space-y-3">
+            {/* Nút đăng xuất trên di động */}
+            <button
+              onClick={handleLogout}
+              className="w-full py-2.5 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white font-bold text-xs rounded-xl transition border border-red-500/20 flex items-center justify-center space-x-1.5"
+            >
+              <span>Đăng xuất</span>
+            </button>
+
             <div className="flex items-center justify-between text-coffee-light">
               <span>Database:</span>
               {isSupabaseConfigured ? (
@@ -389,16 +397,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </header>
 
-        {/* MOBILE SESSION INFO */}
-        <div className="md:hidden bg-white border-b border-coffee-light px-4 py-2.5 flex items-center justify-between">
-          <span className="text-[11px] text-coffee-medium">Nhân viên: <strong className="text-coffee-dark">{currentUser?.full_name}</strong></span>
-          <button 
-            onClick={handleLogout}
-            className="text-xs text-red-600 font-bold hover:underline"
-          >
-            Đăng xuất
-          </button>
-        </div>
+        {/* MOBILE SESSION INFO REMOVED */}
 
         {/* Scrollable Page Wrapper */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto">

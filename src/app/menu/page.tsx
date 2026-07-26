@@ -115,7 +115,7 @@ export default function MenuPage() {
           <p className="text-xs text-coffee-medium/80">Thử thay đổi từ khóa hoặc bộ lọc danh mục của bạn.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
           {filteredProducts.map((prod) => {
             const catName = categories.find(c => c.id === prod.category_id)?.name || 'Khác';
             const isOutOfStock = prod.status === 'Hết hàng';
@@ -128,7 +128,7 @@ export default function MenuPage() {
                 }`}
               >
                 {/* Ảnh sản phẩm */}
-                <div className="relative h-44 bg-coffee-light">
+                <div className="relative h-28 sm:h-44 bg-coffee-light">
                   {prod.image_url ? (
                     <img 
                       src={prod.image_url} 
@@ -140,45 +140,45 @@ export default function MenuPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-coffee-medium">
-                      <Coffee className="w-12 h-12" />
+                      <Coffee className="w-8 h-8 sm:w-12 sm:h-12" />
                     </div>
                   )}
-                  <span className={`absolute top-3 right-3 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  <span className={`absolute top-2 right-2 sm:top-3 sm:right-3 text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
                     isOutOfStock ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                   }`}>
                     {prod.status}
                   </span>
-                  <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 bg-coffee-dark/80 text-coffee-accent rounded-md">
+                  <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 bg-coffee-dark/80 text-coffee-accent rounded-md">
                     {prod.id}
                   </span>
                 </div>
 
                 {/* Chi tiết sản phẩm */}
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wide flex items-center">
+                <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
+                  <div className="space-y-1 sm:space-y-1.5">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-coffee-medium uppercase tracking-wide flex items-center">
                       <Tag className="w-3 h-3 mr-1 text-coffee-primary" />
                       {catName}
                     </span>
-                    <h3 className="font-extrabold text-base text-coffee-dark leading-tight">{prod.name}</h3>
-                    <p className="text-xs text-coffee-medium/90 line-clamp-2">
+                    <h3 className="font-extrabold text-xs sm:text-base text-coffee-dark leading-tight line-clamp-2">{prod.name}</h3>
+                    <p className="text-[10px] sm:text-xs text-coffee-medium/90 line-clamp-2">
                       {prod.description || 'Không có mô tả sản phẩm.'}
                     </p>
                   </div>
 
-                  <div className="pt-3 border-t border-coffee-light/60 flex items-center justify-between">
+                  <div className="pt-3 border-t border-coffee-light/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-0">
                     <div>
-                      <span className="text-[10px] text-coffee-medium block">Giá bán ({prod.don_vi_tinh})</span>
-                      <span className="font-black text-base text-coffee-primary">
+                      <span className="text-[9px] sm:text-[10px] text-coffee-medium block">Giá bán ({prod.don_vi_tinh})</span>
+                      <span className="font-black text-xs sm:text-base text-coffee-primary">
                         {prod.price.toLocaleString('vi-VN')}đ
                       </span>
                     </div>
 
                     {/* Chỉ Admin mới được xem giá vốn */}
                     {currentUser?.role === 'Admin' && (
-                      <div className="text-right">
-                        <span className="text-[10px] text-coffee-medium block">Giá vốn</span>
-                        <span className="font-bold text-xs text-coffee-medium">
+                      <div className="sm:text-right">
+                        <span className="text-[9px] sm:text-[10px] text-coffee-medium block">Giá vốn</span>
+                        <span className="font-bold text-[10px] sm:text-xs text-coffee-medium">
                           {prod.cost_price.toLocaleString('vi-VN')}đ
                         </span>
                       </div>
