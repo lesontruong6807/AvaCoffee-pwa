@@ -309,7 +309,7 @@ export default function TimeLogPage() {
                     type="time"
                     value={timeInput}
                     onChange={(e) => setTimeInput(e.target.value)}
-                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                    className="w-full bg-[#FAF6F0] px-3 py-3 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block min-w-0"
                     required
                   />
                 </div>

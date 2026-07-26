@@ -4,14 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { db, getCurrentUser } from '@/lib/database';
 import { 
   CalendarDays, 
-  MapPin, 
-  CheckCircle2, 
-  AlertCircle, 
   User,
   Calendar,
   Loader2,
-  FileText,
-  Map
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -24,9 +20,6 @@ export default function LeaveRequestPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
-  const [gettingLocation, setGettingLocation] = useState(false);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,55 +52,8 @@ export default function LeaveRequestPage() {
     }
   }, [currentUser]);
 
-  // Lấy vị trí GPS & dịch tọa độ ra địa chỉ
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Trình duyệt của bạn không hỗ trợ định vị GPS.');
-      return;
-    }
-
-    setGettingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setCoords({ latitude, longitude });
-
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-            { headers: { 'Accept-Language': 'vi' } }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setAddress(data.display_name || `Tọa độ: ${latitude}, ${longitude}`);
-          } else {
-            setAddress(`Toạ độ: ${latitude}, ${longitude} (Không thể dịch địa chỉ)`);
-          }
-        } catch (e) {
-          setAddress(`Toạ độ: ${latitude}, ${longitude} (Ngoại tuyến)`);
-        } finally {
-          setGettingLocation(false);
-        }
-      },
-      (error) => {
-        console.error('Lỗi định vị:', error);
-        // Định vị mock để demo
-        const mockLat = 10.7769;
-        const mockLon = 106.7009;
-        setCoords({ latitude: mockLat, longitude: mockLon });
-        setAddress('Nhà thờ Đức Bà, Bến Nghé, Quận 1, Thành phố Hồ Chí Minh (Mock GPS)');
-        setGettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coords) {
-      alert('Vui lòng định vị vị trí GPS của bạn để xác thực yêu cầu xin nghỉ phép!');
-      return;
-    }
 
     if (new Date(startDate) > new Date(endDate)) {
       alert('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
@@ -120,10 +66,7 @@ export default function LeaveRequestPage() {
         user_id: currentUser.id,
         start_date: startDate,
         end_date: endDate,
-        reason,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        location_address: address
+        reason
       });
 
       confetti({
@@ -134,8 +77,6 @@ export default function LeaveRequestPage() {
 
       // Reset form
       setReason('');
-      setCoords(null);
-      setAddress('');
       
       // Load lại lịch sử
       await loadRequests(currentUser.id);
@@ -158,7 +99,7 @@ export default function LeaveRequestPage() {
             <span>Đăng ký Xin Nghỉ Phép</span>
           </h3>
           <p className="text-xs text-coffee-medium">
-            Điền đầy đủ khoảng thời gian và lý do nghỉ phép. Vui lòng định vị GPS để xác thực địa điểm gửi đơn.
+            Điền đầy đủ khoảng thời gian và lý do nghỉ phép. Gửi trực tiếp lên hệ thống để Admin duyệt.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5 pt-4">
@@ -201,65 +142,11 @@ export default function LeaveRequestPage() {
               />
             </div>
 
-            {/* Định vị GPS */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-bold text-coffee-medium uppercase block">Xác thực GPS khi gửi đơn</label>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={handleGetLocation}
-                  disabled={gettingLocation}
-                  className="px-5 py-3 bg-coffee-accent hover:bg-coffee-accent/80 text-coffee-dark font-bold text-xs rounded-2xl transition flex items-center justify-center space-x-2 shadow-sm"
-                >
-                  <MapPin className="w-4 h-4" />
-                  <span>{gettingLocation ? 'Đang định vị GPS...' : 'Lấy vị trí gửi đơn'}</span>
-                </button>
-                
-                {address && (
-                  <div className="flex-1 bg-green-50 text-green-800 text-xs px-4 py-3 rounded-2xl border border-green-200 flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
-                    <span className="line-clamp-2">{address}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Định vị bằng tọa độ số & Nút mở Google Maps */}
-              {coords && (
-                <div className="bg-coffee-cream/35 border border-coffee-accent/60 rounded-2xl p-5 space-y-4 shadow-sm">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-3 rounded-xl border border-coffee-light">
-                      <p className="text-[10px] text-coffee-medium font-bold uppercase">Vĩ độ (Latitude)</p>
-                      <p className="font-mono font-bold text-sm text-coffee-dark mt-0.5">{coords.latitude.toFixed(6)}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded-xl border border-coffee-light">
-                      <p className="text-[10px] text-coffee-medium font-bold uppercase">Kinh độ (Longitude)</p>
-                      <p className="font-mono font-bold text-sm text-coffee-dark mt-0.5">{coords.longitude.toFixed(6)}</p>
-                    </div>
-                  </div>
-                  
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 bg-[#1A73E8] hover:bg-[#1557b0] text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-2"
-                  >
-                    <Map className="w-4.5 h-4.5" />
-                    <span>Mở vị trí gửi đơn trên Google Maps 🗺️</span>
-                  </a>
-                </div>
-              )}
-            </div>
-
             {/* Submit */}
             <button
               type="submit"
-              disabled={submitting || !coords}
-              className={`w-full py-4 text-white font-bold text-xs rounded-2xl transition shadow-md ${
-                coords 
-                  ? 'bg-coffee-primary hover:bg-coffee-dark shadow-coffee-primary/20' 
-                  : 'bg-gray-300 cursor-not-allowed shadow-none'
-              }`}
+              disabled={submitting}
+              className={`w-full py-4 text-white font-bold text-xs rounded-2xl transition shadow-md bg-coffee-primary hover:bg-coffee-dark shadow-coffee-primary/20`}
             >
               {submitting ? 'Đang gửi đơn...' : 'Gửi Đơn Xin Nghỉ Phép'}
             </button>
@@ -314,16 +201,6 @@ export default function LeaveRequestPage() {
                       <span>Lý do: <span className="font-medium text-coffee-medium">{req.reason}</span></span>
                     </p>
                   </div>
-
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${req.latitude},${req.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="border-t border-coffee-light/50 pt-2 flex items-center text-[9px] text-blue-700 hover:text-blue-900 hover:underline"
-                  >
-                    <MapPin className="w-3.5 h-3.5 mr-1 text-coffee-primary shrink-0" />
-                    <span className="line-clamp-1">{req.location_address || `Xem tọa độ: ${req.latitude}, ${req.longitude}`}</span>
-                  </a>
                 </div>
               ))
             )}

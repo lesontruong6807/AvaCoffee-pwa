@@ -385,9 +385,6 @@ const mapLeaveRequestToClient = (lr: any) => lr ? {
   end_date: lr.ngay_ket_thuc,
   reason: lr.ly_do,
   submitted_at: lr.ngay_nop,
-  latitude: Number(lr.vi_do),
-  longitude: Number(lr.kinh_do),
-  location_address: lr.dia_chi,
   status: lr.trang_thai,
   users: lr.nguoidung ? { full_name: lr.nguoidung.ho_ten, email: lr.nguoidung.email } : null
 } : null;
@@ -978,7 +975,7 @@ export const db = {
     })).sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
   },
 
-  async createLeaveRequest(req: { user_id: string; start_date: string; end_date: string; reason: string; latitude: number; longitude: number; location_address: string }) {
+  async createLeaveRequest(req: { user_id: string; start_date: string; end_date: string; reason: string }) {
     const newReq = {
       id: generateShortId('lv_'),
       ...req,
@@ -991,10 +988,7 @@ export const db = {
         id_nhan_vien: req.user_id,
         ngay_bat_dau: req.start_date,
         ngay_ket_thuc: req.end_date,
-        ly_do: req.reason,
-        vi_do: req.latitude,
-        kinh_do: req.longitude,
-        dia_chi: req.location_address
+        ly_do: req.reason
       }]).select();
       if (!error && data) return mapLeaveRequestToClient(data[0]);
     }

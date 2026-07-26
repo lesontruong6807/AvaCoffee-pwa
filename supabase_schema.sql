@@ -124,9 +124,6 @@ CREATE TABLE public.nghiphep (
     ngay_ket_thuc DATE NOT NULL,
     ly_do TEXT NOT NULL,
     ngay_nop TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    vi_do NUMERIC NOT NULL,
-    kinh_do NUMERIC NOT NULL,
-    dia_chi TEXT,
     trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Chờ duyệt',
     CONSTRAINT check_dates CHECK (ngay_ket_thuc >= ngay_bat_dau)
 );

@@ -519,27 +519,6 @@ export default function AdminPage() {
                     <p className="bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light text-coffee-medium italic text-[11px]">
                       Lý do: "{req.reason}"
                     </p>
-                    <p className="text-coffee-medium flex items-start">
-                      <MapPin className="w-3.5 h-3.5 mr-1.5 text-coffee-primary shrink-0 mt-0.5" />
-                      <span>Địa điểm gửi đơn: {req.location_address || `Tọa độ: ${req.latitude}, ${req.longitude}`}</span>
-                    </p>
-                  </div>
-
-                  {/* Định vị bằng tọa độ số & Nút mở Google Maps */}
-                  <div className="bg-coffee-cream/35 border border-coffee-accent/60 rounded-2xl p-4 space-y-3 shadow-sm text-xs">
-                    <div className="flex justify-between font-mono text-[10px] text-coffee-medium">
-                      <span>Vĩ độ: {req.latitude.toFixed(6)}</span>
-                      <span>Kinh độ: {req.longitude.toFixed(6)}</span>
-                    </div>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${req.latitude},${req.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 bg-[#1A73E8] hover:bg-[#1557b0] text-white font-bold text-[10px] rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
-                    >
-                      <Map className="w-3.5 h-3.5" />
-                      <span>Mở vị trí gửi đơn trên Google Maps 🗺️</span>
-                    </a>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2">
