@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF6F0; /* Light Cream */
+  --foreground: #2C1D11; /* Espresso dark text */
+  --coffee-primary: #4A3525; /* Warm Coffee Brown */
+  --coffee-accent: #FFE4C4; /* Bisque */
+  --coffee-cream: #FFFDD0; /* Cream */
+  --coffee-dark: #2C1D11; /* Espresso */
+  --coffee-light: #F5EBE0; /* Soft light cream */
+  --coffee-medium: #8C6A5C; /* Medium brown */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-coffee-primary: var(--coffee-primary);
+  --color-coffee-accent: var(--coffee-accent);
+  --color-coffee-cream: var(--coffee-cream);
+  --color-coffee-dark: var(--coffee-dark);
+  --color-coffee-light: var(--coffee-light);
+  --color-coffee-medium: var(--coffee-medium);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+/* Custom scrollbars for coffee elements */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--coffee-light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--coffee-primary);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--coffee-dark);
+}
+
+/* Print thermal receipt rules */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
