@@ -160,7 +160,34 @@ export default function TimeLogPage() {
     try {
       const shiftDate = new Date();
       const [h, m] = timeInput.split(':');
-      shiftDate.setHours(parseInt(h), parseInt(m), 0, 0);
+      const checkHour = parseInt(h, 10);
+      const checkMin = parseInt(m, 10);
+      const totalMinutes = checkHour * 60 + checkMin;
+
+      // 1. Kiểm tra tồn tại ca trực nếu là Ra ca
+      if (logType === 'out' && !activeLog) {
+        toast.error('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
+        setSubmitting(false);
+        return;
+      }
+
+      // 2. Kiểm tra giới hạn giờ khai báo theo ca
+      const currentShift = logType === 'in' ? shift : activeLog.shift;
+      if (currentShift.startsWith('Ca sáng')) {
+        if (totalMinutes < 6 * 60 || totalMinutes > 14 * 60) {
+          toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 06:00 đến 14:00!');
+          setSubmitting(false);
+          return;
+        }
+      } else if (currentShift.startsWith('Ca chiều')) {
+        if (totalMinutes < 14 * 60 || totalMinutes > 22 * 60) {
+          toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 14:00 đến 22:00!');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      shiftDate.setHours(checkHour, checkMin, 0, 0);
 
       if (logType === 'in') {
         // Chấm công VÀO ca
@@ -183,12 +210,6 @@ export default function TimeLogPage() {
         toast.success('Chấm công VÀO ca thành công! Ca trực của bạn đã bắt đầu.');
       } else {
         // Chấm công RA ca
-        if (!activeLog) {
-          toast.error('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
-          setSubmitting(false);
-          return;
-        }
-
         await db.checkOutTimeLog(activeLog.id, {
           check_out_time: shiftDate.toISOString(),
           latitude: coords.latitude,
@@ -224,7 +245,7 @@ export default function TimeLogPage() {
 
   const formatClockTime = (dateStr: string) => {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   const formatDateString = (dateStr: string) => {
@@ -286,7 +307,7 @@ export default function TimeLogPage() {
                     <select
                       value={shift}
                       onChange={(e) => setShift(e.target.value)}
-                      className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
+                      className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                     >
                       <option>Ca sáng (06:00 - 14:00)</option>
                       <option>Ca chiều (14:00 - 22:00)</option>
@@ -295,7 +316,7 @@ export default function TimeLogPage() {
                 ) : (
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-coffee-medium uppercase block">Ca trực đang kết thúc</label>
-                    <div className="w-full h-11 bg-coffee-light/20 px-4 rounded-2xl text-xs font-bold text-coffee-dark border border-coffee-light flex items-center">
+                    <div className="w-full h-11 bg-coffee-light/20 px-4 py-0 rounded-2xl text-xs font-bold text-coffee-dark border border-coffee-light flex items-center">
                       {activeLog?.shift}
                     </div>
                   </div>
@@ -304,13 +325,13 @@ export default function TimeLogPage() {
                 {/* Giờ vào ca / ra ca */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-coffee-medium uppercase">
-                    Giờ {logType === 'in' ? 'vào ca' : 'ra ca'} (Khai báo)
+                    Giờ {logType === 'in' ? 'vào ca' : 'ra ca'} (Khai báo - 24h)
                   </label>
                   <input
                     type="time"
                     value={timeInput}
                     onChange={(e) => setTimeInput(e.target.value)}
-                    className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block min-w-0"
+                    className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block min-w-0"
                     required
                   />
                 </div>
@@ -324,7 +345,7 @@ export default function TimeLogPage() {
                   placeholder={logType === 'in' ? "Ví dụ: Đi làm đúng giờ, xin vào ca trễ do kẹt xe..." : "Ví dụ: Đã bàn giao ca trực đầy đủ, tổng kết tiền mặt..."}
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
-                  className="w-full h-11 bg-[#FAF6F0] px-4 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/70 block"
+                  className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/70 block"
                 />
               </div>
 

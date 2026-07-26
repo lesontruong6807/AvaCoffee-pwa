@@ -428,7 +428,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] animate-fade-in transition-all duration-300">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[9999] animate-fade-in transition-all duration-300">
           <div className={`px-5 py-3 rounded-2xl shadow-xl border text-xs font-black flex items-center space-x-2.5 backdrop-blur-md ${
             toastType === 'success' 
               ? 'bg-emerald-50/95 border-emerald-200 text-emerald-900 shadow-emerald-100/50' 

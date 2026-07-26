@@ -24,6 +24,10 @@ export default function Home() {
     unpaidBills: 0,
     pendingApprovals: 0
   });
+  const [todayShiftStatus, setTodayShiftStatus] = useState({
+    text: 'Chưa chấm công',
+    color: 'bg-red-500/20 border-red-400/30 text-red-200'
+  });
   const [greeting, setGreeting] = useState('Chào bạn');
   const [loading, setLoading] = useState(true);
 
@@ -40,22 +44,22 @@ export default function Home() {
       try {
         const isAdmin = user && user.role === 'Admin';
 
-        // 1. Chỉ fetch bàn và hóa đơn dùng chung
+        // 1. Fetch tables, orders, and time logs (always fetch logs to show shift status)
         const promises: Promise<any>[] = [
           db.getTables(),
-          db.getOrders()
+          db.getOrders(),
+          db.getTimeLogs()
         ];
 
-        // 2. Chỉ fetch logs & leaves nếu tài khoản là Admin
+        // 2. Only fetch leaves if Admin
         if (isAdmin) {
-          promises.push(db.getTimeLogs());
           promises.push(db.getLeaveRequests());
         }
 
         const results = await Promise.all(promises);
         const tables = results[0];
         const orders = results[1];
-        const logs = isAdmin ? results[2] : [];
+        const logs = results[2] || [];
         const leaves = isAdmin ? results[3] : [];
 
         const serving = tables.filter((t: any) => t.status === 'Đang phục vụ').length;
@@ -69,6 +73,37 @@ export default function Home() {
           unpaidBills: unpaid,
           pendingApprovals: pendingTime + pendingLeave
         });
+
+        // Tính toán trạng thái ca trực hôm nay của nhân viên hiện tại
+        if (user) {
+          const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local format
+          const myLogs = logs.filter((l: any) => l.user_id === user.id);
+          const todayLogs = myLogs.filter((l: any) => {
+            const logDateStr = new Date(l.check_in_time).toLocaleDateString('en-CA');
+            return logDateStr === todayStr;
+          });
+
+          let statusText = 'Chưa chấm công';
+          let statusColor = 'bg-red-500/20 border-red-400/30 text-red-200';
+
+          if (todayLogs.length > 0) {
+            const hasActive = todayLogs.some((l: any) => l.status === 'Đang trong ca');
+            const hasOut = todayLogs.some((l: any) => l.check_out_time);
+
+            if (hasActive) {
+              statusText = 'Đang trong ca';
+              statusColor = 'bg-yellow-500/20 border-yellow-400/30 text-yellow-200';
+            } else if (hasOut) {
+              statusText = 'Hoàn tất ca làm';
+              statusColor = 'bg-green-500/20 border-green-400/30 text-green-200';
+            }
+          }
+
+          setTodayShiftStatus({
+            text: statusText,
+            color: statusColor
+          });
+        }
       } catch (e) {
         console.error('Lỗi khi tải thống kê trang chủ:', e);
       } finally {
@@ -192,16 +227,11 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Ngày giờ đơn giản */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-2xl flex items-center space-x-3 self-start sm:self-auto shrink-0 shadow-sm">
-            <div className="text-right">
-              <p className="text-sm font-black text-coffee-accent leading-none">
-                {(typeof window !== 'undefined') ? new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '00:00'}
-              </p>
-              <p className="text-[9px] font-bold text-coffee-light/80 leading-none mt-1">
-                {(typeof window !== 'undefined') ? new Date().toLocaleDateString('vi-VN') : ''}
-              </p>
-            </div>
+          {/* Ngày giờ đơn giản trên cùng 1 hàng, không có ô */}
+          <div className="text-right text-xs font-bold text-coffee-accent/90 shrink-0 self-start sm:self-auto flex items-center space-x-2">
+            <span>{(typeof window !== 'undefined') ? new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '00:00'}</span>
+            <span className="text-coffee-light/40">•</span>
+            <span>{(typeof window !== 'undefined') ? new Date().toLocaleDateString('vi-VN') : ''}</span>
           </div>
         </div>
 
@@ -231,10 +261,10 @@ export default function Home() {
             <h4 className="font-black text-base text-white leading-none">{stats.pendingApprovals} đơn</h4>
           </div>
 
-          {/* Trạng thái ca trực */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-sm">
-            <span className="text-[9px] font-bold text-coffee-light/80 uppercase tracking-wider">Trạng thái ca</span>
-            <h4 className="font-bold text-[10px] text-coffee-accent truncate leading-none">Đang hoạt động</h4>
+          {/* Trạng thái ca trực (Động & màu sắc code tùy trạng thái) */}
+          <div className={`backdrop-blur-sm border p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-sm transition-all duration-300 ${todayShiftStatus.color}`}>
+            <span className="text-[9px] font-black uppercase tracking-wider">Trạng thái ca</span>
+            <h4 className="font-extrabold text-[11px] truncate leading-none">{todayShiftStatus.text}</h4>
           </div>
         </div>
       </div>
@@ -243,7 +273,7 @@ export default function Home() {
       <div className="space-y-6">
         {/* Nhóm Nhiệm vụ mỗi ngày */}
         <div className="space-y-3">
-          <h3 className="font-black text-sm md:text-base text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-primary pl-2">Nhiệm vụ mỗi ngày</h3>
+          <h3 className="font-black text-base md:text-lg text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-primary pl-2">Nhiệm vụ mỗi ngày</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {dailyCards.map((card) => {
               const Icon = card.icon;
@@ -263,7 +293,7 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-0.5">
-                    <h4 className="font-extrabold text-xs text-coffee-dark tracking-tight flex items-center space-x-1">
+                    <h4 className="font-extrabold text-sm text-coffee-dark tracking-tight flex items-center space-x-1">
                       <span>{card.name}</span>
                       <ChevronRight className="w-3.5 h-3.5 text-coffee-medium/40 group-hover:translate-x-0.5 transition-transform" />
                     </h4>
@@ -279,7 +309,7 @@ export default function Home() {
 
         {/* Nhóm Tính năng Khác */}
         <div className="space-y-3">
-          <h3 className="font-black text-sm md:text-base text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-medium pl-2">Khác</h3>
+          <h3 className="font-black text-base md:text-lg text-coffee-dark uppercase tracking-wider border-l-4 border-coffee-medium pl-2">Khác</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {otherCards.map((card) => {
               const Icon = card.icon;
@@ -299,7 +329,7 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-0.5">
-                    <h4 className="font-extrabold text-xs text-coffee-dark tracking-tight flex items-center space-x-1">
+                    <h4 className="font-extrabold text-sm text-coffee-dark tracking-tight flex items-center space-x-1">
                       <span>{card.name}</span>
                       <ChevronRight className="w-3.5 h-3.5 text-coffee-medium/40 group-hover:translate-x-0.5 transition-transform" />
                     </h4>
