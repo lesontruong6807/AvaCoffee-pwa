@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { db, getCurrentUser } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
@@ -8,7 +9,8 @@ import {
   User,
   Calendar,
   Loader2,
-  FileText
+  FileText,
+  ArrowLeft
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -91,7 +93,16 @@ export default function LeaveRequestPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <div className="w-full space-y-6">
+      <Link 
+        href="/"
+        className="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-coffee-light text-coffee-primary rounded-xl text-xs font-bold hover:bg-coffee-light transition shadow-sm w-fit animate-fade-in"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Về Trang chủ</span>
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       {/* FORM ĐĂNG KÝ (2/3) */}
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-coffee-light space-y-4">
@@ -208,6 +219,7 @@ export default function LeaveRequestPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

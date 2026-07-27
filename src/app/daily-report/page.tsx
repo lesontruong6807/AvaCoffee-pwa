@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { db, getCurrentUser } from '@/lib/database';
-import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft } from 'lucide-react';
+import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft, ArrowLeft } from 'lucide-react';
 
 export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -106,6 +107,14 @@ export default function DailyReportPage() {
 
   return (
     <div className="w-full space-y-6 font-sans">
+      <Link 
+        href="/"
+        className="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-coffee-light text-coffee-primary rounded-xl text-xs font-bold hover:bg-coffee-light transition shadow-sm w-fit animate-fade-in"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Về Trang chủ</span>
+      </Link>
+
       {/* Tiêu đề & Ngày */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-coffee-light">
         <div>

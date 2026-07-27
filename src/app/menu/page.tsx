@@ -75,7 +75,7 @@ export default function MenuPage() {
           className="px-4 py-2 bg-white border border-coffee-light text-coffee-primary rounded-xl text-xs font-bold hover:bg-coffee-light flex items-center space-x-2 w-fit transition shadow-sm"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Về Dashboard</span>
+          <span>Về Trang chủ</span>
         </Link>
       </div>
 

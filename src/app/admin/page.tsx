@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { db, getCurrentUser } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
@@ -21,7 +22,8 @@ import {
   ShoppingBag,
   Loader2,
   CheckCircle2,
-  Map
+  Map,
+  ArrowLeft
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -127,6 +129,9 @@ export default function AdminPage() {
 
   // --- LÓGIC PHÊ DUYỆT ---
   const handleApproveTime = async (id: string, status: 'Đã duyệt' | 'Từ chối') => {
+    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn ${status === 'Đã duyệt' ? 'CHẤP NHẬN' : 'TỪ CHỐI'} lượt chấm công này không?`);
+    if (!isConfirmed) return;
+    
     try {
       await db.approveTimeLog(id, status);
       confetti({ particleCount: 50, spread: 40 });
@@ -138,6 +143,9 @@ export default function AdminPage() {
   };
 
   const handleApproveLeave = async (id: string, status: 'Đã duyệt' | 'Từ chối') => {
+    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn ${status === 'Đã duyệt' ? 'CHẤP NHẬN' : 'TỪ CHỐI'} đơn nghỉ phép này không?`);
+    if (!isConfirmed) return;
+
     try {
       await db.approveLeaveRequest(id, status);
       confetti({ particleCount: 50, spread: 40 });
@@ -149,6 +157,9 @@ export default function AdminPage() {
   };
 
   const handleApproveInventory = async (id: string, status: 'Đã duyệt' | 'Từ chối') => {
+    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn ${status === 'Đã duyệt' ? 'CHẤP NHẬN' : 'TỪ CHỐI'} đơn kho này không?`);
+    if (!isConfirmed) return;
+
     try {
       await db.approveInventoryLog(id, status);
       confetti({ particleCount: 50, spread: 40 });
@@ -302,6 +313,13 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
+      <Link 
+        href="/"
+        className="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-coffee-light text-coffee-primary rounded-xl text-xs font-bold hover:bg-coffee-light transition shadow-sm w-fit animate-fade-in"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Về Trang chủ</span>
+      </Link>
       {/* TABS HEADER ADMIN */}
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-coffee-light flex flex-wrap gap-2">
         <button

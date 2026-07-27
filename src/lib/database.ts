@@ -972,6 +972,13 @@ export const db = {
     if (isSupabaseConfigured && supabase) {
       const { data: order } = await supabase.from('hoadon').select('id_ban').eq('id', orderId).single();
       
+      // Trừ kho nguyên liệu khi thanh toán
+      const { data: items } = await supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId);
+      if (items && items.length > 0) {
+        const cartItems = items.map(item => ({ product_id: item.idsp, quantity: item.so_luong }));
+        await this.deductStockFromOrder(cartItems);
+      }
+
       const { data: updatedOrder, error } = await supabase
         .from('hoadon')
         .update({
@@ -992,6 +999,13 @@ export const db = {
     const orders = mockDb.getOrders();
     const oIdx = orders.findIndex(o => o.id === orderId);
     if (oIdx !== -1) {
+      // Trừ kho nguyên liệu trong Mock DB khi thanh toán
+      const items = mockDb.getOrderItems().filter(item => item.order_id === orderId);
+      if (items && items.length > 0) {
+        const cartItems = items.map(item => ({ product_id: item.product_id, quantity: item.quantity }));
+        await this.deductStockFromOrder(cartItems);
+      }
+
       orders[oIdx].payment_status = 'Đã thanh toán';
       orders[oIdx].payment_method = paymentMethod;
       orders[oIdx].paid_at = paidAt;
@@ -1032,13 +1046,17 @@ export const db = {
     const oIdx = orders.findIndex(o => o.id === orderId);
     if (oIdx !== -1) {
       const tableId = orders[oIdx].table_id;
+      
+      // Xóa hóa đơn
       orders.splice(oIdx, 1);
       mockDb.setOrders(orders);
       
-      const items = mockDb.getOrderItems();
-      const filteredItems = items.filter(item => item.order_id !== orderId);
+      // Xóa chi tiết hóa đơn
+      const allItems = mockDb.getOrderItems();
+      const filteredItems = allItems.filter(item => item.order_id !== orderId);
       mockDb.setOrderItems(filteredItems);
       
+      // Giải phóng bàn
       const tables = mockDb.getTables();
       const tIdx = tables.findIndex(t => t.id === tableId);
       if (tIdx !== -1) {
@@ -1598,6 +1616,61 @@ export const db = {
     }
 
     return targetLog;
+  },
+
+  // Hoàn trả kho nguyên liệu khi hủy đơn hàng
+  async restoreStockFromOrder(items: Array<{ product_id: string; quantity: number }>) {
+    try {
+      const recipes = await this.getRecipes();
+      const ingredients = await this.getIngredients();
+      let updated = false;
+
+      for (const item of items) {
+        const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
+        for (const rec of itemRecipes) {
+          const ing = ingredients.find(i => i.id === rec.ingredient_id);
+          if (ing) {
+            const restoreQty = rec.quantity_needed * item.quantity;
+            ing.stock_quantity = Number(ing.stock_quantity) + restoreQty;
+            updated = true;
+
+            if (isSupabaseConfigured && supabase) {
+              await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id);
+              await supabase.from('lichsukho').insert([{
+                id: generateShortId('inv_'),
+                id_nguyen_lieu: ing.id,
+                so_luong_thay_doi: restoreQty,
+                loai_giao_dich: 'Khác',
+                chi_phi: 0,
+                ghi_chu: `Hoàn kho do hủy đơn hàng (Mã SP: ${item.product_id})`,
+                trang_thai: 'Đã duyệt'
+              }]);
+            } else {
+              const logs = mockDb.getInventoryLogs();
+              logs.push({
+                id: generateShortId('inv_'),
+                ingredient_id: ing.id,
+                custom_ingredient_name: null,
+                change_amount: restoreQty,
+                type: 'Khác' as const,
+                cost: 0,
+                note: `Hoàn kho do hủy đơn hàng (Mã SP: ${item.product_id})`,
+                staff_id: 'system',
+                created_at: new Date().toISOString(),
+                status: 'Đã duyệt' as const
+              });
+              mockDb.setInventoryLogs(logs);
+            }
+          }
+        }
+      }
+
+      if (updated && (!isSupabaseConfigured || !supabase)) {
+        mockDb.setIngredients(ingredients);
+      }
+    } catch (e) {
+      console.error('Lỗi khi hoàn trả tồn kho đơn hàng:', e);
+    }
   },
 
   // Tự động khấu trừ kho khi có đơn bán hàng mới ở POS

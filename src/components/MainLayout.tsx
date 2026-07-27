@@ -212,7 +212,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Trang chủ', path: '/', icon: LayoutDashboard },
     { name: 'Bán hàng (POS)', path: '/pos', icon: ShoppingBag },
     { name: 'Hóa đơn chưa thanh toán', path: '/payment', icon: CreditCard },
     { name: 'Báo cáo ca trực', path: '/daily-report', icon: BarChart3 },

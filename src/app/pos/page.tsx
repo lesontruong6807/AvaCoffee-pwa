@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   db, 
   getCurrentUser, 
@@ -136,9 +137,6 @@ export default function PosPage() {
         items: cart
       });
 
-      // Tự động trừ kho nguyên liệu theo công thức pha chế
-      await db.deductStockFromOrder(cart);
-
       // Tạo hiệu ứng confetti ăn mừng
       confetti({
         particleCount: 100,
@@ -174,6 +172,16 @@ export default function PosPage() {
 
   return (
     <div className="w-full space-y-6">
+      {/* Nút Quay về Trang chủ */}
+      {!selectedTable && (
+        <Link 
+          href="/"
+          className="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-coffee-light text-coffee-primary rounded-xl text-xs font-bold hover:bg-coffee-light transition shadow-sm w-fit"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Về Trang chủ</span>
+        </Link>
+      )}
 
       {/* TÊN BÀN ĐANG ĐƯỢC CHỌN (BREADCRUMB) */}
       {selectedTable && (
@@ -228,7 +236,13 @@ export default function PosPage() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {tables.map((table) => {
+            {[...tables]
+              .sort((a, b) => {
+                if (a.table_name === 'Khách mang về') return -1;
+                if (b.table_name === 'Khách mang về') return 1;
+                return 0;
+              })
+              .map((table) => {
               const isOccupied = table.status === 'Đang phục vụ';
               return (
                 <button
@@ -500,10 +514,10 @@ export default function PosPage() {
                     Hủy tất cả
                   </button>
                   <button
-                    onClick={() => setPosStep('summary')}
+                    onClick={handleConfirmOrder}
                     className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition shadow shadow-coffee-primary/20"
                   >
-                    Xem Hóa Đơn
+                    Xác nhận đơn
                   </button>
                 </div>
               </div>
@@ -609,9 +623,9 @@ export default function PosPage() {
                     Hủy tất cả
                   </button>
                   <button
-                    onClick={() => {
-                      setPosStep('summary');
+                    onClick={async () => {
                       setIsMobileCartOpen(false);
+                      await handleConfirmOrder();
                     }}
                     className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow"
                   >
