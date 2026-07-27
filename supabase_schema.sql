@@ -116,7 +116,8 @@ CREATE TABLE public.chamcong (
     dia_chi TEXT,
     ghi_chu_vao TEXT,
     ghi_chu_ra TEXT,
-    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Đang trong ca', 'Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Đang trong ca'
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Đang trong ca', 'Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Đang trong ca',
+    sua_lai BOOLEAN DEFAULT FALSE
 );
 
 -- 8. BẢNG XIN NGHỈ PHÉP (nghiphep)

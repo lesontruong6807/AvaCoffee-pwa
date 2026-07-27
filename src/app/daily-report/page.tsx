@@ -93,6 +93,7 @@ export default function DailyReportPage() {
 
   const morning = calculateMetrics(morningOrders, morningLogs);
   const afternoon = calculateMetrics(afternoonOrders, afternoonLogs);
+  const bothShifts = calculateMetrics(todayOrders, todayLogs);
 
   if (loading) {
     return (
@@ -155,34 +156,17 @@ export default function DailyReportPage() {
       </div>
 
       {activeShiftFilter === 'both' ? (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* --- CA SÁNG --- */}
-          <div className="space-y-6">
-            <div className="bg-coffee-primary text-white p-5 rounded-3xl shadow flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-lg">Ca Sáng</h3>
-                <p className="text-xs text-coffee-accent/80 font-medium">Khung giờ hoạt động: 06:00 - 14:00</p>
-              </div>
-              <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
-                {morning.orders.length} Đơn hàng
-              </span>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="bg-coffee-primary text-white p-5 rounded-3xl shadow flex items-center justify-between">
+            <div>
+              <h3 className="font-extrabold text-lg">Cả Hai Ca</h3>
+              <p className="text-xs text-coffee-accent/80 font-medium">Tổng hợp ca làm việc: 06:00 - 22:00</p>
             </div>
-            <ShiftMetricsSection metrics={morning} />
+            <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
+              {bothShifts.orders.length} Đơn hàng
+            </span>
           </div>
-
-          {/* --- CA CHIỀU --- */}
-          <div className="space-y-6">
-            <div className="bg-coffee-dark text-white p-5 rounded-3xl shadow flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-lg">Ca Chiều</h3>
-                <p className="text-xs text-coffee-accent/80 font-medium">Khung giờ hoạt động: 14:00 - 22:00</p>
-              </div>
-              <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
-                {afternoon.orders.length} Đơn hàng
-              </span>
-            </div>
-            <ShiftMetricsSection metrics={afternoon} />
-          </div>
+          <ShiftMetricsSection metrics={bothShifts} />
         </div>
       ) : activeShiftFilter === 'morning' ? (
         <div className="max-w-3xl mx-auto space-y-6">

@@ -34,6 +34,79 @@ export default function TimeLogPage() {
   const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Trạng thái Sửa ca làm
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState<any>(null);
+  const [editCheckInTime, setEditCheckInTime] = useState('');
+  const [editCheckOutTime, setEditCheckOutTime] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  const handleOpenEditModal = (log: any) => {
+    setEditingLog(log);
+    
+    const inDate = new Date(log.check_in_time);
+    const inH = String(inDate.getHours()).padStart(2, '0');
+    const inM = String(inDate.getMinutes()).padStart(2, '0');
+    setEditCheckInTime(`${inH}:${inM}`);
+
+    if (log.check_out_time) {
+      const outDate = new Date(log.check_out_time);
+      const outH = String(outDate.getHours()).padStart(2, '0');
+      const outM = String(outDate.getMinutes()).padStart(2, '0');
+      setEditCheckOutTime(`${outH}:${outM}`);
+    } else {
+      setEditCheckOutTime('');
+    }
+
+    setEditReason('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLog) return;
+    if (!editReason.trim()) {
+      toast.error('Vui lòng nhập lý do chỉnh sửa giờ ca làm!');
+      return;
+    }
+
+    setSubmittingEdit(true);
+    try {
+      const logDay = new Date(editingLog.check_in_time);
+      
+      const [inH, inM] = editCheckInTime.split(':');
+      const newInDate = new Date(logDay);
+      newInDate.setHours(parseInt(inH, 10), parseInt(inM, 10), 0, 0);
+
+      let newOutISO = null;
+      if (editingLog.check_out_time && editCheckOutTime) {
+        const [outH, outM] = editCheckOutTime.split(':');
+        const newOutDate = new Date(logDay);
+        newOutDate.setHours(parseInt(outH, 10), parseInt(outM, 10), 0, 0);
+        newOutISO = newOutDate.toISOString();
+      }
+
+      await db.updateTimeLogRequest(editingLog.id, {
+        check_in_time: newInDate.toISOString(),
+        check_out_time: newOutISO,
+        ghi_chu_vao: `[Sửa lại] ${editReason.trim()}`
+      });
+
+      confetti({ particleCount: 50, spread: 40 });
+      toast.success('Đã gửi yêu cầu chỉnh sửa giờ ca làm lên Admin phê duyệt!');
+      setIsEditModalOpen(false);
+      if (currentUser) {
+        await loadLogs(currentUser.id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi gửi yêu cầu chỉnh sửa.');
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
   useEffect(() => {
     // Đọc tham số ?type=in hoặc type=out từ URL client-side
     const params = new URLSearchParams(window.location.search);
@@ -499,12 +572,93 @@ export default function TimeLogPage() {
                     <MapPin className="w-3.5 h-3.5 mr-1 text-coffee-primary shrink-0 mt-0.5" />
                     <span className="line-clamp-2">{log.location_address || `Tọa độ: ${log.latitude}, ${log.longitude}`}</span>
                   </a>
+
+                  {new Date(log.check_in_time).toDateString() === new Date().toDateString() && (
+                    <button
+                      onClick={() => handleOpenEditModal(log)}
+                      className="w-full mt-2 py-2 bg-coffee-primary/10 hover:bg-coffee-primary hover:text-white text-coffee-primary font-bold text-[10px] rounded-xl transition flex items-center justify-center space-x-1 border border-coffee-primary/25"
+                    >
+                      ✏️ Chỉnh sửa lại giờ làm hôm nay
+                    </button>
+                  )}
                 </div>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* MODAL SỬA GIỜ CHẤM CÔNG HÔM NAY */}
+      {isEditModalOpen && editingLog && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-coffee-light space-y-5 animate-scaleIn">
+            <div className="flex justify-between items-center border-b border-coffee-light pb-4">
+              <h3 className="font-extrabold text-base text-coffee-dark">
+                ✏️ Sửa Giờ Ca Làm Việc Hôm Nay
+              </h3>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 hover:bg-[#FAF6F0] rounded-xl text-coffee-medium transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="p-3 bg-[#FAF6F0] border border-coffee-light rounded-2xl text-[11px] text-coffee-medium space-y-0.5">
+                <p>Ca trực: <strong>{editingLog.shift}</strong></p>
+                <p>Ngày làm việc: <strong>{formatDateString(editingLog.check_in_time)}</strong></p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-coffee-medium uppercase block">Giờ vào ca mới</label>
+                  <input
+                    type="time"
+                    value={editCheckInTime}
+                    onChange={(e) => setEditCheckInTime(e.target.value)}
+                    className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
+                    required
+                  />
+                </div>
+
+                {editingLog.check_out_time && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-coffee-medium uppercase block">Giờ ra ca mới</label>
+                    <input
+                      type="time"
+                      value={editCheckOutTime}
+                      onChange={(e) => setEditCheckOutTime(e.target.value)}
+                      className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-coffee-medium uppercase block">Lý do chỉnh sửa giờ (Bắt buộc)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: quên bấm chấm công đúng giờ, ghi nhận sai giờ..."
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/70 block"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingEdit}
+                className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition shadow-md shadow-coffee-primary/20 flex items-center justify-center space-x-2"
+              >
+                <span>Gửi Yêu Cầu Chỉnh Sửa</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

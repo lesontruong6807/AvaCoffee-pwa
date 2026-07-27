@@ -19,18 +19,34 @@ import { db, getCurrentUser } from '@/lib/database';
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [stats, setStats] = useState({
-    totalTables: 0,
-    servingTables: 0,
-    unpaidBills: 0,
-    pendingApprovals: 0
+  const [stats, setStats] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('ava_cached_stats');
+      if (cached) {
+        try { return JSON.parse(cached); } catch (e) {}
+      }
+    }
+    return {
+      totalTables: 0,
+      servingTables: 0,
+      unpaidBills: 0,
+      pendingApprovals: 0
+    };
   });
-  const [todayShiftStatus, setTodayShiftStatus] = useState({
-    text: 'Chưa chấm công',
-    color: 'bg-red-500/20 border-red-400/30 text-red-200'
+  const [todayShiftStatus, setTodayShiftStatus] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('ava_cached_shift');
+      if (cached) {
+        try { return JSON.parse(cached); } catch (e) {}
+      }
+    }
+    return {
+      text: 'Chưa chấm công',
+      color: 'bg-red-500/20 border-red-400/30 text-red-200'
+    };
   });
   const [greeting, setGreeting] = useState('Chào bạn');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -52,9 +68,10 @@ export default function Home() {
           db.getTimeLogs()
         ];
 
-        // 2. Only fetch leaves if Admin
+        // 2. Only fetch leaves & inventory logs if Admin
         if (isAdmin) {
           promises.push(db.getLeaveRequests());
+          promises.push(db.getInventoryLogs());
         }
 
         const results = await Promise.all(promises);
@@ -62,18 +79,23 @@ export default function Home() {
         const orders = results[1];
         const logs = results[2] || [];
         const leaves = isAdmin ? results[3] : [];
+        const invLogs = isAdmin ? results[4] : [];
 
         const serving = tables.filter((t: any) => t.status === 'Đang phục vụ').length;
         const unpaid = orders.filter((o: any) => o.payment_status === 'Chưa thanh toán').length;
         const pendingTime = isAdmin ? logs.filter((l: any) => l.status === 'Chờ duyệt').length : 0;
         const pendingLeave = isAdmin ? leaves.filter((r: any) => r.status === 'Chờ duyệt').length : 0;
+        const pendingInv = isAdmin ? invLogs.filter((r: any) => r.status === 'Chờ duyệt').length : 0;
 
-        setStats({
+        const newStats = {
           totalTables: tables.length,
           servingTables: serving,
           unpaidBills: unpaid,
-          pendingApprovals: pendingTime + pendingLeave
-        });
+          pendingApprovals: pendingTime + pendingLeave + pendingInv
+        };
+
+        setStats(newStats);
+        localStorage.setItem('ava_cached_stats', JSON.stringify(newStats));
 
         // Tính toán trạng thái ca trực hôm nay của nhân viên hiện tại
         if (user) {
@@ -100,15 +122,15 @@ export default function Home() {
             }
           }
 
-          setTodayShiftStatus({
+          const newShiftStatus = {
             text: statusText,
             color: statusColor
-          });
+          };
+          setTodayShiftStatus(newShiftStatus);
+          localStorage.setItem('ava_cached_shift', JSON.stringify(newShiftStatus));
         }
       } catch (e) {
         console.error('Lỗi khi tải thống kê trang chủ:', e);
-      } finally {
-        setLoading(false);
       }
     }
     loadStats();
@@ -209,15 +231,6 @@ export default function Home() {
 
   const dailyCards = visibleCards.filter(card => card.group === 'daily');
   const otherCards = visibleCards.filter(card => card.group === 'other');
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <Loader2 className="w-10 h-10 text-coffee-primary animate-spin" />
-        <p className="text-coffee-medium font-medium">Đang tải trang tổng quan...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 pb-12 font-sans">

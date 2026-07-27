@@ -29,6 +29,7 @@ export default function InventoryPage() {
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'stock' | 'logs'>('stock');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Restock Modal
   const [isRestockOpen, setIsRestockOpen] = useState(false);
@@ -188,6 +189,21 @@ export default function InventoryPage() {
   const selectedRestockIngredient = ingredients.find(i => i.id === selectedIngId);
   const selectedStocktakeIngredient = ingredients.find(i => i.id === stocktakeIngId);
 
+  const getIngStats = (ingId: string) => {
+    const todayLogs = logs.filter(l => new Date(l.created_at).toLocaleDateString('en-CA') === todayStr && l.ingredient_id === ingId);
+    const refilled = todayLogs
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+    const sold = todayLogs
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    return { refilled, sold };
+  };
+
+  const filteredIngredients = ingredients.filter(ing => 
+    ing.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 font-sans">
@@ -231,7 +247,7 @@ export default function InventoryPage() {
             className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-extrabold text-xs rounded-2xl transition shadow-md shadow-coffee-primary/20 flex items-center space-x-1.5"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>+ Nhập Thêm</span>
+            <span>Nhập Thêm</span>
           </button>
         </div>
       </div>
@@ -299,75 +315,125 @@ export default function InventoryPage() {
       {/* TAB 1: DANH SÁCH TỒN KHO */}
       {activeTab === 'stock' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ingredients.map((ing) => {
-              const isLowStock = ing.min_stock !== null && Number(ing.stock_quantity) <= Number(ing.min_stock);
-              const formattedStock = formatIngredientStock(ing.stock_quantity, ing.unit, ing.quy_cach);
+          {/* Ô Tìm Kiếm Nhanh */}
+          <div className="bg-white p-4 rounded-3xl border border-coffee-light shadow-sm flex items-center space-x-2">
+            <input
+              type="text"
+              placeholder="🔍 Tìm kiếm nhanh nguyên liệu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 h-11 px-4 bg-[#FAF6F0] rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 bg-coffee-light hover:bg-coffee-accent/40 text-coffee-dark text-xs font-bold rounded-xl transition"
+              >
+                Xóa
+              </button>
+            )}
+          </div>
 
-              return (
-                <div
-                  key={ing.id}
-                  className={`bg-white p-4 rounded-3xl border transition-all duration-200 shadow-sm flex flex-col justify-between space-y-3 relative overflow-hidden ${
-                    isLowStock 
-                      ? 'border-red-300 ring-2 ring-red-400/20 bg-red-50/30' 
-                      : 'border-coffee-light hover:border-coffee-accent'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-extrabold text-sm md:text-base text-coffee-dark tracking-tight leading-snug">
-                        {ing.name}
-                      </h3>
-                      <span className="text-[10px] text-coffee-medium font-semibold">
-                        Đơn vị: <strong className="text-coffee-dark">{ing.unit}</strong> {ing.quy_cach ? `(${ing.quy_cach})` : ''}
-                      </span>
-                    </div>
+          {/* Bảng Excel-style */}
+          <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
+                <thead>
+                  <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
+                    <th className="p-3.5 w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
+                      Tên nguyên liệu
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
+                      Tồn đầu ngày
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-green-700 border-r border-coffee-light/60">
+                      SL nhập (+)
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
+                      SL bán (-)
+                    </th>
+                    <th className="p-3.5 w-40 font-black text-coffee-primary border-r border-coffee-light/60">
+                      Tồn thực tế
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-coffee-dark text-center">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {filteredIngredients.map((ing) => {
+                    const isLowStock = ing.min_stock !== null && Number(ing.stock_quantity) <= Number(ing.min_stock);
+                    const formattedStock = formatIngredientStock(ing.stock_quantity, ing.unit, ing.quy_cach);
+                    const formattedOpening = formatIngredientStock(ing.opening_stock, ing.unit, ing.quy_cach);
+                    const { refilled, sold } = getIngStats(ing.id);
 
-                    {isLowStock && (
-                      <span className="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1 shrink-0">
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>Sắp hết</span>
-                      </span>
-                    )}
-                  </div>
+                    // Formatter for Refill and Sales values
+                    const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                    const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
 
-                  {/* SỐ LƯỢNG TỒN THỰC TẾ & TỒN ĐẦU */}
-                  <div className="bg-[#FAF6F0] p-3 rounded-2xl border border-coffee-light/60 space-y-1.5">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] font-extrabold text-coffee-medium uppercase">Tồn thực tế:</span>
-                      <strong className={`font-black text-base md:text-lg ${isLowStock ? 'text-red-600' : 'text-coffee-primary'}`}>
-                        {formattedStock}
-                      </strong>
-                    </div>
-
-                    <div className="flex justify-between text-[10px] text-coffee-medium pt-1 border-t border-dashed border-coffee-light">
-                      <span>Tồn đầu ca: <strong>{formatIngredientStock(ing.opening_stock, ing.unit, ing.quy_cach)}</strong></span>
-                      {ing.min_stock !== null && (
-                        <span>Mức cảnh báo: <strong className="text-red-700">{ing.min_stock} {ing.unit}</strong></span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* NÚT THAO TÁC NHANH CHO TỪNG MÓN */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      onClick={() => handleOpenStocktake(ing.id)}
-                      className="py-2 bg-white hover:bg-[#FAF6F0] text-coffee-dark font-bold text-[11px] rounded-xl border border-coffee-light transition flex items-center justify-center space-x-1"
-                    >
-                      <ClipboardCheck className="w-3.5 h-3.5 text-coffee-medium" />
-                      <span>Kiểm kho</span>
-                    </button>
-                    <button
-                      onClick={() => handleOpenRestock(ing.id)}
-                      className="py-2 bg-coffee-primary/10 hover:bg-coffee-primary text-coffee-primary hover:text-white font-bold text-[11px] rounded-xl transition flex items-center justify-center space-x-1"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      <span>Nhập thêm</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                    return (
+                      <tr 
+                        key={ing.id} 
+                        className={`hover:bg-coffee-light/20 transition-all ${
+                          isLowStock ? 'bg-red-50/20' : ''
+                        }`}
+                      >
+                        {/* Sticky First Column */}
+                        <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 truncate ${
+                          isLowStock ? 'bg-red-50/90' : 'bg-white'
+                        }`}>
+                          <div className="flex flex-col">
+                            <span className="truncate">{ing.name}</span>
+                            <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-0.5">
+                              ({ing.unit}{ing.quy_cach ? `, ${ing.quy_cach}` : ''})
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold">
+                          {formattedOpening}
+                        </td>
+                        <td className="p-3 border-r border-coffee-light/60 text-green-700 font-extrabold">
+                          {formatRefill}
+                        </td>
+                        <td className="p-3 border-r border-coffee-light/60 text-red-600 font-extrabold">
+                          {formatSold}
+                        </td>
+                        <td className="p-3 border-r border-coffee-light/60 font-black">
+                          <div className="flex items-center space-x-1.5">
+                            <span className={isLowStock ? 'text-red-600' : 'text-coffee-primary'}>
+                              {formattedStock}
+                            </span>
+                            {isLowStock && (
+                              <span className="text-[8px] font-black bg-red-500 text-white px-1.5 py-0.2 rounded uppercase scale-90 tracking-wider">
+                                Sắp hết
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => handleOpenStocktake(ing.id)}
+                              className="px-2.5 py-1.5 bg-white hover:bg-[#FAF6F0] text-coffee-dark font-bold text-[10px] rounded-lg border border-coffee-light transition"
+                              title="Kiểm kho"
+                            >
+                              Kiểm
+                            </button>
+                            <button
+                              onClick={() => handleOpenRestock(ing.id)}
+                              className="px-2.5 py-1.5 bg-coffee-primary/10 hover:bg-coffee-primary hover:text-white text-coffee-primary font-bold text-[10px] rounded-lg transition"
+                              title="Nhập thêm"
+                            >
+                              Nhập
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

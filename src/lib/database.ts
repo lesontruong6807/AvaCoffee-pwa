@@ -589,6 +589,7 @@ const mapTimeLogToClient = (tl: any) => tl ? {
   ghi_chu_vao: tl.ghi_chu_vao || '',
   ghi_chu_ra: tl.ghi_chu_ra || '',
   status: tl.trang_thai,
+  is_edited: tl.sua_lai || false,
   users: tl.nguoidung ? { full_name: tl.nguoidung.ho_ten, email: tl.nguoidung.email } : null
 } : null;
 
@@ -1169,6 +1170,40 @@ export const db = {
     return null;
   },
 
+  async updateTimeLogRequest(logId: string, updates: {
+    check_in_time: string;
+    check_out_time: string | null;
+    ghi_chu_vao: string;
+  }) {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('chamcong')
+        .update({
+          gio_vao: updates.check_in_time,
+          gio_ra: updates.check_out_time,
+          ghi_chu_vao: updates.ghi_chu_vao,
+          trang_thai: 'Chờ duyệt',
+          sua_lai: true
+        })
+        .eq('id', logId)
+        .select();
+      if (!error && data) return mapTimeLogToClient(data[0]);
+    }
+
+    const logs = mockDb.getTimeLogs();
+    const idx = logs.findIndex(l => l.id === logId);
+    if (idx !== -1) {
+      logs[idx].check_in_time = updates.check_in_time;
+      logs[idx].check_out_time = updates.check_out_time;
+      logs[idx].ghi_chu_vao = updates.ghi_chu_vao;
+      logs[idx].status = 'Chờ duyệt';
+      logs[idx].sua_lai = true;
+      mockDb.setTimeLogs(logs);
+      return logs[idx];
+    }
+    return null;
+  },
+
   // --- LEAVE REQUESTS (nghiphep) ---
   async getLeaveRequests() {
     if (isSupabaseConfigured && supabase) {
@@ -1228,8 +1263,50 @@ export const db = {
     return null;
   },
 
+  async checkDailyRollover() {
+    if (typeof window === 'undefined') return;
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const lastRollover = localStorage.getItem('ava_last_rollover_date');
+    if (lastRollover !== todayStr) {
+      try {
+        let ingredients: any[] = [];
+        if (isSupabaseConfigured && supabase) {
+          const { data } = await supabase.from('nguyenlieu').select('*');
+          if (data) {
+            ingredients = data.map(ing => ({
+              id: ing.id,
+              name: ing.ten_nguyen_lieu,
+              unit: ing.don_vi_tinh,
+              stock_quantity: Number(ing.so_luong_ton),
+              opening_stock: Number(ing.ton_dau_ngay || ing.so_luong_ton),
+              min_stock: ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : null,
+              quy_cach: ing.quy_cach
+            }));
+          }
+        } else {
+          ingredients = mockDb.getIngredients();
+        }
+
+        for (const ing of ingredients) {
+          ing.opening_stock = ing.stock_quantity;
+          if (isSupabaseConfigured && supabase) {
+            await supabase.from('nguyenlieu').update({ ton_dau_ngay: ing.stock_quantity }).eq('id', ing.id);
+          }
+        }
+
+        if (!isSupabaseConfigured || !supabase) {
+          mockDb.setIngredients(ingredients);
+        }
+        localStorage.setItem('ava_last_rollover_date', todayStr);
+      } catch (e) {
+        console.error('Lỗi khi rollover ngày mới cho kho:', e);
+      }
+    }
+  },
+
   // --- NGUYÊN LIỆU & KHO (nguyenlieu, congthuc, lichsukho) ---
   async getIngredients() {
+    await this.checkDailyRollover();
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from('nguyenlieu')
@@ -1241,7 +1318,7 @@ export const db = {
           name: ing.ten_nguyen_lieu,
           unit: ing.don_vi_tinh,
           stock_quantity: Number(ing.so_luong_ton),
-          opening_stock: Number(ing.ton_dau_ngay || ing.so_luong_ton),
+          opening_stock: Number(ing.ton_dau_ngay !== null ? ing.ton_dau_ngay : ing.so_luong_ton),
           min_stock: ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : null,
           quy_cach: ing.quy_cach
         }));
@@ -1534,6 +1611,30 @@ export const db = {
 
             if (isSupabaseConfigured && supabase) {
               await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id);
+              await supabase.from('lichsukho').insert([{
+                id: generateShortId('inv_'),
+                id_nguyen_lieu: ing.id,
+                so_luong_thay_doi: -deductQty,
+                loai_giao_dich: 'Bán hàng',
+                chi_phi: 0,
+                ghi_chu: `Khấu trừ tự động qua POS (Mã SP: ${item.product_id})`,
+                trang_thai: 'Đã duyệt'
+              }]);
+            } else {
+              const logs = mockDb.getInventoryLogs();
+              logs.push({
+                id: generateShortId('inv_'),
+                ingredient_id: ing.id,
+                custom_ingredient_name: null,
+                change_amount: -deductQty,
+                type: 'Bán hàng' as const,
+                cost: 0,
+                note: `Khấu trừ tự động qua POS (Mã SP: ${item.product_id})`,
+                staff_id: 'system',
+                created_at: new Date().toISOString(),
+                status: 'Đã duyệt' as const
+              });
+              mockDb.setInventoryLogs(logs);
             }
           }
         }

@@ -406,11 +406,18 @@ export default function AdminPage() {
                           <p className="text-[10px] text-coffee-medium">{log.users?.email}</p>
                         </div>
                       </div>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        isWorking ? 'bg-blue-100 text-blue-805 text-blue-700' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {log.status}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          isWorking ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {log.status}
+                        </span>
+                        {log.is_edited && (
+                          <span className="text-[9px] font-black bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Sửa lại
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="text-xs space-y-3">
@@ -738,6 +745,7 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-coffee-light text-coffee-medium font-bold">
                       <th className="py-2">Mã đơn</th>
+                      <th className="py-2">Ngày</th>
                       <th className="py-2">Bàn</th>
                       <th className="py-2">Thanh toán</th>
                       <th className="py-2 text-right">Tổng tiền</th>
@@ -747,6 +755,7 @@ export default function AdminPage() {
                     {paidOrders.slice(0, 5).map((order) => (
                       <tr key={order.id}>
                         <td className="py-2.5 font-mono text-[10px] text-coffee-medium">{order.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
                         <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
                         <td className="py-2.5">
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
@@ -760,7 +769,7 @@ export default function AdminPage() {
                     ))}
                     {paidOrders.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-coffee-medium/60">Chưa có giao dịch thanh toán nào hôm nay.</td>
+                        <td colSpan={5} className="py-6 text-center text-coffee-medium/60">Chưa có giao dịch thanh toán nào hôm nay.</td>
                       </tr>
                     )}
                   </tbody>

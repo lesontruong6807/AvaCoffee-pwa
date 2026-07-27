@@ -194,7 +194,7 @@ export default function MenuPage() {
                     </div>
 
                     <span className="text-[10px] font-bold text-coffee-medium group-hover:text-coffee-dark underline underline-offset-2">
-                      Xem công thức 📋
+                      Công thức 📋
                     </span>
                   </div>
                 </div>
