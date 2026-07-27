@@ -359,22 +359,30 @@ export default function AdminPage() {
               <p className="text-xs text-coffee-medium">Xem lại vị trí chấm công, nghỉ phép và đơn nhập/kiểm kho để duyệt.</p>
             </div>
             {/* Sub-tabs */}
-            <div className="flex bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light">
+            <div className="flex bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light overflow-x-auto max-w-full gap-1">
               <button
                 onClick={() => setApprovalSubTab('time')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  approvalSubTab === 'time' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium'
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                  approvalSubTab === 'time' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
                 }`}
               >
                 Chấm công
               </button>
               <button
                 onClick={() => setApprovalSubTab('leave')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  approvalSubTab === 'leave' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium'
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                  approvalSubTab === 'leave' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
                 }`}
               >
                 Nghỉ phép
+              </button>
+              <button
+                onClick={() => setApprovalSubTab('inventory')}
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                  approvalSubTab === 'inventory' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
+                }`}
+              >
+                Duyệt Kho & Kiểm Kho
               </button>
             </div>
           </div>
@@ -382,7 +390,7 @@ export default function AdminPage() {
           {/* DUYỆT CHẤM CÔNG */}
           {approvalSubTab === 'time' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').map((log) => {
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' && l.check_out_time).map((log) => {
                 const formatTime = (dStr: any) => {
                   if (!dStr) return 'Chưa ra ca';
                   return new Date(dStr).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
@@ -507,7 +515,7 @@ export default function AdminPage() {
                 );
               })}
 
-              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').length === 0 && (
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' && l.check_out_time).length === 0 && (
                 <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                   <p className="font-bold">Tuyệt vời! Không còn yêu cầu chấm công nào chờ duyệt</p>

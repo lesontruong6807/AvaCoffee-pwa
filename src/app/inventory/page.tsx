@@ -340,7 +340,7 @@ export default function InventoryPage() {
               <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
-                    <th className="p-3.5 w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
+                    <th className="p-3.5 w-24 sm:w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
                       Tên nguyên liệu
                     </th>
                     <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
@@ -379,12 +379,12 @@ export default function InventoryPage() {
                         }`}
                       >
                         {/* Sticky First Column */}
-                        <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 truncate ${
+                        <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-24 sm:w-52 whitespace-normal break-words ${
                           isLowStock ? 'bg-red-50/90' : 'bg-white'
                         }`}>
                           <div className="flex flex-col">
-                            <span className="truncate">{ing.name}</span>
-                            <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-0.5">
+                            <span className="whitespace-normal break-words leading-tight">{ing.name}</span>
+                            <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-1">
                               ({ing.unit}{ing.quy_cach ? `, ${ing.quy_cach}` : ''})
                             </span>
                           </div>

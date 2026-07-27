@@ -110,13 +110,12 @@ export default function Home() {
           let statusColor = 'bg-red-500/20 border-red-400/30 text-red-200';
 
           if (todayLogs.length > 0) {
-            const hasActive = todayLogs.some((l: any) => l.status === 'Đang trong ca');
-            const hasOut = todayLogs.some((l: any) => l.check_out_time);
+            const hasActiveShift = todayLogs.some((l: any) => !l.check_out_time);
 
-            if (hasActive) {
+            if (hasActiveShift) {
               statusText = 'Đang trong ca';
               statusColor = 'bg-yellow-500/20 border-yellow-400/30 text-yellow-200';
-            } else if (hasOut) {
+            } else {
               statusText = 'Hoàn tất ca làm';
               statusColor = 'bg-green-500/20 border-green-400/30 text-green-200';
             }
