@@ -61,31 +61,33 @@ export default function Home() {
       try {
         const isAdmin = user && user.role === 'Admin';
 
-        // 1. Fetch tables, orders, and time logs (always fetch logs to show shift status)
-        const promises: Promise<any>[] = [
+        // Tải toàn bộ dữ liệu bàn, đơn, chấm công, nghỉ phép và kho hàng
+        const [tables, orders, logs, leaves, invLogs] = await Promise.all([
           db.getTables(),
           db.getOrders(),
-          db.getTimeLogs()
-        ];
-
-        // 2. Only fetch leaves & inventory logs if Admin
-        if (isAdmin) {
-          promises.push(db.getLeaveRequests());
-          promises.push(db.getInventoryLogs());
-        }
-
-        const results = await Promise.all(promises);
-        const tables = results[0];
-        const orders = results[1];
-        const logs = results[2] || [];
-        const leaves = isAdmin ? results[3] : [];
-        const invLogs = isAdmin ? results[4] : [];
+          db.getTimeLogs(),
+          db.getLeaveRequests(),
+          db.getInventoryLogs()
+        ]);
 
         const serving = tables.filter((t: any) => t.status === 'Đang phục vụ').length;
         const unpaid = orders.filter((o: any) => o.payment_status === 'Chưa thanh toán').length;
-        const pendingTime = isAdmin ? logs.filter((l: any) => l.status === 'Chờ duyệt').length : 0;
-        const pendingLeave = isAdmin ? leaves.filter((r: any) => r.status === 'Chờ duyệt').length : 0;
-        const pendingInv = isAdmin ? invLogs.filter((r: any) => r.status === 'Chờ duyệt').length : 0;
+        
+        let pendingTime = 0;
+        let pendingLeave = 0;
+        let pendingInv = 0;
+
+        if (isAdmin) {
+          // Admin: Xem tổng số lượng yêu cầu đang chờ phê duyệt của toàn hệ thống
+          pendingTime = (logs || []).filter((l: any) => l.status === 'Chờ duyệt').length;
+          pendingLeave = (leaves || []).filter((r: any) => r.status === 'Chờ duyệt').length;
+          pendingInv = (invLogs || []).filter((r: any) => r.status === 'Chờ duyệt').length;
+        } else if (user) {
+          // Nhân viên: Chỉ đếm các đơn của MÌNH nộp đang chờ duyệt
+          pendingTime = (logs || []).filter((l: any) => l.user_id === user.id && l.status === 'Chờ duyệt').length;
+          pendingLeave = (leaves || []).filter((r: any) => r.user_id === user.id && r.status === 'Chờ duyệt').length;
+          pendingInv = (invLogs || []).filter((r: any) => r.staff_id === user.id && r.status === 'Chờ duyệt').length;
+        }
 
         const newStats = {
           totalTables: tables.length,
@@ -279,7 +281,9 @@ export default function Home() {
 
           {/* Yêu cầu chờ duyệt */}
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between h-20 shadow-sm">
-            <span className="text-[9px] font-bold text-coffee-light/80 uppercase tracking-wider">Chờ phê duyệt</span>
+            <span className="text-[9px] font-bold text-coffee-light/80 uppercase tracking-wider">
+              {currentUser?.role === 'Admin' ? 'Chờ phê duyệt' : 'Đơn của tôi chờ'}
+            </span>
             <h4 className="font-black text-base text-white leading-none">{stats.pendingApprovals} đơn</h4>
           </div>
 
