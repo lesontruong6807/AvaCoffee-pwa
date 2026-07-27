@@ -75,18 +75,18 @@ export default function ReceiptComponent({
       </div>
 
       {/* DANH SÁCH MÓN */}
-      <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', margin: '4px 0' }}>
+      <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', margin: '4px 0', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>
-            <th style={{ padding: '3px 0', textAlign: 'left' }}>Tên món</th>
-            <th style={{ padding: '3px 0', textAlign: 'center', width: '30px' }}>SL</th>
-            <th style={{ padding: '3px 0', textAlign: 'right', width: '70px' }}>Thành tiền</th>
+            <th style={{ padding: '3px 0', textAlign: 'left', width: '50%' }}>Tên món</th>
+            <th style={{ padding: '3px 0', textAlign: 'center', width: '15%' }}>SL</th>
+            <th style={{ padding: '3px 0', textAlign: 'right', width: '35%' }}>Thành tiền</th>
           </tr>
         </thead>
         <tbody>
           {cart.map((item) => (
             <tr key={item.product_id} style={{ borderBottom: '1px dashed #ccc' }}>
-              <td style={{ padding: '4px 0', paddingRight: '4px' }}>{item.name}</td>
+              <td style={{ padding: '4px 0', paddingRight: '4px', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}>{item.name}</td>
               <td style={{ padding: '4px 0', textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
               <td style={{ padding: '4px 0', textAlign: 'right' }}>
                 {item.subtotal.toLocaleString('vi-VN')}đ
