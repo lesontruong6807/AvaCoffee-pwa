@@ -883,8 +883,11 @@ export const db = {
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Ghi hóa đơn chính (hoadon)
-      const { data: order, error: orderErr } = await supabase
+      // 1. Ghi hóa đơn chính (hoadon) - thử kèm giam_gia trước, nếu lỗi thì thử lại không kèm
+      let order = null;
+      let orderErr = null;
+
+      const firstAttempt = await supabase
         .from('hoadon')
         .insert([{
           id: orderId,
@@ -897,6 +900,27 @@ export const db = {
         }])
         .select()
         .single();
+
+      if (firstAttempt.error) {
+        console.warn('Lỗi ghi hoadon kèm giam_gia, thử lại không kèm giam_gia:', firstAttempt.error);
+        const retryAttempt = await supabase
+          .from('hoadon')
+          .insert([{
+            id: orderId,
+            id_ban: table_id,
+            id_nhan_vien: staff_id,
+            tong_tien: total_amount,
+            trang_thai_thanh_toan: 'Chưa thanh toán',
+            ngay_tao: createdAt
+          }])
+          .select()
+          .single();
+        order = retryAttempt.data;
+        orderErr = retryAttempt.error;
+      } else {
+        order = firstAttempt.data;
+        orderErr = firstAttempt.error;
+      }
 
       if (!orderErr && order) {
         // 2. Chuyển trạng thái bàn sang Đang phục vụ
