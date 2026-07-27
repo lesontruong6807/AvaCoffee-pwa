@@ -1012,35 +1012,42 @@ export const db = {
   async cancelOrder(orderId: string) {
     if (isSupabaseConfigured && supabase) {
       const { data: order } = await supabase.from('hoadon').select('id_ban').eq('id', orderId).single();
-      const { data: updatedOrder, error } = await supabase
-        .from('hoadon')
-        .update({ trang_thai_thanh_toan: 'Đã hủy' })
-        .eq('id', orderId)
-        .select()
-        .single();
-
-      if (!error && updatedOrder && order?.id_ban) {
+      
+      // 1. Delete details
+      await supabase.from('hoadondetail').delete().eq('idhoadon', orderId);
+      
+      // 2. Delete main order
+      const { error } = await supabase.from('hoadon').delete().eq('id', orderId);
+      
+      if (!error && order?.id_ban) {
+        // 3. Reset table status
         await supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban);
-        return mapOrderToClient(updatedOrder);
+        return true;
       }
+      return false;
     }
 
+    // Mock DB Fallback
     const orders = mockDb.getOrders();
     const oIdx = orders.findIndex(o => o.id === orderId);
     if (oIdx !== -1) {
-      orders[oIdx].payment_status = 'Đã hủy';
-      mockDb.setOrders(orders);
-
       const tableId = orders[oIdx].table_id;
+      orders.splice(oIdx, 1);
+      mockDb.setOrders(orders);
+      
+      const items = mockDb.getOrderItems();
+      const filteredItems = items.filter(item => item.order_id !== orderId);
+      mockDb.setOrderItems(filteredItems);
+      
       const tables = mockDb.getTables();
       const tIdx = tables.findIndex(t => t.id === tableId);
       if (tIdx !== -1) {
         tables[tIdx].status = 'Trống';
         mockDb.setTables(tables);
       }
-      return orders[oIdx];
+      return true;
     }
-    return null;
+    return false;
   },
 
   // --- TIME LOGS (chamcong) ---

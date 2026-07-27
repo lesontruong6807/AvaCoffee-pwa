@@ -5,7 +5,7 @@ import { db } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
   CreditCard, 
-  Printer, 
+  Trash2, 
   DollarSign, 
   ArrowRightLeft, 
   Calendar, 
@@ -98,68 +98,31 @@ export default function PaymentPage() {
     }
   };
 
-  // In hóa đơn nhiệt
-  const handlePrint = () => {
+  // Hủy hóa đơn hoàn toàn
+  const handleCancel = async () => {
     if (!selectedOrder) return;
-    window.print();
+    const confirmCancel = window.confirm("Bạn có chắc chắn muốn hủy và xóa hoàn toàn hóa đơn này không?");
+    if (!confirmCancel) return;
+
+    try {
+      const success = await db.cancelOrder(selectedOrder.id);
+      if (success) {
+        toast.success("Đã hủy và xóa hóa đơn thành công!");
+        setSelectedOrder(null);
+        setOrderItems([]);
+        await loadOrders();
+      } else {
+        toast.error("Không thể hủy hóa đơn này.");
+      }
+    } catch (e) {
+      console.error("Lỗi khi hủy hóa đơn:", e);
+      toast.error("Gặp lỗi khi hủy hóa đơn.");
+    }
   };
 
   return (
     <div className="w-full space-y-6">
-      {/* PHẦN CHỈ IN CHO MÁY IN NHIỆT 80MM (ẨN TRÊN WEB, HIỆN KHI PRINT) */}
-      {selectedOrder && (
-        <div id="thermal-receipt" className="hidden print-only bg-white p-4 text-black text-xs font-mono w-[80mm] leading-tight">
-          <div className="text-center space-y-1 mb-4">
-            <h1 className="font-extrabold text-base tracking-wider uppercase">AVA COFFEE</h1>
-            <p className="text-[10px]">Đ/c: 123 Đường Cà Phê, Quận 1, TP. HCM</p>
-            <p className="text-[10px]">SĐT: 0987.654.321</p>
-            <p className="text-[10px]">--------------------------------</p>
-            <h2 className="font-bold text-xs uppercase">HÓA ĐƠN TẠM TÍNH</h2>
-            <p className="text-[9px]">{selectedOrder.tables?.table_name}</p>
-          </div>
-
-          <div className="space-y-1 text-[10px] mb-3">
-            <p>Mã HĐ: {selectedOrder.id.substring(0, 8).toUpperCase()}</p>
-            <p>Ngày: {new Date(selectedOrder.created_at).toLocaleString('vi-VN')}</p>
-            <p>Thu ngân: {selectedOrder.users?.full_name || 'Nhân viên'}</p>
-            <p className="text-[10px]">--------------------------------</p>
-          </div>
-
-          {/* Chi tiết món */}
-          <table className="w-full text-[10px] border-collapse mb-3">
-            <thead>
-              <tr className="border-b border-dashed border-black">
-                <th className="text-left py-1">Tên món</th>
-                <th className="text-center py-1">SL</th>
-                <th className="text-right py-1">T.Tiền</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderItems.map((item) => (
-                <tr key={item.id} className="border-b border-dashed border-gray-200">
-                  <td className="py-1 pr-1">{item.products?.name}</td>
-                  <td className="text-center py-1">{item.quantity}</td>
-                  <td className="text-right py-1">{(item.subtotal).toLocaleString('vi-VN')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="space-y-1 text-[10px] text-right mb-4">
-            <p className="text-[10px]">--------------------------------</p>
-            <p className="font-bold text-xs">TỔNG TIỀN: {selectedOrder.total_amount.toLocaleString('vi-VN')}đ</p>
-            <p className="text-[9px] italic">Giá chưa bao gồm VAT</p>
-          </div>
-
-          <div className="text-center space-y-1 text-[9px] mt-6">
-            <p>Cảm ơn Quý Khách - Hẹn gặp lại!</p>
-            <p>Powered by AVA POS System</p>
-          </div>
-        </div>
-      )}
-
-      {/* GIAO DIỆN WEB CHÍNH (ẨN KHI IN) */}
-      <div className="no-print grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Danh sách hóa đơn chưa thanh toán (Bên trái, 1/3) */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
@@ -234,11 +197,11 @@ export default function PaymentPage() {
 
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={handlePrint}
-                    className="p-3 bg-coffee-light hover:bg-coffee-accent text-coffee-primary rounded-2xl transition flex items-center space-x-2 text-xs font-bold shadow-sm"
+                    onClick={handleCancel}
+                    className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl transition flex items-center space-x-2 text-xs font-bold shadow-sm"
                   >
-                    <Printer className="w-4 h-4" />
-                    <span>In tạm tính (80mm)</span>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Hủy đơn</span>
                   </button>
                   <button
                     onClick={() => setIsPayModalOpen(true)}

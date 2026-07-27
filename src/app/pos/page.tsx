@@ -22,7 +22,6 @@ import {
   Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import ReceiptComponent from '@/components/ReceiptComponent';
 
 interface CartItem {
   product_id: string;
@@ -48,26 +47,8 @@ export default function PosPage() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
-  const [printData, setPrintData] = useState<{
-    tableName: string;
-    staffName: string;
-    staffRole: string;
-    cart: CartItem[];
-    totalAmount: number;
-    orderTime: string;
-  } | null>(null);
-
-  const [localServerIp, setLocalServerIp] = useState('localhost');
-  const [printerIp, setPrinterIp] = useState('192.168.1.232');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedServer = localStorage.getItem('ava_local_server_ip');
-      if (savedServer) setLocalServerIp(savedServer);
-      const savedPrinter = localStorage.getItem('ava_printer_ip');
-      if (savedPrinter) setPrinterIp(savedPrinter);
-    }
-
     async function loadData() {
       try {
         const [tablesData, categoriesData, productsData] = await Promise.all([
@@ -147,23 +128,6 @@ export default function PosPage() {
     if (!selectedTable || cart.length === 0) return;
     setSavingOrder(true);
 
-    const snapshotPrintData = {
-      tableName: selectedTable.table_name,
-      staffName: currentUser?.full_name || 'Lê Sơn',
-      staffRole: currentUser?.role || 'Admin',
-      cart: [...cart],
-      totalAmount: totalCartAmount,
-      orderTime: new Date().toLocaleString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      }),
-      printerIp: printerIp
-    };
-    setPrintData(snapshotPrintData);
-
     try {
       await db.createOrder({
         table_id: selectedTable.id,
@@ -174,28 +138,6 @@ export default function PosPage() {
 
       // Tự động trừ kho nguyên liệu theo công thức pha chế
       await db.deductStockFromOrder(cart);
-
-      // Gửi lệnh in hóa đơn tới Local Print Service
-      try {
-        const printResponse = await fetch(`http://${localServerIp}:5000/print`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(snapshotPrintData)
-        });
-        const printRes = await printResponse.json();
-        if (printRes.success) {
-          toast.success('Hóa đơn đã được in tự động qua máy in Zywell!');
-        } else {
-          throw new Error(printRes.error || 'Lỗi kết nối máy in Zywell');
-        }
-      } catch (printError) {
-        console.warn('Không thể kết nối local print server, chuyển sang in qua trình duyệt:', printError);
-        toast.error('Máy in Zywell offline, đang mở hộp thoại in trình duyệt...');
-        // Kích hoạt in hóa đơn dự phòng bằng trình duyệt
-        setTimeout(() => {
-          window.print();
-        }, 150);
-      }
 
       // Tạo hiệu ứng confetti ăn mừng
       confetti({
@@ -329,45 +271,6 @@ export default function PosPage() {
                 </button>
               );
             })}
-          </div>
-
-          {/* Cấu hình Máy in Local */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
-            <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider flex items-center space-x-2">
-              <span>⚙️ Cấu hình máy in Zywell</span>
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] text-coffee-medium font-bold uppercase block">
-                  IP Máy tính chạy Print Service (Localhost/IP Máy)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Mặc định: localhost"
-                  value={localServerIp}
-                  onChange={(e) => {
-                    setLocalServerIp(e.target.value);
-                    localStorage.setItem('ava_local_server_ip', e.target.value);
-                  }}
-                  className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-semibold"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-coffee-medium font-bold uppercase block">
-                  IP Máy in Zywell ZY908 (Local IP)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Mặc định: 192.168.1.232"
-                  value={printerIp}
-                  onChange={(e) => {
-                    setPrinterIp(e.target.value);
-                    localStorage.setItem('ava_printer_ip', e.target.value);
-                  }}
-                  className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-semibold"
-                />
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -627,9 +530,12 @@ export default function PosPage() {
 
         {/* MOBILE BOTTOM CART DRAWER OVERLAY */}
         {isMobileCartOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center">
+          <div className="lg:hidden fixed inset-0 z-50">
             <div className="fixed inset-0 bg-black/60" onClick={() => setIsMobileCartOpen(false)} />
-            <div className="relative bg-white w-full rounded-t-[32px] max-h-[80vh] flex flex-col shadow-2xl p-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] z-50 transition-all duration-300">
+            <div 
+              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[32px] max-h-[85vh] flex flex-col shadow-2xl p-6 pt-5 z-50 transition-all duration-300"
+              style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+            >
               <div className="w-12 h-1.5 bg-coffee-light rounded-full mx-auto mb-5 shrink-0" onClick={() => setIsMobileCartOpen(false)} />
               
               <h3 className="font-bold text-base text-coffee-dark border-b border-coffee-light pb-3 flex items-center justify-between shrink-0">
@@ -789,16 +695,6 @@ export default function PosPage() {
           </div>
         </div>
       )}
-
-      {/* COMPONENT IN PHIẾU ĐẶT MÓN (K80) */}
-      <ReceiptComponent
-        tableName={printData?.tableName || selectedTable?.table_name}
-        staffName={printData?.staffName || currentUser?.full_name}
-        staffRole={printData?.staffRole || currentUser?.role}
-        cart={printData?.cart || cart}
-        totalAmount={printData?.totalAmount || totalCartAmount}
-        orderTime={printData?.orderTime}
-      />
     </div>
   );
 }
