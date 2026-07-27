@@ -85,6 +85,7 @@ CREATE TABLE public.hoadon (
     tong_tien NUMERIC NOT NULL CHECK (tong_tien >= 0) DEFAULT 0,
     trang_thai_thanh_toan TEXT NOT NULL CHECK (trang_thai_thanh_toan IN ('Chưa thanh toán', 'Đã thanh toán', 'Đã hủy')) DEFAULT 'Chưa thanh toán',
     phuong_thuc_thanh_toan TEXT CHECK (phuong_thuc_thanh_toan IN ('Tiền mặt', 'Chuyển khoản')),
+    giam_gia NUMERIC DEFAULT 0 CHECK (giam_gia >= 0),
     ngay_tao TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     ngay_thanh_toan TIMESTAMP WITH TIME ZONE
 );

@@ -553,6 +553,7 @@ const mapOrderToClient = (o: any) => o ? {
   table_id: o.id_ban,
   staff_id: o.id_nhan_vien,
   total_amount: Number(o.tong_tien),
+  discount: Number(o.giam_gia || 0),
   payment_status: o.trang_thai_thanh_toan,
   payment_method: o.phuong_thuc_thanh_toan,
   created_at: o.ngay_tao,
@@ -876,8 +877,8 @@ export const db = {
       }));
   },
 
-  async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; items: any[] }) {
-    const { table_id, staff_id, total_amount, items } = orderData;
+  async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; discount?: number; items: any[] }) {
+    const { table_id, staff_id, total_amount, discount = 0, items } = orderData;
     const orderId = generateShortId('ord_');
     const createdAt = new Date().toISOString();
 
@@ -890,6 +891,7 @@ export const db = {
           id_ban: table_id,
           id_nhan_vien: staff_id,
           tong_tien: total_amount,
+          giam_gia: discount,
           trang_thai_thanh_toan: 'Chưa thanh toán',
           ngay_tao: createdAt
         }])
@@ -930,6 +932,7 @@ export const db = {
       table_id,
       staff_id,
       total_amount,
+      giam_gia: discount,
       payment_status: 'Chưa thanh toán' as const,
       payment_method: null,
       created_at: createdAt,

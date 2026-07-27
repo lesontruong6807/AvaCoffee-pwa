@@ -29,7 +29,7 @@ import confetti from 'canvas-confetti';
 
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'products' | 'staff'>('approvals');
+  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'inventory' | 'products' | 'staff'>('approvals');
   const [loading, setLoading] = useState(true);
 
   // Dữ liệu quản trị
@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
+  const [ingredients, setIngredients] = useState<any[]>([]);
 
   // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
   const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
@@ -64,14 +65,15 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs, invLogs] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
         db.getProducts(),
         db.getCategories(),
         db.getUsers(),
-        db.getInventoryLogs()
+        db.getInventoryLogs(),
+        db.getIngredients()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -80,6 +82,7 @@ export default function AdminPage() {
       setCategories(cats);
       setUsers(usrs);
       setInventoryLogs(invLogs);
+      setIngredients(ings);
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -96,6 +99,18 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, []);
+
+  // Bộ lọc ngày cho Báo cáo doanh thu (Tab 'reports')
+  const [repStartDate, setRepStartDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
+  });
+  const [repEndDate, setRepEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+
+  // Bộ lọc ngày & tìm kiếm cho Báo cáo kho (Tab 'inventory')
+  const [invStartDate, setInvStartDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [invEndDate, setInvEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [invSearchQuery, setInvSearchQuery] = useState('');
 
   // Kiểm tra quyền Admin
   if (!loading && currentUser?.role !== 'Admin') {
@@ -290,26 +305,90 @@ export default function AdminPage() {
   };
 
   // --- LÓGIC BÁO CÁO DOANH THU ---
-  // Lọc theo tháng hiện tại của năm hiện tại (Tự động reset sang tháng mới dựa vào Now())
-  const currentMonthDate = new Date();
-  const currentYear = currentMonthDate.getFullYear();
-  const currentMonthNum = currentMonthDate.getMonth(); // 0-indexed
+  const repStartT = new Date(repStartDate + 'T00:00:00').getTime();
+  const repEndT = new Date(repEndDate + 'T23:59:59').getTime();
 
   const paidOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
-    const orderDate = new Date(o.created_at);
-    return orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonthNum;
-  });
-  const monthLogs = inventoryLogs.filter(l => {
-    const logDate = new Date(l.created_at);
-    return logDate.getFullYear() === currentYear && logDate.getMonth() === currentMonthNum && l.type === 'Nhập kho';
+    const t = new Date(o.created_at).getTime();
+    return t >= repStartT && t <= repEndT;
   });
 
-  const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const rangeRestockLogs = inventoryLogs.filter(l => {
+    if (l.type !== 'Nhập kho' || l.status === 'Từ chối') return false;
+    const t = new Date(l.created_at).getTime();
+    return t >= repStartT && t <= repEndT;
+  });
+
+  const totalDiscount = paidOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
+  const grossRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
   const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
-  const totalRestockExpenses = monthLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
-  const netMonthRevenue = totalRevenue - totalRestockExpenses;
+  
+  const totalRestockCosts = rangeRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+  const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
+  const netMonthRevenue = grossRevenue - totalRestockExpenses;
+  const totalRevenue = grossRevenue;
+
+  // --- LÓGIC BÁO CÁO KHO THEO KHOẢNG NGÀY ---
+  const getLogAppliedAmount = (log: any) => {
+    if (log.type === 'Bán hàng' || log.type === 'Pha chế') {
+      return Number(log.change_amount || 0);
+    }
+    if (log.type === 'Nhập kho') {
+      if (log.status === 'Từ chối') return 0;
+      return Number(log.change_amount || 0);
+    }
+    if (log.type === 'Hao hụt/Cân lại') {
+      if (log.status === 'Đã duyệt') return Number(log.change_amount || 0);
+      return 0;
+    }
+    return Number(log.change_amount || 0);
+  };
+
+  const getHistoricalIngStats = (ing: any) => {
+    const startT = new Date(invStartDate + 'T00:00:00').getTime();
+    const endT = new Date(invEndDate + 'T23:59:59').getTime();
+
+    const ingLogs = inventoryLogs
+      .filter(l => l.ingredient_id === ing.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const logsAfterStart = ingLogs.filter(l => new Date(l.created_at).getTime() >= startT);
+    const totalAppliedAfterStart = logsAfterStart.reduce((sum, l) => sum + getLogAppliedAmount(l), 0);
+    const openingStock = Number(ing.stock_quantity) - totalAppliedAfterStart;
+
+    const logsAfterEnd = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
+    const totalAppliedAfterEnd = logsAfterEnd.reduce((sum, l) => sum + getLogAppliedAmount(l), 0);
+    const endingStock = Number(ing.stock_quantity) - totalAppliedAfterEnd;
+
+    const logsInRange = ingLogs.filter(l => {
+      const t = new Date(l.created_at).getTime();
+      return t >= startT && t <= endT;
+    });
+
+    const refilled = logsInRange
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
+    const sold = logsInRange
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+
+    return {
+      openingStock,
+      endingStock,
+      refilled,
+      sold
+    };
+  };
+
+  const formatIngredientStock = (qty: number, unit: string, quyCach: string | null) => {
+    if (quyCach && quyCach.toLowerCase().includes('lít') && unit.toLowerCase() === 'ml') {
+      return `${qty / 1000}L`;
+    }
+    return `${qty} ${unit}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -343,6 +422,17 @@ export default function AdminPage() {
         >
           <BarChart3 className="w-4.5 h-4.5" />
           <span>Báo cáo doanh thu</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('inventory')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'inventory'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <CalendarDays className="w-4.5 h-4.5" />
+          <span>Báo cáo kho</span>
         </button>
         <button
           onClick={() => setAdminTab('products')}
@@ -672,14 +762,41 @@ export default function AdminPage() {
       {/* 2. TAB BÁO CÁO DOANH THU */}
       {adminTab === 'reports' && (
         <div className="space-y-6">
-          {/* Header Báo Cáo Doanh Thu Tháng */}
+          {/* Bộ lọc khoảng ngày */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3.5 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Từ ngày:</span>
+                <input
+                  type="date"
+                  value={repStartDate}
+                  onChange={(e) => setRepStartDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Đến ngày:</span>
+                <input
+                  type="date"
+                  value={repEndDate}
+                  onChange={(e) => setRepEndDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+            </div>
+            <div className="text-xs text-coffee-medium">
+              Tìm thấy <strong>{paidOrders.length}</strong> hóa đơn trong khoảng chọn.
+            </div>
+          </div>
+
+          {/* Header Báo Cáo Doanh Thu */}
           <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
             <div>
-              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Doanh thu tháng này</h3>
-              <p className="text-xs text-coffee-medium mt-1">Tổng hợp và so sánh kết quả kinh doanh của **Tháng {(new Date().getMonth() + 1)}/{new Date().getFullYear()}**.</p>
+              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Doanh thu theo giai đoạn</h3>
+              <p className="text-xs text-coffee-medium mt-1">Tổng hợp và báo cáo kết quả kinh doanh từ ngày <strong>{new Date(repStartDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{new Date(repEndDate).toLocaleDateString('vi-VN')}</strong>.</p>
             </div>
             <span className="text-[10px] font-extrabold px-3 py-1.5 bg-coffee-light text-coffee-primary rounded-xl uppercase tracking-wider">
-              Lũy kế tháng
+              Theo khoảng ngày
             </span>
           </div>
 
@@ -688,7 +805,7 @@ export default function AdminPage() {
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">TỔNG DOANH THU</span>
-                <h4 className="font-black text-2xl text-coffee-primary">{totalRevenue.toLocaleString('vi-VN')}đ</h4>
+                <h4 className="font-black text-2xl text-coffee-primary">{grossRevenue.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-green-50 rounded-2xl text-green-700">
                 <DollarSign className="w-6 h-6" />
@@ -707,7 +824,7 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP / PHÁT SINH</span>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP / GIẢM GIÁ</span>
                 <h4 className="font-black text-2xl text-red-600">-{totalRestockExpenses.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-red-50 rounded-2xl text-red-700">
@@ -717,7 +834,7 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ THÁNG</span>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ</span>
                 <h4 className="font-black text-2xl text-emerald-700">{netMonthRevenue.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-700">
@@ -801,6 +918,120 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2.5 TAB BÁO CÁO KHO THEO KHOẢNG NGÀY */}
+      {adminTab === 'inventory' && (
+        <div className="space-y-6">
+          {/* Bộ lọc khoảng ngày & tìm kiếm */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Từ ngày:</span>
+                <input
+                  type="date"
+                  value={invStartDate}
+                  onChange={(e) => setInvStartDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Đến ngày:</span>
+                <input
+                  type="date"
+                  value={invEndDate}
+                  onChange={(e) => setInvEndDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+            </div>
+            
+            <input
+              type="text"
+              placeholder="🔍 Tìm kiếm nguyên liệu..."
+              value={invSearchQuery}
+              onChange={(e) => setInvSearchQuery(e.target.value)}
+              className="w-full md:w-64 h-10 px-4 bg-[#FAF6F0] rounded-xl text-xs border-none focus:ring-1 focus:ring-coffee-primary text-coffee-dark"
+            />
+          </div>
+
+          {/* Tiêu đề báo cáo */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+            <div>
+              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Thống kê nguyên liệu kho</h3>
+              <p className="text-xs text-coffee-medium mt-1">
+                Xem lượng tồn đầu kỳ ngày <strong>{new Date(invStartDate).toLocaleDateString('vi-VN')}</strong> đến lượng tồn thực tế cuối ngày <strong>{new Date(invEndDate).toLocaleDateString('vi-VN')}</strong>.
+              </p>
+            </div>
+            <span className="text-[10px] font-extrabold px-3 py-1.5 bg-coffee-light text-coffee-primary rounded-xl uppercase tracking-wider">
+              Báo cáo kho tổng hợp
+            </span>
+          </div>
+
+          {/* Bảng Excel-style */}
+          <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
+                <thead>
+                  <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
+                    <th className="p-3.5 w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
+                      Tên nguyên liệu
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
+                      Tồn đầu kỳ
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-green-700 border-r border-coffee-light/60">
+                      SL nhập (+)
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
+                      SL bán (-)
+                    </th>
+                    <th className="p-3.5 w-40 font-black text-coffee-primary">
+                      Tồn thực tế cuối kỳ
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {ingredients
+                    .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
+                    .map((ing) => {
+                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                      const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
+                      const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
+                      const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                      const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
+
+                      return (
+                        <tr key={ing.id} className="hover:bg-coffee-light/20 transition-all">
+                          {/* Sticky First Column */}
+                          <td className="p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-52 whitespace-normal break-words bg-white">
+                            <div className="flex flex-col">
+                              <span className="whitespace-normal break-words leading-tight">{ing.name}</span>
+                              <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-1">
+                                ({ing.unit}{ing.quy_cach ? `, ${ing.quy_cach}` : ''})
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold">
+                            {formattedOpening}
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-green-700 font-extrabold">
+                            {formatRefill}
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-red-600 font-extrabold">
+                            {formatSold}
+                          </td>
+                          <td className="p-3 text-coffee-primary font-black">
+                            {formattedEnding}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

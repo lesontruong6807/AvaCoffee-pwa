@@ -246,8 +246,30 @@ export default function PaymentPage() {
                         )}
                       </div>
 
+                      {/* Phân rã giá tiền (Tạm tính, Giảm giá, Tổng cộng) */}
+                      <div className="bg-[#FAF6F0]/40 p-4 rounded-2xl border border-coffee-light/60 space-y-2">
+                        {order.discount > 0 && (
+                          <>
+                            <div className="flex justify-between text-xs text-coffee-medium">
+                              <span>Tiền món ăn:</span>
+                              <span className="font-semibold">{(order.total_amount + order.discount).toLocaleString('vi-VN')}đ</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-red-600">
+                              <span>Giảm giá:</span>
+                              <span className="font-bold">-{order.discount.toLocaleString('vi-VN')}đ</span>
+                            </div>
+                          </>
+                        )}
+                        <div className="flex items-center justify-between border-t border-coffee-light/40 pt-2">
+                          <span className="font-extrabold text-xs text-coffee-dark">Tổng tiền thanh toán:</span>
+                          <span className="text-sm font-black text-coffee-primary font-mono">
+                            {order.total_amount.toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      </div>
+
                       {/* Action Buttons inside Card */}
-                      <div className="flex items-center justify-end space-x-3 pt-3 border-t border-coffee-light/60">
+                      <div className="flex items-center justify-end space-x-3 pt-1 border-t border-coffee-light/40">
                         <button
                           onClick={handleCancel}
                           className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition flex items-center space-x-2 text-xs font-bold shadow-sm"

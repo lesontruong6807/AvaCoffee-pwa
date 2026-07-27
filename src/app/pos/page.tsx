@@ -49,6 +49,10 @@ export default function PosPage() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
+  // Trạng thái giảm giá
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -120,9 +124,19 @@ export default function PosPage() {
     setCart(prev => prev.filter(item => item.product_id !== productId));
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    setDiscountValue(0);
+    setDiscountType('amount');
+  };
 
   const totalCartAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
+
+  const discountAmount = discountType === 'amount'
+    ? Math.min(totalCartAmount, discountValue)
+    : Math.min(totalCartAmount, Math.round((totalCartAmount * discountValue) / 100));
+
+  const finalTotalAmount = Math.max(0, totalCartAmount - discountAmount);
 
   // --- LÓGIC CONFIRM & SUBMIT ORDER ---
   const handleConfirmOrder = async () => {
@@ -133,7 +147,8 @@ export default function PosPage() {
       await db.createOrder({
         table_id: selectedTable.id,
         staff_id: currentUser?.id || 'u1',
-        total_amount: totalCartAmount,
+        total_amount: finalTotalAmount,
+        discount: discountAmount,
         items: cart
       });
 
@@ -499,10 +514,70 @@ export default function PosPage() {
             {/* Phần dưới hóa đơn nháp */}
             {cart.length > 0 && (
               <div className="border-t border-coffee-light pt-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-coffee-medium font-semibold">Tổng cộng:</span>
-                  <span className="text-xl font-extrabold text-coffee-primary">
-                    {totalCartAmount.toLocaleString('vi-VN')}đ
+                {/* Phần giảm giá */}
+                <div className="bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">Giảm giá</span>
+                    <div className="flex bg-white rounded-lg p-0.5 border border-coffee-light">
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('amount'); setDiscountValue(0); }}
+                        className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${
+                          discountType === 'amount' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        Số tiền (đ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('percent'); setDiscountValue(0); }}
+                        className={`px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${
+                          discountType === 'percent' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        Phần trăm (%)
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percent' ? 100 : undefined}
+                      placeholder={discountType === 'amount' ? "Số tiền giảm..." : "Phần trăm giảm..."}
+                      value={discountValue || ''}
+                      onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
+                      className="flex-1 h-9 px-3 bg-white border border-coffee-light rounded-xl text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition"
+                    />
+                    {discountValue > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDiscountValue(0)}
+                        className="h-9 px-3 bg-white border border-red-200 text-red-500 rounded-xl text-xs hover:bg-red-50 transition font-bold"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs text-coffee-medium">
+                  <span>Tổng tiền món:</span>
+                  <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+
+                {discountAmount > 0 && (
+                   <div className="flex justify-between items-center text-xs text-red-600">
+                     <span>Giảm giá:</span>
+                     <span className="font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                   </div>
+                )}
+
+                <div className="flex justify-between items-center border-t border-coffee-light/50 pt-3">
+                  <span className="text-sm text-coffee-dark font-extrabold">Tổng thanh toán:</span>
+                  <span className="text-xl font-black text-coffee-primary">
+                    {finalTotalAmount.toLocaleString('vi-VN')}đ
                   </span>
                 </div>
 
@@ -605,10 +680,70 @@ export default function PosPage() {
               </div>
 
               <div className="border-t border-coffee-light pt-3 space-y-3 bg-white shrink-0">
-                <div className="flex justify-between items-center">
+                {/* Phần giảm giá di động */}
+                <div className="bg-[#FAF6F0] p-3.5 rounded-xl border border-coffee-light space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Giảm giá</span>
+                    <div className="flex bg-white rounded-lg p-0.5 border border-coffee-light">
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('amount'); setDiscountValue(0); }}
+                        className={`px-2 py-0.5 rounded-md text-[8px] font-bold transition-all ${
+                          discountType === 'amount' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        Tiền (đ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('percent'); setDiscountValue(0); }}
+                        className={`px-2 py-0.5 rounded-md text-[8px] font-bold transition-all ${
+                          discountType === 'percent' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        %
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percent' ? 100 : undefined}
+                      placeholder={discountType === 'amount' ? "Số tiền giảm..." : "Phần trăm giảm..."}
+                      value={discountValue || ''}
+                      onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
+                      className="flex-1 h-8 px-2.5 bg-white border border-coffee-light rounded-lg text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition"
+                    />
+                    {discountValue > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDiscountValue(0)}
+                        className="h-8 px-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs hover:bg-red-50 transition font-bold"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs text-coffee-medium">
+                  <span>Tiền món:</span>
+                  <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-xs text-red-600">
+                    <span>Giảm giá:</span>
+                    <span className="font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center border-t border-coffee-light/50 pt-2">
                   <span className="text-xs text-coffee-medium font-semibold">Tổng thanh toán:</span>
                   <span className="text-lg font-extrabold text-coffee-primary">
-                    {totalCartAmount.toLocaleString('vi-VN')}đ
+                    {finalTotalAmount.toLocaleString('vi-VN')}đ
                   </span>
                 </div>
 

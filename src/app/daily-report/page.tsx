@@ -67,17 +67,19 @@ export default function DailyReportPage() {
 
   // 3. Hàm tính toán các chỉ số cho từng ca
   const calculateMetrics = (shiftOrders: any[], shiftLogs: any[]) => {
-    const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const totalDiscount = shiftOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
+    const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
     const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
     const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
     
-    // Tổng chi phí nhập kho / phát sinh trong ca
-    const restockExpenses = shiftLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+    // Tổng chi phí nhập kho + Giảm giá
+    const restockCosts = shiftLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+    const restockExpenses = restockCosts + totalDiscount; 
     const restockItems = shiftLogs;
 
-    // Tiền mặt hiện tại sau khi trừ chi phí
-    const currentCash = Math.max(0, totalCash - restockExpenses);
-    // Doanh thu thực tế sau khi trừ chi phí nhập
+    // Tiền mặt hiện tại sau khi trừ chi phí thực tế
+    const currentCash = Math.max(0, totalCash - restockCosts);
+    // Doanh thu thực tế sau khi trừ chi phí nhập & giảm giá
     const netRevenue = grossRevenue - restockExpenses;
 
     return {
@@ -224,10 +226,10 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
           </div>
         </div>
 
-        {/* THAY THẾ 'Bình quân/đơn' THÀNH 'Chi phí nhập / phát sinh' */}
+        {/* THAY THẾ 'Bình quân/đơn' THÀNH 'Chi phí nhập / giảm giá' */}
         <div className="bg-white p-4.5 rounded-2xl border border-coffee-light flex items-center justify-between shadow-sm">
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Chi phí nhập / phát sinh</span>
+            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Chi phí nhập / giảm giá</span>
             <span className="font-black text-xl text-red-600">-{metrics.restockExpenses.toLocaleString('vi-VN')}đ</span>
           </div>
           <div className="p-2.5 bg-red-50 rounded-xl text-red-700">
