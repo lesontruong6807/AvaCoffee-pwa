@@ -390,7 +390,7 @@ export default function AdminPage() {
           {/* DUYỆT CHẤM CÔNG */}
           {approvalSubTab === 'time' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {timeLogs.filter(l => l.status === 'Chờ duyệt' && l.check_out_time).map((log) => {
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').map((log) => {
                 const formatTime = (dStr: any) => {
                   if (!dStr) return 'Chưa ra ca';
                   return new Date(dStr).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
@@ -515,7 +515,7 @@ export default function AdminPage() {
                 );
               })}
 
-              {timeLogs.filter(l => l.status === 'Chờ duyệt' && l.check_out_time).length === 0 && (
+              {timeLogs.filter(l => l.status === 'Chờ duyệt' || l.status === 'Đang trong ca').length === 0 && (
                 <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                   <p className="font-bold">Tuyệt vời! Không còn yêu cầu chấm công nào chờ duyệt</p>
