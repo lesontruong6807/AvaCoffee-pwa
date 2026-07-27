@@ -22,6 +22,7 @@ import {
   Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import ReceiptComponent from '@/components/ReceiptComponent';
 
 interface CartItem {
   product_id: string;
@@ -47,6 +48,14 @@ export default function PosPage() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  const [printData, setPrintData] = useState<{
+    tableName: string;
+    staffName: string;
+    staffRole: string;
+    cart: CartItem[];
+    totalAmount: number;
+    orderTime: string;
+  } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -128,6 +137,22 @@ export default function PosPage() {
     if (!selectedTable || cart.length === 0) return;
     setSavingOrder(true);
 
+    const snapshotPrintData = {
+      tableName: selectedTable.table_name,
+      staffName: currentUser?.full_name || 'Lê Sơn',
+      staffRole: currentUser?.role || 'Admin',
+      cart: [...cart],
+      totalAmount: totalCartAmount,
+      orderTime: new Date().toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    };
+    setPrintData(snapshotPrintData);
+
     try {
       await db.createOrder({
         table_id: selectedTable.id,
@@ -138,6 +163,11 @@ export default function PosPage() {
 
       // Tự động trừ kho nguyên liệu theo công thức pha chế
       await db.deductStockFromOrder(cart);
+
+      // Kích hoạt in phiếu đặt món K80 bằng trình duyệt
+      setTimeout(() => {
+        window.print();
+      }, 150);
 
       // Tạo hiệu ứng confetti ăn mừng
       confetti({
@@ -692,6 +722,16 @@ export default function PosPage() {
           </div>
         </div>
       )}
+
+      {/* COMPONENT IN PHIẾU ĐẶT MÓN (K80) */}
+      <ReceiptComponent
+        tableName={printData?.tableName || selectedTable?.table_name}
+        staffName={printData?.staffName || currentUser?.full_name}
+        staffRole={printData?.staffRole || currentUser?.role}
+        cart={printData?.cart || cart}
+        totalAmount={printData?.totalAmount || totalCartAmount}
+        orderTime={printData?.orderTime}
+      />
     </div>
   );
 }
