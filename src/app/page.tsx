@@ -12,7 +12,8 @@ import {
   ChevronRight,
   BarChart3,
   ShoppingBag,
-  Loader2
+  Loader2,
+  Boxes
 } from 'lucide-react';
 import { db, getCurrentUser } from '@/lib/database';
 
@@ -149,6 +150,15 @@ export default function Home() {
       color: 'bg-teal-50 border-teal-200 text-teal-950',
       badge: 'Ra ca',
       group: 'daily'
+    },
+    {
+      name: 'Kho',
+      description: 'Theo dõi tồn kho thực tế, nhập thêm và kiểm kê.',
+      path: '/inventory',
+      icon: Boxes,
+      color: 'bg-amber-50 border-amber-200 text-amber-950',
+      badge: 'Nguyên liệu',
+      group: 'other'
     },
     {
       name: 'Báo cáo ca trực',

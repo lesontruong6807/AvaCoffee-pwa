@@ -136,6 +136,9 @@ export default function PosPage() {
         items: cart
       });
 
+      // Tự động trừ kho nguyên liệu theo công thức pha chế
+      await db.deductStockFromOrder(cart);
+
       // Tạo hiệu ứng confetti ăn mừng
       confetti({
         particleCount: 100,
@@ -365,7 +368,7 @@ export default function PosPage() {
                     {/* Chi tiết sản phẩm */}
                     <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between space-y-2">
                       <div>
-                        <h4 className="font-bold text-coffee-dark text-xs sm:text-sm leading-tight line-clamp-2">{prod.name}</h4>
+                        <h4 className="font-black text-coffee-dark text-sm sm:text-base md:text-lg leading-tight line-clamp-2">{prod.name}</h4>
                         <p className="text-[10px] sm:text-xs text-coffee-medium mt-1 flex items-center">
                           <Tag className="w-3 h-3 mr-1 shrink-0" />
                           <span className="truncate">{categories.find(c => c.id === prod.category_id)?.name}</span>

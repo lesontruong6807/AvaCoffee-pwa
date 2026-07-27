@@ -41,6 +41,24 @@ export default function MenuPage() {
     return matchesSearch && matchesCategory;
   });
 
+  // Recipe Inspector Modal State
+  const [selectedProductForRecipe, setSelectedProductForRecipe] = useState<any>(null);
+  const [productRecipes, setProductRecipes] = useState<any[]>([]);
+  const [loadingRecipes, setLoadingRecipes] = useState(false);
+
+  const handleOpenRecipeModal = async (prod: any) => {
+    setSelectedProductForRecipe(prod);
+    setLoadingRecipes(true);
+    try {
+      const recs = await db.getProductRecipes(prod.id);
+      setProductRecipes(recs);
+    } catch (e) {
+      console.error('Lỗi lấy công thức món:', e);
+    } finally {
+      setLoadingRecipes(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-6 font-sans">
       {/* Tiêu đề trang */}
@@ -122,18 +140,19 @@ export default function MenuPage() {
 
             return (
               <div 
-                key={prod.id} 
-                className={`bg-white rounded-3xl overflow-hidden border border-coffee-light flex flex-col shadow-sm transition-all duration-300 relative ${
-                  isOutOfStock ? 'opacity-60' : 'hover:-translate-y-1 hover:shadow-md'
+                key={prod.id}
+                onClick={() => handleOpenRecipeModal(prod)}
+                className={`bg-white rounded-3xl overflow-hidden border border-coffee-light flex flex-col shadow-sm transition-all duration-300 relative cursor-pointer group ${
+                  isOutOfStock ? 'opacity-60' : 'hover:-translate-y-1 hover:shadow-lg hover:border-coffee-accent'
                 }`}
               >
                 {/* Ảnh sản phẩm */}
-                <div className="relative h-28 sm:h-44 bg-coffee-light">
+                <div className="relative h-32 sm:h-44 bg-coffee-light overflow-hidden">
                   {prod.image_url ? (
                     <img 
                       src={prod.image_url} 
                       alt={prod.name} 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/logo.jpg';
                       }}
@@ -143,51 +162,107 @@ export default function MenuPage() {
                       <Coffee className="w-8 h-8 sm:w-12 sm:h-12" />
                     </div>
                   )}
-                  <span className={`absolute top-2 right-2 sm:top-3 sm:right-3 text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                  <span className={`absolute top-2 right-2 sm:top-3 sm:right-3 text-[8px] sm:text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                     isOutOfStock ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                   }`}>
                     {prod.status}
                   </span>
-                  <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 bg-coffee-dark/80 text-coffee-accent rounded-md">
+                  <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 bg-coffee-dark/80 text-coffee-accent rounded-md">
                     {prod.id}
                   </span>
                 </div>
 
                 {/* Chi tiết sản phẩm */}
                 <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
-                  <div className="space-y-1 sm:space-y-1.5">
+                  <div className="space-y-1.5">
                     <span className="text-[9px] sm:text-[10px] font-bold text-coffee-medium uppercase tracking-wide flex items-center">
                       <Tag className="w-3 h-3 mr-1 text-coffee-primary" />
                       {catName}
                     </span>
-                    <h3 className="font-extrabold text-xs sm:text-base text-coffee-dark leading-tight line-clamp-2">{prod.name}</h3>
-                    <p className="text-[10px] sm:text-xs text-coffee-medium/90 line-clamp-2">
-                      {prod.description || 'Không có mô tả sản phẩm.'}
-                    </p>
+                    {/* Tên món bự rực rỡ */}
+                    <h3 className="font-black text-sm sm:text-lg md:text-xl text-coffee-dark leading-tight group-hover:text-coffee-primary transition">
+                      {prod.name}
+                    </h3>
                   </div>
 
-                  <div className="pt-3 border-t border-coffee-light/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-0">
+                  <div className="pt-3 border-t border-coffee-light/60 flex items-center justify-between">
                     <div>
-                      <span className="text-[9px] sm:text-[10px] text-coffee-medium block">Giá bán ({prod.don_vi_tinh})</span>
-                      <span className="font-black text-xs sm:text-base text-coffee-primary">
+                      <span className="text-[9px] sm:text-[10px] text-coffee-medium block">Giá bán</span>
+                      <span className="font-black text-sm sm:text-base text-coffee-primary">
                         {prod.price.toLocaleString('vi-VN')}đ
                       </span>
                     </div>
 
-                    {/* Chỉ Admin mới được xem giá vốn */}
-                    {currentUser?.role === 'Admin' && (
-                      <div className="sm:text-right">
-                        <span className="text-[9px] sm:text-[10px] text-coffee-medium block">Giá vốn</span>
-                        <span className="font-bold text-[10px] sm:text-xs text-coffee-medium">
-                          {prod.cost_price.toLocaleString('vi-VN')}đ
-                        </span>
-                      </div>
-                    )}
+                    <span className="text-[10px] font-bold text-coffee-medium group-hover:text-coffee-dark underline underline-offset-2">
+                      Xem công thức 📋
+                    </span>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* RECIPE INSPECTOR MODAL */}
+      {selectedProductForRecipe && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-coffee-light space-y-5 animate-scaleIn">
+            <div className="flex justify-between items-start border-b border-coffee-light pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden bg-coffee-light shrink-0">
+                  <img
+                    src={selectedProductForRecipe.image_url}
+                    alt={selectedProductForRecipe.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/logo.jpg'; }}
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-coffee-medium uppercase">{selectedProductForRecipe.id}</span>
+                  <h3 className="font-black text-lg text-coffee-dark leading-tight">{selectedProductForRecipe.name}</h3>
+                  <p className="text-xs font-extrabold text-coffee-primary">{selectedProductForRecipe.price?.toLocaleString('vi-VN')}đ</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedProductForRecipe(null)}
+                className="p-1 hover:bg-[#FAF6F0] rounded-xl text-coffee-medium transition font-extrabold text-xs"
+              >
+                Đóng ✖
+              </button>
+            </div>
+
+            {/* Nội dung công thức */}
+            <div className="space-y-3">
+              <h4 className="font-extrabold text-xs text-coffee-medium uppercase tracking-wider flex items-center space-x-1.5">
+                <span>📋 Công thức pha chế chuẩn (1 ly)</span>
+              </h4>
+
+              {loadingRecipes ? (
+                <div className="py-8 flex justify-center">
+                  <Loader2 className="w-6 h-6 text-coffee-primary animate-spin" />
+                </div>
+              ) : productRecipes.length === 0 ? (
+                <p className="text-xs text-coffee-medium italic py-4 text-center">Chưa có công thức định lượng chi tiết.</p>
+              ) : (
+                <div className="space-y-2">
+                  {productRecipes.map((rec) => (
+                    <div key={rec.id} className="p-3 bg-[#FAF6F0] rounded-2xl border border-coffee-light flex items-center justify-between text-xs">
+                      <span className="font-bold text-coffee-dark">{rec.ingredient_name}</span>
+                      <strong className="font-black text-coffee-primary text-sm">
+                        {rec.quantity_needed} {rec.ingredient_unit}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[10px] text-coffee-medium/70 italic text-center pt-2 border-t border-coffee-light/60">
+              * Công thức này dùng để tham khảo định lượng pha chế tại cửa hàng AVA Coffee.
+            </p>
+          </div>
         </div>
       )}
     </div>

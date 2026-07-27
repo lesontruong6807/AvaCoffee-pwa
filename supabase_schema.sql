@@ -3,6 +3,9 @@
 -- Hãy chạy script này trong SQL Editor của Supabase.
 
 -- Hủy bỏ các bảng cũ (cả tên tiếng Anh và tiếng Việt) nếu đã tồn tại
+DROP TABLE IF EXISTS public.lichsukho CASCADE;
+DROP TABLE IF EXISTS public.congthuc CASCADE;
+DROP TABLE IF EXISTS public.nguyenlieu CASCADE;
 DROP TABLE IF EXISTS public.nghiphep CASCADE;
 DROP TABLE IF EXISTS public.chamcong CASCADE;
 DROP TABLE IF EXISTS public.hoadondetail CASCADE;
@@ -128,6 +131,40 @@ CREATE TABLE public.nghiphep (
     CONSTRAINT check_dates CHECK (ngay_ket_thuc >= ngay_bat_dau)
 );
 
+-- 9. BẢNG NGUYÊN LIỆU (nguyenlieu)
+CREATE TABLE public.nguyenlieu (
+    id TEXT PRIMARY KEY DEFAULT public.generate_short_id('ing_'),
+    ten_nguyen_lieu TEXT NOT NULL UNIQUE,
+    don_vi_tinh TEXT NOT NULL,
+    so_luong_ton NUMERIC NOT NULL DEFAULT 0,
+    ton_dau_ngay NUMERIC NOT NULL DEFAULT 0,
+    muc_canh_bao NUMERIC,
+    quy_cach TEXT
+);
+
+-- 10. BẢNG CÔNG THỨC PHA CHẾ (congthuc)
+CREATE TABLE public.congthuc (
+    id TEXT PRIMARY KEY DEFAULT public.generate_short_id('rec_'),
+    id_san_pham TEXT REFERENCES public.sanpham(id) ON DELETE CASCADE NOT NULL,
+    id_nguyen_lieu TEXT REFERENCES public.nguyenlieu(id) ON DELETE CASCADE NOT NULL,
+    so_luong_can NUMERIC NOT NULL CHECK (so_luong_can > 0),
+    don_vi_tinh TEXT NOT NULL
+);
+
+-- 11. BẢNG LỊCH SỬ KHO & NHẬP XUẤT (lichsukho)
+CREATE TABLE public.lichsukho (
+    id TEXT PRIMARY KEY DEFAULT public.generate_short_id('inv_'),
+    id_nguyen_lieu TEXT REFERENCES public.nguyenlieu(id) ON DELETE CASCADE,
+    ten_nguyen_lieu_khac TEXT,
+    so_luong_thay_doi NUMERIC NOT NULL,
+    loai_giao_dich TEXT NOT NULL CHECK (loai_giao_dich IN ('Nhập kho', 'Bán hàng', 'Hao hụt/Cân lại', 'Pha chế')),
+    chi_phi NUMERIC DEFAULT 0,
+    ghi_chu TEXT,
+    id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE SET NULL,
+    thoi_gian_tao TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    trang_thai TEXT NOT NULL CHECK (trang_thai IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối')) DEFAULT 'Đã duyệt'
+);
+
 -- BẬT ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.nguoidung ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.danhsachban ENABLE ROW LEVEL SECURITY;
@@ -137,6 +174,9 @@ ALTER TABLE public.hoadon ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hoadondetail ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chamcong ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nghiphep ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nguyenlieu ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.congthuc ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lichsukho ENABLE ROW LEVEL SECURITY;
 
 -- TẠO CÁC CHÍNH SÁCH RLS (BẢN ĐƠN GIẢN CHO DEV)
 CREATE POLICY "Cho phép đọc mọi bảng công khai" ON public.nguoidung FOR SELECT USING (true);
@@ -155,6 +195,12 @@ CREATE POLICY "Cho phép đọc bảng chamcong công khai" ON public.chamcong F
 CREATE POLICY "Cho phép cập nhật bảng chamcong công khai" ON public.chamcong FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Cho phép đọc bảng nghiphep công khai" ON public.nghiphep FOR SELECT USING (true);
 CREATE POLICY "Cho phép cập nhật bảng nghiphep công khai" ON public.nghiphep FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng nguyenlieu công khai" ON public.nguyenlieu FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng nguyenlieu công khai" ON public.nguyenlieu FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng congthuc công khai" ON public.congthuc FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng congthuc công khai" ON public.congthuc FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Cho phép đọc bảng lichsukho công khai" ON public.lichsukho FOR SELECT USING (true);
+CREATE POLICY "Cho phép cập nhật bảng lichsukho công khai" ON public.lichsukho FOR ALL USING (true) WITH CHECK (true);
 
 -- CHÈN DỮ LIỆU MẪU (SEED DATA)
 
@@ -185,17 +231,17 @@ INSERT INTO public.danhmuc (id, ten_danh_muc) VALUES
 ('c_soda', 'Soda')
 ON CONFLICT (ten_danh_muc) DO NOTHING;
 
--- 4. Thêm sản phẩm mẫu (SanPham - 19 món khớp 100% hình ảnh thực đơn)
+-- 4. Thêm sản phẩm mẫu (SanPham - Đã đổi Cà phê đen -> Cà phê đá, Cacao -> Cacao sữa)
 INSERT INTO public.sanpham (id, id_danh_muc, ten_san_pham, don_vi_tinh, don_gia, gia_von, hinh_anh, trang_thai) VALUES
 -- Cà phê (CP)
-('CP001', 'c_caphe', 'Cà phê đen', 'Ly', 15000, 5000, '/products/CP001.png', 'Còn hàng'),
+('CP001', 'c_caphe', 'Cà phê đá', 'Ly', 15000, 5000, '/products/CP001.png', 'Còn hàng'),
 ('CP002', 'c_caphe', 'Cà phê sữa', 'Ly', 17000, 6000, '/products/CP002.png', 'Còn hàng'),
 ('CP003', 'c_caphe', 'Cà phê sữa tươi', 'Ly', 22000, 8000, '/products/CP003.png', 'Còn hàng'),
 ('CP004', 'c_caphe', 'Cà phê muối', 'Ly', 22000, 8000, '/products/CP004.png', 'Còn hàng'),
 ('CP005', 'c_caphe', 'Bạc xìu', 'Ly', 22000, 8000, '/products/CP005.png', 'Còn hàng'),
 
 -- Thức uống khác (TUK)
-('TUK001', 'c_douongkhac', 'Cacao', 'Ly', 20000, 7000, '/products/TUK001.png', 'Còn hàng'),
+('TUK001', 'c_douongkhac', 'Cacao sữa', 'Ly', 20000, 7000, '/products/TUK001.png', 'Còn hàng'),
 ('TUK002', 'c_douongkhac', 'Cacao kem muối', 'Ly', 25000, 9000, '/products/TUK002.png', 'Còn hàng'),
 ('TUK003', 'c_douongkhac', 'Matcha Latte', 'Ly', 25000, 9000, '/products/TUK003.png', 'Còn hàng'),
 ('TUK004', 'c_douongkhac', 'Matcha Latte kem muối', 'Ly', 30000, 11000, '/products/TUK004.png', 'Còn hàng'),
@@ -221,3 +267,154 @@ SET ten_san_pham = EXCLUDED.ten_san_pham,
     gia_von = EXCLUDED.gia_von, 
     hinh_anh = EXCLUDED.hinh_anh, 
     trang_thai = EXCLUDED.trang_thai;
+
+-- 5. Thêm Nguyên Liệu (NguyenLieu - Khớp 100% file nguyên liệu AVA)
+INSERT INTO public.nguyenlieu (id, ten_nguyen_lieu, don_vi_tinh, so_luong_ton, ton_dau_ngay, muc_canh_bao, quy_cach) VALUES
+('ing_caphe', 'Cà phê hạt AVA', 'g', 5000, 5000, 1000, '1kg'),
+('ing_cacao', 'Cacao AVA', 'g', 1000, 1000, 200, '1kg'),
+('ing_matcha', 'Bột Matcha', 'g', 500, 500, 50, '500g'),
+('ing_trasanmay', 'Trà săn mây', 'g', 600, 600, 300, '300g'),
+('ing_hongtra', 'Hồng trà', 'g', 1000, 1000, 500, '100g'),
+('ing_suadac', 'Sữa đặc', 'g', 6000, 6000, 2400, '1200g'),
+('ing_suatuoi', 'Sữa tươi', 'ml', 5000, 5000, 2000, '1000ml'),
+('ing_lyden', 'Ly đen AVA', 'cái', 200, 200, 50, 'cái'),
+('ing_lytrang', 'Ly trắng AVA', 'cái', 200, 200, 50, 'cái'),
+('ing_lyhoavan', 'Ly trắng hoa văn AVA', 'cái', 200, 200, 50, 'cái'),
+('ing_onghutthuong', 'Ống hút thường', 'bịch', 5, 5, NULL, 'bịch'),
+('ing_onghuttraicay', 'Ống hút trái cây', 'bịch', 5, 5, NULL, 'bịch'),
+('ing_muong', 'Muỗng', 'bịch', 5, 5, NULL, 'bịch'),
+('ing_tuimangdi', 'Túi mang đi', 'kg', 5, 5, NULL, '1kg'),
+('ing_duong', 'Đường', 'g', 5000, 5000, 1000, '1000g'),
+('ing_nuocduong', 'Nước đường', 'ml', 1200, 1200, 200, 'ml'),
+('ing_kembeo', 'Kem béo', 'hộp', 5, 5, 1, 'hộp'),
+('ing_muoihong', 'Muối hồng', 'g', 500, 500, 10, 'g'),
+('ing_kemmuoi', 'Kem muối', 'ml', 900, 900, 120, 'ml'),
+('ing_suachua', 'Sữa chua', 'hộp', 20, 20, 4, 'hộp'),
+('ing_mutdau', 'Mứt dâu', 'ml', 1000, 1000, 200, 'ml'),
+('ing_mutvietquat', 'Mứt việt quất', 'ml', 1000, 1000, 200, 'ml'),
+('ing_mutdao', 'Mứt đào', 'ml', 1000, 1000, 200, 'ml'),
+('ing_sirodau', 'Siro dâu', 'ml', 1000, 1000, 200, 'ml'),
+('ing_sirodao', 'Siro đào', 'ml', 1000, 1000, 200, 'ml'),
+('ing_sirovai', 'Siro vải', 'ml', 1000, 1000, 200, 'ml'),
+('ing_7up', '7-Up', 'chai', 24, 24, 10, 'chai'),
+('ing_nuoccothongtra', 'Nước cốt hồng trà', 'ml', 1600, 1600, 500, 'ml')
+ON CONFLICT (id) DO UPDATE
+SET ten_nguyen_lieu = EXCLUDED.ten_nguyen_lieu,
+    don_vi_tinh = EXCLUDED.don_vi_tinh,
+    muc_canh_bao = EXCLUDED.muc_canh_bao,
+    quy_cach = EXCLUDED.quy_cach;
+
+-- 6. Thêm Công Thức Pha Chế (CongThuc - Khớp 100% file công thức nước AVA)
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES
+-- 1. Cà phê đá
+('rec_cp1_1', 'CP001', 'ing_caphe', 18, 'g'),
+('rec_cp1_2', 'CP001', 'ing_nuocduong', 10, 'ml'),
+('rec_cp1_3', 'CP001', 'ing_lyden', 1, 'cái'),
+
+-- 2. Cà phê sữa
+('rec_cp2_1', 'CP002', 'ing_caphe', 18, 'g'),
+('rec_cp2_2', 'CP002', 'ing_suadac', 30, 'g'),
+('rec_cp2_3', 'CP002', 'ing_lytrang', 1, 'cái'),
+
+-- 3. Cà phê sữa tươi
+('rec_cp3_1', 'CP003', 'ing_caphe', 11, 'g'),
+('rec_cp3_2', 'CP003', 'ing_suadac', 25, 'g'),
+('rec_cp3_3', 'CP003', 'ing_suatuoi', 100, 'ml'),
+('rec_cp3_4', 'CP003', 'ing_lytrang', 1, 'cái'),
+
+-- 4. Cà phê muối
+('rec_cp4_1', 'CP004', 'ing_caphe', 18, 'g'),
+('rec_cp4_2', 'CP004', 'ing_suadac', 30, 'g'),
+('rec_cp4_3', 'CP004', 'ing_kemmuoi', 60, 'ml'),
+('rec_cp4_4', 'CP004', 'ing_lytrang', 1, 'cái'),
+
+-- 5. Bạc xỉu
+('rec_cp5_1', 'CP005', 'ing_caphe', 11, 'g'),
+('rec_cp5_2', 'CP005', 'ing_suadac', 40, 'g'),
+('rec_cp5_3', 'CP005', 'ing_suatuoi', 50, 'ml'),
+('rec_cp5_4', 'CP005', 'ing_lytrang', 1, 'cái'),
+
+-- 6. Cacao sữa
+('rec_tuk1_1', 'TUK001', 'ing_cacao', 10, 'g'),
+('rec_tuk1_2', 'TUK001', 'ing_suadac', 40, 'g'),
+('rec_tuk1_3', 'TUK001', 'ing_suatuoi', 30, 'ml'),
+('rec_tuk1_4', 'TUK001', 'ing_lytrang', 1, 'cái'),
+
+-- 7. Cacao kem muối
+('rec_tuk2_1', 'TUK002', 'ing_cacao', 10, 'g'),
+('rec_tuk2_2', 'TUK002', 'ing_suadac', 40, 'g'),
+('rec_tuk2_3', 'TUK002', 'ing_suatuoi', 30, 'ml'),
+('rec_tuk2_4', 'TUK002', 'ing_kemmuoi', 60, 'ml'),
+('rec_tuk2_5', 'TUK002', 'ing_lyhoavan', 1, 'cái'),
+
+-- 8. Matcha Latte
+('rec_tuk3_1', 'TUK003', 'ing_matcha', 3.5, 'g'),
+('rec_tuk3_2', 'TUK003', 'ing_suadac', 30, 'g'),
+('rec_tuk3_3', 'TUK003', 'ing_suatuoi', 100, 'ml'),
+('rec_tuk3_4', 'TUK003', 'ing_lytrang', 1, 'cái'),
+
+-- 9. Matcha Latte kem muối
+('rec_tuk4_1', 'TUK004', 'ing_matcha', 3.5, 'g'),
+('rec_tuk4_2', 'TUK004', 'ing_suadac', 30, 'g'),
+('rec_tuk4_3', 'TUK004', 'ing_suatuoi', 100, 'ml'),
+('rec_tuk4_4', 'TUK004', 'ing_kemmuoi', 60, 'ml'),
+('rec_tuk4_5', 'TUK004', 'ing_lyhoavan', 1, 'cái'),
+
+-- 10. Trà tắc
+('rec_t1_1', 'T001', 'ing_nuoccothongtra', 300, 'ml'),
+
+-- 11. Trà dâu
+('rec_t2_1', 'T002', 'ing_nuoccothongtra', 150, 'ml'),
+('rec_t2_2', 'T002', 'ing_sirodau', 30, 'ml'),
+('rec_t2_3', 'T002', 'ing_nuocduong', 20, 'ml'),
+('rec_t2_4', 'T002', 'ing_lyhoavan', 1, 'cái'),
+
+-- 12. Trà đào
+('rec_t3_1', 'T003', 'ing_nuoccothongtra', 150, 'ml'),
+('rec_t3_2', 'T003', 'ing_sirodao', 30, 'ml'),
+('rec_t3_3', 'T003', 'ing_nuocduong', 20, 'ml'),
+('rec_t3_4', 'T003', 'ing_lyhoavan', 1, 'cái'),
+
+-- 13. Trà vải
+('rec_t4_1', 'T004', 'ing_nuoccothongtra', 150, 'ml'),
+('rec_t4_2', 'T004', 'ing_sirovai', 30, 'ml'),
+('rec_t4_3', 'T004', 'ing_nuocduong', 20, 'ml'),
+('rec_t4_4', 'T004', 'ing_lyhoavan', 1, 'cái'),
+
+-- 14. Yaourt đá
+('rec_y1_1', 'Y001', 'ing_suachua', 1, 'hộp'),
+('rec_y1_2', 'Y001', 'ing_suadac', 50, 'g'),
+('rec_y1_3', 'Y001', 'ing_lyhoavan', 1, 'cái'),
+
+-- 15. Yaourt dâu
+('rec_y2_1', 'Y002', 'ing_suachua', 1, 'hộp'),
+('rec_y2_2', 'Y002', 'ing_suadac', 30, 'g'),
+('rec_y2_3', 'Y002', 'ing_mutdau', 50, 'ml'),
+('rec_y2_4', 'Y002', 'ing_lyhoavan', 1, 'cái'),
+
+-- 16. Yaourt việt quất
+('rec_y3_1', 'Y003', 'ing_suachua', 1, 'hộp'),
+('rec_y3_2', 'Y003', 'ing_suadac', 30, 'g'),
+('rec_y3_3', 'Y003', 'ing_mutvietquat', 50, 'ml'),
+('rec_y3_4', 'Y003', 'ing_lyhoavan', 1, 'cái'),
+
+-- 17. Soda dâu
+('rec_s1_1', 'S001', 'ing_7up', 1, 'chai'),
+('rec_s1_2', 'S001', 'ing_mutdau', 40, 'ml'),
+('rec_s1_3', 'S001', 'ing_sirodau', 10, 'ml'),
+('rec_s1_4', 'S001', 'ing_nuocduong', 10, 'ml'),
+('rec_s1_5', 'S001', 'ing_lyhoavan', 1, 'cái'),
+
+-- 18. Soda đào
+('rec_s2_1', 'S002', 'ing_7up', 1, 'chai'),
+('rec_s2_2', 'S002', 'ing_mutdao', 30, 'ml'),
+('rec_s2_3', 'S002', 'ing_sirodao', 20, 'ml'),
+('rec_s2_4', 'S002', 'ing_nuocduong', 10, 'ml'),
+('rec_s2_5', 'S002', 'ing_lyhoavan', 1, 'cái'),
+
+-- 19. Soda việt quất
+('rec_s3_1', 'S003', 'ing_7up', 1, 'chai'),
+('rec_s3_2', 'S003', 'ing_mutvietquat', 50, 'ml'),
+('rec_s3_3', 'S003', 'ing_nuocduong', 10, 'ml'),
+('rec_s3_4', 'S003', 'ing_lyhoavan', 1, 'cái')
+ON CONFLICT (id) DO NOTHING;

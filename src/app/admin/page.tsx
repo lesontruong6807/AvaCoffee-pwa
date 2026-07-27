@@ -37,9 +37,10 @@ export default function AdminPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
 
-  // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép)
-  const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave'>('time');
+  // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
+  const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
 
   // Trạng thái Form CRUD Sản phẩm
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -61,13 +62,14 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
         db.getProducts(),
         db.getCategories(),
-        db.getUsers()
+        db.getUsers(),
+        db.getInventoryLogs()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -75,6 +77,7 @@ export default function AdminPage() {
       setProducts(prods);
       setCategories(cats);
       setUsers(usrs);
+      setInventoryLogs(invLogs);
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -142,6 +145,17 @@ export default function AdminPage() {
       toast.success(`Đã cập nhật trạng thái nghỉ phép thành: ${status}`);
     } catch (e) {
       toast.error('Không thể phê duyệt đơn nghỉ phép.');
+    }
+  };
+
+  const handleApproveInventory = async (id: string, status: 'Đã duyệt' | 'Từ chối') => {
+    try {
+      await db.approveInventoryLog(id, status);
+      confetti({ particleCount: 50, spread: 40 });
+      loadAllData();
+      toast.success(`Đã cập nhật đơn kho thành: ${status}`);
+    } catch (e) {
+      toast.error('Không thể phê duyệt đơn kho.');
     }
   };
 
@@ -275,13 +289,16 @@ export default function AdminPage() {
     const orderDate = new Date(o.created_at);
     return orderDate.getFullYear() === currentYear && orderDate.getMonth() === currentMonthNum;
   });
+  const monthLogs = inventoryLogs.filter(l => {
+    const logDate = new Date(l.created_at);
+    return logDate.getFullYear() === currentYear && logDate.getMonth() === currentMonthNum && l.type === 'Nhập kho';
+  });
+
   const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
-
-  // Tính lợi nhuận ước tính (Giả sử các món ăn bán ra được join để lấy cost_price, ở đây tính nhanh 60% làm lợi nhuận gộp mẫu hoặc tính dựa trên giá vốn thực tế nếu có)
-  const averageBill = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
-  const estimatedProfit = totalRevenue * 0.62; // Ước tính 62% biên lợi nhuận gộp
+  const totalRestockExpenses = monthLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+  const netMonthRevenue = totalRevenue - totalRestockExpenses;
 
   return (
     <div className="space-y-6">
@@ -336,16 +353,16 @@ export default function AdminPage() {
       {/* 1. TAB PHÊ DUYỆT YÊU CẦU */}
       {adminTab === 'approvals' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex items-center justify-between">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Yêu Cầu Chờ Duyệt</h3>
-              <p className="text-xs text-coffee-medium">Xem lại vị trí chấm công và xin nghỉ phép của nhân viên trên bản đồ để duyệt.</p>
+              <p className="text-xs text-coffee-medium">Xem lại vị trí chấm công, nghỉ phép và đơn nhập/kiểm kho để duyệt.</p>
             </div>
             {/* Sub-tabs */}
             <div className="flex bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light">
               <button
                 onClick={() => setApprovalSubTab('time')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                   approvalSubTab === 'time' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium'
                 }`}
               >
@@ -353,7 +370,7 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={() => setApprovalSubTab('leave')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                   approvalSubTab === 'leave' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium'
                 }`}
               >
@@ -549,6 +566,73 @@ export default function AdminPage() {
               )}
             </div>
           )}
+
+          {/* DUYỆT NHẬP & KIỂM KHO */}
+          {approvalSubTab === 'inventory' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {inventoryLogs.filter(l => l.status === 'Chờ duyệt').map((log) => (
+                <div key={log.id} className="bg-white rounded-3xl p-6 border border-coffee-light shadow-sm flex flex-col justify-between space-y-4">
+                  <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-9 h-9 bg-coffee-light rounded-xl flex items-center justify-center text-coffee-primary font-bold text-xs">
+                        {log.staff_name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-coffee-dark">{log.staff_name}</h4>
+                        <p className="text-[10px] text-coffee-medium">{new Date(log.created_at).toLocaleString('vi-VN')}</p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full uppercase">
+                      {log.type} - Chờ duyệt
+                    </span>
+                  </div>
+
+                  <div className="text-xs space-y-2">
+                    <p className="font-extrabold text-coffee-dark text-sm">
+                      Món: {log.ingredient_name}
+                    </p>
+                    <p className="text-coffee-medium">
+                      Số lượng thay đổi: <strong className="text-coffee-dark">{log.change_amount > 0 ? `+${log.change_amount}` : log.change_amount} {log.ingredient_unit}</strong>
+                    </p>
+                    {log.cost > 0 && (
+                      <p className="text-coffee-medium">
+                        Chi phí phát sinh: <strong className="text-emerald-700">{log.cost.toLocaleString('vi-VN')}đ</strong>
+                      </p>
+                    )}
+                    {log.note && (
+                      <p className="bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light text-coffee-medium italic text-[11px]">
+                        Ghi chú: "{log.note}"
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      onClick={() => handleApproveInventory(log.id, 'Từ chối')}
+                      className="py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Từ chối</span>
+                    </button>
+                    <button
+                      onClick={() => handleApproveInventory(log.id, 'Đã duyệt')}
+                      className="py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Phê duyệt</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {inventoryLogs.filter(l => l.status === 'Chờ duyệt').length === 0 && (
+                <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
+                  <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
+                  <p className="font-bold">Tuyệt vời! Không còn đơn kho hoặc kiểm kho nào chờ duyệt</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -590,20 +674,20 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">GIÁ TRỊ TRUNG BÌNH</span>
-                <h4 className="font-black text-2xl text-coffee-primary">{Math.round(averageBill).toLocaleString('vi-VN')}đ</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP / PHÁT SINH</span>
+                <h4 className="font-black text-2xl text-red-600">-{totalRestockExpenses.toLocaleString('vi-VN')}đ</h4>
               </div>
-              <div className="p-3 bg-purple-50 rounded-2xl text-purple-700">
-                <TrendingUp className="w-6 h-6" />
+              <div className="p-3 bg-red-50 rounded-2xl text-red-700">
+                <TrendingUp className="w-6 h-6 rotate-180" />
               </div>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">LỢI NHUẬN GỘP ƯỚC TÍNH</span>
-                <h4 className="font-black text-2xl text-coffee-primary">{Math.round(estimatedProfit).toLocaleString('vi-VN')}đ</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ THÁNG</span>
+                <h4 className="font-black text-2xl text-emerald-700">{netMonthRevenue.toLocaleString('vi-VN')}đ</h4>
               </div>
-              <div className="p-3 bg-amber-50 rounded-2xl text-amber-700">
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-700">
                 <ShieldCheck className="w-6 h-6" />
               </div>
             </div>

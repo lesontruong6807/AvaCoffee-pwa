@@ -6,23 +6,28 @@ import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Cal
 
 export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
+  const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeShiftFilter, setActiveShiftFilter] = useState<'morning' | 'afternoon' | 'both'>('both');
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
-    async function loadOrders() {
+    async function loadData() {
       try {
-        const allOrders = await db.getOrders();
+        const [allOrders, allLogs] = await Promise.all([
+          db.getOrders(),
+          db.getInventoryLogs()
+        ]);
         setOrders(allOrders);
+        setInventoryLogs(allLogs);
       } catch (e) {
         console.error('Lỗi khi tải hóa đơn báo cáo:', e);
       } finally {
         setLoading(false);
       }
     }
-    loadOrders();
+    loadData();
   }, []);
 
   // 1. Chỉ lấy hóa đơn đã thanh toán trong ngày hôm nay (dựa trên toDateString)
@@ -33,39 +38,61 @@ export default function DailyReportPage() {
     return orderDate.toDateString() === todayStr;
   });
 
+  const todayLogs = inventoryLogs.filter(l => {
+    const logDate = new Date(l.created_at);
+    return logDate.toDateString() === todayStr && l.type === 'Nhập kho';
+  });
+
   // 2. Phân loại theo Ca làm việc
   // Ca sáng: 6h - 14h (6:00:00 - 13:59:59)
   const morningOrders = todayOrders.filter(o => {
     const hour = new Date(o.created_at).getHours();
     return hour >= 6 && hour < 14;
   });
+  const morningLogs = todayLogs.filter(l => {
+    const hour = new Date(l.created_at).getHours();
+    return hour >= 6 && hour < 14;
+  });
 
-  // Ca chiều: 14h - 22h (và các giờ muộn/sớm khác ngoài ca sáng để tránh sót đơn)
+  // Ca chiều: 14h - 22h (và các giờ muộn/sớm khác ngoài ca sáng)
   const afternoonOrders = todayOrders.filter(o => {
     const hour = new Date(o.created_at).getHours();
     return hour >= 14 || hour < 6;
   });
+  const afternoonLogs = todayLogs.filter(l => {
+    const hour = new Date(l.created_at).getHours();
+    return hour >= 14 || hour < 6;
+  });
 
   // 3. Hàm tính toán các chỉ số cho từng ca
-  const calculateMetrics = (shiftOrders: any[]) => {
-    const totalRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const calculateMetrics = (shiftOrders: any[], shiftLogs: any[]) => {
+    const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
     const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
     const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
-    const averageBill = shiftOrders.length > 0 ? totalRevenue / shiftOrders.length : 0;
-    const estimatedProfit = totalRevenue * 0.62;
+    
+    // Tổng chi phí nhập kho / phát sinh trong ca
+    const restockExpenses = shiftLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+    const restockItems = shiftLogs;
+
+    // Tiền mặt hiện tại sau khi trừ chi phí
+    const currentCash = Math.max(0, totalCash - restockExpenses);
+    // Doanh thu thực tế sau khi trừ chi phí nhập
+    const netRevenue = grossRevenue - restockExpenses;
 
     return {
       orders: shiftOrders,
-      totalRevenue,
+      grossRevenue,
       totalCash,
       totalTransfer,
-      averageBill,
-      estimatedProfit
+      restockExpenses,
+      restockItems,
+      currentCash,
+      netRevenue
     };
   };
 
-  const morning = calculateMetrics(morningOrders);
-  const afternoon = calculateMetrics(afternoonOrders);
+  const morning = calculateMetrics(morningOrders, morningLogs);
+  const afternoon = calculateMetrics(afternoonOrders, afternoonLogs);
 
   if (loading) {
     return (
@@ -197,20 +224,21 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
         <div className="bg-white p-4.5 rounded-2xl border border-coffee-light flex items-center justify-between shadow-sm">
           <div className="space-y-1">
             <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Doanh thu ca</span>
-            <span className="font-black text-xl text-coffee-primary">{metrics.totalRevenue.toLocaleString('vi-VN')}đ</span>
+            <span className="font-black text-xl text-coffee-primary">{metrics.grossRevenue.toLocaleString('vi-VN')}đ</span>
           </div>
           <div className="p-2.5 bg-green-50 rounded-xl text-green-700">
             <DollarSign className="w-5 h-5" />
           </div>
         </div>
 
+        {/* THAY THẾ 'Bình quân/đơn' THÀNH 'Chi phí nhập / phát sinh' */}
         <div className="bg-white p-4.5 rounded-2xl border border-coffee-light flex items-center justify-between shadow-sm">
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Bình quân / Đơn</span>
-            <span className="font-black text-xl text-coffee-primary">{Math.round(metrics.averageBill).toLocaleString('vi-VN')}đ</span>
+            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Chi phí nhập / phát sinh</span>
+            <span className="font-black text-xl text-red-600">-{metrics.restockExpenses.toLocaleString('vi-VN')}đ</span>
           </div>
-          <div className="p-2.5 bg-purple-50 rounded-xl text-purple-700">
-            <TrendingUp className="w-5 h-5" />
+          <div className="p-2.5 bg-red-50 rounded-xl text-red-700">
+            <ArrowRightLeft className="w-5 h-5" />
           </div>
         </div>
 
@@ -226,8 +254,8 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
 
         <div className="bg-white p-4.5 rounded-2xl border border-coffee-light flex items-center justify-between shadow-sm">
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Lợi nhuận gộp ước tính</span>
-            <span className="font-black text-xl text-coffee-primary">{Math.round(metrics.estimatedProfit).toLocaleString('vi-VN')}đ</span>
+            <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Doanh thu thực tế ca</span>
+            <span className="font-black text-xl text-emerald-700">{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
           </div>
           <div className="p-2.5 bg-amber-50 rounded-xl text-amber-700">
             <ShieldCheck className="w-5 h-5" />
@@ -241,13 +269,13 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
         <div className="space-y-3">
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-semibold">
-              <span className="text-coffee-dark">Tiền mặt</span>
-              <span className="text-coffee-primary">{metrics.totalCash.toLocaleString('vi-VN')}đ ({metrics.totalRevenue > 0 ? Math.round((metrics.totalCash/metrics.totalRevenue)*100) : 0}%)</span>
+              <span className="text-coffee-dark">Tiền mặt bán hàng</span>
+              <span className="text-coffee-primary">{metrics.totalCash.toLocaleString('vi-VN')}đ ({metrics.grossRevenue > 0 ? Math.round((metrics.totalCash/metrics.grossRevenue)*100) : 0}%)</span>
             </div>
             <div className="w-full bg-[#FAF6F0] h-2.5 rounded-full overflow-hidden">
               <div 
                 className="bg-coffee-primary h-full rounded-full" 
-                style={{ width: `${metrics.totalRevenue > 0 ? (metrics.totalCash / metrics.totalRevenue) * 100 : 0}%` }}
+                style={{ width: `${metrics.grossRevenue > 0 ? (metrics.totalCash / metrics.grossRevenue) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -255,12 +283,12 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-semibold">
               <span className="text-coffee-dark">Chuyển khoản</span>
-              <span className="text-coffee-primary">{metrics.totalTransfer.toLocaleString('vi-VN')}đ ({metrics.totalRevenue > 0 ? Math.round((metrics.totalTransfer/metrics.totalRevenue)*100) : 0}%)</span>
+              <span className="text-coffee-primary">{metrics.totalTransfer.toLocaleString('vi-VN')}đ ({metrics.grossRevenue > 0 ? Math.round((metrics.totalTransfer/metrics.grossRevenue)*100) : 0}%)</span>
             </div>
             <div className="w-full bg-[#FAF6F0] h-2.5 rounded-full overflow-hidden">
               <div 
                 className="bg-coffee-dark h-full rounded-full" 
-                style={{ width: `${metrics.totalRevenue > 0 ? (metrics.totalTransfer / metrics.totalRevenue) * 100 : 0}%` }}
+                style={{ width: `${metrics.grossRevenue > 0 ? (metrics.totalTransfer / metrics.grossRevenue) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -310,6 +338,51 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
             )}
           </div>
         )}
+      </div>
+
+      {/* BẢNG DÒNG TIỀN NGAY DƯỚI HÓA ĐƠN TRONG CA */}
+      <div className="bg-[#FAF6F0] p-5 rounded-3xl border border-coffee-light space-y-3 text-xs shadow-sm">
+        <h4 className="font-extrabold text-sm text-coffee-dark flex items-center justify-between border-b border-coffee-light/80 pb-2.5">
+          <span>💵 Bảng Tính Dòng Tiền Thực Tế Ca</span>
+          <span className="text-[10px] text-coffee-medium font-bold uppercase">Cân bằng két tiền</span>
+        </h4>
+
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-coffee-medium">Tiền mặt bán hàng:</span>
+            <strong className="font-extrabold text-coffee-dark">{metrics.totalCash.toLocaleString('vi-VN')}đ</strong>
+          </div>
+
+          {/* Chi tiết từng khoản chi phí phát sinh */}
+          {metrics.restockItems.length > 0 ? (
+            metrics.restockItems.map((log: any) => (
+              <div key={log.id} className="flex justify-between items-center text-red-600 pl-3 text-[11px]">
+                <span>- {log.ingredient_name} ({log.note || 'Nhập kho'}):</span>
+                <strong>-{log.cost.toLocaleString('vi-VN')}đ</strong>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between items-center text-coffee-medium/70 pl-3 text-[11px] italic">
+              <span>- Chi phí nhập/phát sinh:</span>
+              <span>0đ</span>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-2 border-t border-dashed border-coffee-light font-extrabold text-coffee-dark text-sm">
+            <span>👉 Tiền mặt hiện tại trong két:</span>
+            <span className="text-amber-800">{metrics.currentCash.toLocaleString('vi-VN')}đ</span>
+          </div>
+
+          <div className="flex justify-between items-center text-coffee-medium pt-1">
+            <span>+ Chuyển khoản (Ngân hàng):</span>
+            <strong className="font-bold text-blue-700">+{metrics.totalTransfer.toLocaleString('vi-VN')}đ</strong>
+          </div>
+
+          <div className="flex justify-between items-center pt-2.5 border-t border-coffee-light font-black text-base text-emerald-800">
+            <span>= Doanh thu thực tế ca:</span>
+            <span>{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
+          </div>
+        </div>
       </div>
     </div>
   );
