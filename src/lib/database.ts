@@ -923,28 +923,23 @@ export const db = {
       }
 
       if (!orderErr && order) {
-        // 2. Chuyển trạng thái bàn sang Đang phục vụ
-        await supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id);
+        // Song song: Chuyển trạng thái bàn + Ghi chi tiết hóa đơn (items đã chứa name từ POS)
+        const orderItemsToInsert = items.map(item => ({
+          id: generateShortId('item_'),
+          idhoadon: orderId,
+          idsp: item.product_id,
+          ten_san_pham: item.name || 'Sản phẩm',
+          don_vi_tinh: item.don_vi_tinh || 'Ly',
+          don_gia: item.unit_price || item.price,
+          so_luong: item.quantity,
+          thanh_tien: item.subtotal,
+          ghi_chu: item.notes || ''
+        }));
 
-        // Lấy thông tin sản phẩm để ghi trực tiếp (Tên món, Đơn vị tính) vào chi tiết hóa đơn
-        const products = await this.getProducts();
-
-        // 3. Ghi chi tiết hóa đơn (hoadondetail)
-        const orderItemsToInsert = items.map(item => {
-          const prod = products.find(p => p.id === item.product_id);
-          return {
-            id: generateShortId('item_'),
-            idhoadon: orderId,
-            idsp: item.product_id,
-            ten_san_pham: prod ? prod.name : 'Sản phẩm',
-            don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
-            don_gia: item.unit_price || item.price,
-            so_luong: item.quantity,
-            thanh_tien: item.subtotal,
-            ghi_chu: item.notes || ''
-          };
-        });
-        await supabase.from('hoadondetail').insert(orderItemsToInsert);
+        await Promise.all([
+          supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id),
+          supabase.from('hoadondetail').insert(orderItemsToInsert)
+        ]);
         return mapOrderToClient(order);
       }
     }
@@ -997,29 +992,41 @@ export const db = {
     const paidAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      const { data: order } = await supabase.from('hoadon').select('id_ban').eq('id', orderId).single();
-      
+      // Song song: lấy thông tin bàn + lấy danh sách items cùng lúc
+      const [orderResult, itemsResult] = await Promise.all([
+        supabase.from('hoadon').select('id_ban').eq('id', orderId).single(),
+        supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId)
+      ]);
+      const order = orderResult.data;
+      const items = itemsResult.data;
+
       // Trừ kho nguyên liệu khi thanh toán
-      const { data: items } = await supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId);
       if (items && items.length > 0) {
         const cartItems = items.map(item => ({ product_id: item.idsp, quantity: item.so_luong }));
         await this.deductStockFromOrder(cartItems);
       }
 
-      const { data: updatedOrder, error } = await supabase
-        .from('hoadon')
-        .update({
-          trang_thai_thanh_toan: 'Đã thanh toán',
-          phuong_thuc_thanh_toan: paymentMethod,
-          ngay_thanh_toan: paidAt
-        })
-        .eq('id', orderId)
-        .select()
-        .single();
-
-      if (!error && updatedOrder && order?.id_ban) {
-        await supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban);
-        return mapOrderToClient(updatedOrder);
+      // Song song: cập nhật trạng thái thanh toán + cập nhật trạng thái bàn cùng lúc
+      const updatePromises: any[] = [
+        supabase
+          .from('hoadon')
+          .update({
+            trang_thai_thanh_toan: 'Đã thanh toán',
+            phuong_thuc_thanh_toan: paymentMethod,
+            ngay_thanh_toan: paidAt
+          })
+          .eq('id', orderId)
+          .select()
+          .single()
+      ];
+      if (order?.id_ban) {
+        updatePromises.push(
+          supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban)
+        );
+      }
+      const [payResult] = await Promise.all(updatePromises);
+      if (!payResult.error && payResult.data) {
+        return mapOrderToClient(payResult.data);
       }
     }
 

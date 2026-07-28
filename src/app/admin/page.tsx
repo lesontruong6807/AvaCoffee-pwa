@@ -26,6 +26,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF } from '@/lib/exportUtils';
 
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -795,9 +796,26 @@ export default function AdminPage() {
               <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Doanh thu theo giai đoạn</h3>
               <p className="text-xs text-coffee-medium mt-1">Tổng hợp và báo cáo kết quả kinh doanh từ ngày <strong>{new Date(repStartDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{new Date(repEndDate).toLocaleDateString('vi-VN')}</strong>.</p>
             </div>
-            <span className="text-[10px] font-extrabold px-3 py-1.5 bg-coffee-light text-coffee-primary rounded-xl uppercase tracking-wider">
-              Theo khoảng ngày
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => exportRevenueToExcel({
+                  grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
+                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders
+                }, repStartDate, repEndDate)}
+                className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
+              >
+                📊 Xuất Excel
+              </button>
+              <button
+                onClick={() => exportRevenueToPDF({
+                  grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
+                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders
+                }, repStartDate, repEndDate)}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
+              >
+                📄 Xuất PDF
+              </button>
+            </div>
           </div>
 
           {/* Dashboard Metrics */}
@@ -959,16 +977,59 @@ export default function AdminPage() {
           </div>
 
           {/* Tiêu đề báo cáo */}
-          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div>
               <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Thống kê nguyên liệu kho</h3>
               <p className="text-xs text-coffee-medium mt-1">
                 Xem lượng tồn đầu kỳ ngày <strong>{new Date(invStartDate).toLocaleDateString('vi-VN')}</strong> đến lượng tồn thực tế cuối ngày <strong>{new Date(invEndDate).toLocaleDateString('vi-VN')}</strong>.
               </p>
             </div>
-            <span className="text-[10px] font-extrabold px-3 py-1.5 bg-coffee-light text-coffee-primary rounded-xl uppercase tracking-wider">
-              Báo cáo kho tổng hợp
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  const rows = ingredients
+                    .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
+                    .map(ing => {
+                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                      return {
+                        name: ing.name,
+                        unit: ing.unit,
+                        quy_cach: ing.quy_cach,
+                        openingStock: formatIngredientStock(openingStock, ing.unit, ing.quy_cach),
+                        refilled: refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-',
+                        sold: sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-',
+                        endingStock: formatIngredientStock(endingStock, ing.unit, ing.quy_cach)
+                      };
+                    });
+                  exportInventoryToExcel(rows, invStartDate, invEndDate);
+                }}
+                className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
+              >
+                📊 Xuất Excel
+              </button>
+              <button
+                onClick={() => {
+                  const rows = ingredients
+                    .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
+                    .map(ing => {
+                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                      return {
+                        name: ing.name,
+                        unit: ing.unit,
+                        quy_cach: ing.quy_cach,
+                        openingStock: formatIngredientStock(openingStock, ing.unit, ing.quy_cach),
+                        refilled: refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-',
+                        sold: sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-',
+                        endingStock: formatIngredientStock(endingStock, ing.unit, ing.quy_cach)
+                      };
+                    });
+                  exportInventoryToPDF(rows, invStartDate, invEndDate);
+                }}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
+              >
+                📄 Xuất PDF
+              </button>
+            </div>
           </div>
 
           {/* Bảng Excel-style */}
@@ -1043,7 +1104,7 @@ export default function AdminPage() {
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex items-center justify-between">
             <div className="space-y-1">
               <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Đồ Uống</h3>
-              <p className="text-xs text-coffee-medium">Cập nhật giá bán, giá vốn, trạng thái còn hàng/hết hàng và thêm đồ uống mới.</p>
+              <p className="text-xs text-coffee-medium">Cập nhật giá bán, trạng thái còn hàng/hết hàng và thêm đồ uống mới.</p>
             </div>
             <button
               onClick={openAddProduct}
@@ -1092,10 +1153,6 @@ export default function AdminPage() {
                     <p className="flex justify-between">
                       <span className="text-coffee-medium">Giá bán:</span>
                       <strong className="text-coffee-primary">{prod.price.toLocaleString('vi-VN')}đ</strong>
-                    </p>
-                    <p className="flex justify-between">
-                      <span className="text-coffee-medium">Giá vốn:</span>
-                      <strong className="text-coffee-dark">{(prod.cost_price || 0).toLocaleString('vi-VN')}đ</strong>
                     </p>
                   </div>
 
@@ -1254,32 +1311,17 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Giá bán */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-coffee-medium uppercase">Giá bán (đ)</label>
-                  <input
-                    type="number"
-                    value={prodPrice}
-                    onChange={(e) => setProdPrice(Number(e.target.value))}
-                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
-                    min={0}
-                    required
-                  />
-                </div>
-
-                {/* Giá vốn */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-coffee-medium uppercase">Giá vốn (đ)</label>
-                  <input
-                    type="number"
-                    value={prodCostPrice}
-                    onChange={(e) => setProdCostPrice(Number(e.target.value))}
-                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
-                    min={0}
-                    required
-                  />
-                </div>
+              {/* Giá bán */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Giá bán (đ)</label>
+                <input
+                  type="number"
+                  value={prodPrice}
+                  onChange={(e) => setProdPrice(Number(e.target.value))}
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  min={0}
+                  required
+                />
               </div>
 
               {/* Loại món và trạng thái */}
