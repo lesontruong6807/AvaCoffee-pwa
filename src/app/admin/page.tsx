@@ -26,11 +26,11 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF } from '@/lib/exportUtils';
+import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF, exportAttendanceToExcel, exportAttendanceToPDF } from '@/lib/exportUtils';
 
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'inventory' | 'products' | 'staff'>('approvals');
+  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'inventory' | 'products' | 'staff' | 'attendance'>('approvals');
   const [loading, setLoading] = useState(true);
 
   // Dữ liệu quản trị
@@ -61,7 +61,21 @@ export default function AdminPage() {
   const [editingStaff, setEditingStaff] = useState<any>(null);
   const [staffName, setStaffName] = useState('');
   const [staffEmail, setStaffEmail] = useState('');
+  const [staffUsername, setStaffUsername] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'Admin' | 'User'>('User');
+
+  // Bộ lọc Báo cáo Chấm công
+  const [attStartDate, setAttStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [attEndDate, setAttEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [attUserId, setAttUserId] = useState('all');
+  const [attendanceSubTab, setAttendanceSubTab] = useState<'summary' | 'shifts' | 'leaves'>('summary');
 
   const loadAllData = async () => {
     setLoading(true);
@@ -252,6 +266,8 @@ export default function AdminPage() {
     setEditingStaff(null);
     setStaffName('');
     setStaffEmail('');
+    setStaffUsername('');
+    setStaffPassword('');
     setStaffRole('User');
     setIsStaffModalOpen(true);
   };
@@ -260,24 +276,38 @@ export default function AdminPage() {
     setEditingStaff(staff);
     setStaffName(staff.full_name);
     setStaffEmail(staff.email);
+    setStaffUsername(staff.username || '');
+    setStaffPassword(''); // Bỏ trống mật khẩu khi sửa, chỉ đổi nếu admin nhập mới
     setStaffRole(staff.role);
     setIsStaffModalOpen(true);
   };
 
   const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    const staffPayload = {
+    const staffPayload: any = {
       full_name: staffName,
       email: staffEmail,
-      role: staffRole
+      role: staffRole,
     };
+
+    if (editingStaff) {
+      // Khi sửa đổi hồ sơ nhân viên
+      if (staffPassword) {
+        staffPayload.password = staffPassword;
+      }
+      // Cho phép sửa cả username nếu cần, nhưng thường thì không đổi
+      staffPayload.username = staffUsername;
+    } else {
+      // Khi thêm nhân viên mới
+      staffPayload.username = staffUsername;
+      staffPayload.password = staffPassword || '123456';
+    }
 
     try {
       if (editingStaff) {
         await db.updateUser(editingStaff.id, staffPayload);
         toast.success('Cập nhật nhân viên thành công!');
       } else {
-        // Mock ID nhân viên mới
         const newId = `u_${Date.now()}`;
         await db.createUser({ id: newId, ...staffPayload });
         toast.success('Thêm nhân viên mới thành công!');
@@ -456,6 +486,17 @@ export default function AdminPage() {
         >
           <Users className="w-4.5 h-4.5" />
           <span>Quản lý nhân viên</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('attendance')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'attendance'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <Clock className="w-4.5 h-4.5" />
+          <span>Báo cáo chấm công</span>
         </button>
       </div>
 
@@ -1206,7 +1247,7 @@ export default function AdminPage() {
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-xs text-coffee-dark truncate">{staff.full_name}</h4>
-                    <p className="text-[10px] text-coffee-medium truncate">{staff.email}</p>
+                    <p className="text-[10px] text-coffee-medium truncate">@{staff.username || 'no-username'} • {staff.email}</p>
                     <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${
                       staff.role === 'Admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
                     }`}>
@@ -1252,7 +1293,10 @@ export default function AdminPage() {
                         <div className="w-8 h-8 bg-coffee-accent rounded-lg text-coffee-dark font-extrabold flex items-center justify-center text-xs">
                           {staff.full_name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-bold text-coffee-dark">{staff.full_name}</span>
+                        <div>
+                          <span className="font-bold text-coffee-dark block">{staff.full_name}</span>
+                          <span className="text-[10px] text-coffee-medium">@{staff.username || 'no-username'}</span>
+                        </div>
                       </td>
                       <td className="p-4 text-coffee-medium">{staff.email}</td>
                       <td className="p-4">
@@ -1284,6 +1328,371 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* 6. TAB BÁO CÁO CHẤM CÔNG */}
+      {adminTab === 'attendance' && (() => {
+        // Hàm tính số ngày giao nhau giữa đơn xin nghỉ và khoảng ngày lọc
+        const getOverlapDays = (leaveStart: string, leaveEnd: string, rangeStart: string, rangeEnd: string) => {
+          const sStr = leaveStart > rangeStart ? leaveStart : rangeStart;
+          const eStr = leaveEnd < rangeEnd ? leaveEnd : rangeEnd;
+          if (sStr > eStr) return 0;
+          const sDate = new Date(sStr + 'T00:00:00');
+          const eDate = new Date(eStr + 'T00:00:00');
+          const diffTime = eDate.getTime() - sDate.getTime();
+          return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        };
+
+        const attStartT = new Date(attStartDate + 'T00:00:00').getTime();
+        const attEndT = new Date(attEndDate + 'T23:59:59').getTime();
+
+        const filteredLogs = timeLogs.filter(log => {
+          if (attUserId !== 'all' && log.user_id !== attUserId) return false;
+          const t = new Date(log.check_in_time).getTime();
+          return t >= attStartT && t <= attEndT;
+        });
+
+        const filteredLeaves = leaveRequests.filter(leave => {
+          if (attUserId !== 'all' && leave.user_id !== attUserId) return false;
+          const startT = new Date(leave.start_date + 'T00:00:00').getTime();
+          const endT = new Date(leave.end_date + 'T23:59:59').getTime();
+          return (startT <= attEndT && endT >= attStartT);
+        });
+
+        const summaryRows = users.map(user => {
+          const userLogs = filteredLogs.filter(log => log.user_id === user.id);
+          const approvedLogs = userLogs.filter(log => log.status === 'Đã duyệt');
+          
+          let totalHours = 0;
+          approvedLogs.forEach(log => {
+            if (log.check_out_time) {
+              const start = new Date(log.check_in_time).getTime();
+              const end = new Date(log.check_out_time).getTime();
+              const diff = end - start;
+              if (diff > 0) {
+                totalHours += diff / (1000 * 60 * 60);
+              }
+            }
+          });
+
+          const userLeaves = filteredLeaves.filter(leave => leave.user_id === user.id && leave.status === 'Đã duyệt');
+          let totalLeaveDays = 0;
+          userLeaves.forEach(leave => {
+            totalLeaveDays += getOverlapDays(leave.start_date, leave.end_date, attStartDate, attEndDate);
+          });
+
+          return {
+            userId: user.id,
+            staffName: user.full_name,
+            username: user.username || '',
+            role: user.role,
+            totalShifts: approvedLogs.length,
+            totalHours: totalHours,
+            totalLeaveDays: totalLeaveDays,
+            totalLeaveHours: totalLeaveDays * 8
+          };
+        });
+
+        const totalApprovedShifts = summaryRows.reduce((acc, r) => acc + (attUserId === 'all' || r.userId === attUserId ? r.totalShifts : 0), 0);
+        const totalApprovedHours = summaryRows.reduce((acc, r) => acc + (attUserId === 'all' || r.userId === attUserId ? r.totalHours : 0), 0);
+        const totalLeaveDays = summaryRows.reduce((acc, r) => acc + (attUserId === 'all' || r.userId === attUserId ? r.totalLeaveDays : 0), 0);
+        const totalLeaveHours = summaryRows.reduce((acc, r) => acc + (attUserId === 'all' || r.userId === attUserId ? r.totalLeaveHours : 0), 0);
+
+        const shiftsDetails = filteredLogs.map(log => {
+          let hours = 0;
+          if (log.check_out_time) {
+            const start = new Date(log.check_in_time).getTime();
+            const end = new Date(log.check_out_time).getTime();
+            const diff = end - start;
+            if (diff > 0) hours = diff / (1000 * 60 * 60);
+          }
+          const staff = users.find(u => u.id === log.user_id);
+          return {
+            staffName: staff?.full_name || log.users?.full_name || 'Nhân viên',
+            date: new Date(log.check_in_time).toLocaleDateString('vi-VN'),
+            shiftName: log.shift,
+            checkIn: new Date(log.check_in_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.check_in_time).toLocaleDateString('vi-VN'),
+            checkOut: log.check_out_time ? new Date(log.check_out_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.check_out_time).toLocaleDateString('vi-VN') : '-',
+            hours: hours,
+            status: log.status
+          };
+        });
+
+        const leavesDetails = filteredLeaves.map(leave => {
+          const staff = users.find(u => u.id === leave.user_id);
+          const startStr = new Date(leave.start_date).toLocaleDateString('vi-VN');
+          const endStr = new Date(leave.end_date).toLocaleDateString('vi-VN');
+          const daysInPeriod = getOverlapDays(leave.start_date, leave.end_date, attStartDate, attEndDate);
+
+          return {
+            staffName: staff?.full_name || leave.users?.full_name || 'Nhân viên',
+            startDate: startStr,
+            endDate: endStr,
+            days: daysInPeriod,
+            reason: leave.reason,
+            status: leave.status
+          };
+        });
+
+        return (
+          <div className="space-y-6">
+            {/* Header + Bộ lọc */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="font-extrabold text-lg text-coffee-dark">Báo Cáo Chấm Công & Nghỉ Phép</h3>
+                  <p className="text-xs text-coffee-medium">Xem tổng số ca làm, số giờ công thực tế, và lịch sử xin nghỉ phép.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => exportAttendanceToExcel(summaryRows, shiftsDetails, leavesDetails, attStartDate, attEndDate)}
+                    className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200 flex items-center gap-1"
+                  >
+                    📊 Xuất Excel
+                  </button>
+                  <button
+                    onClick={() => exportAttendanceToPDF(summaryRows, shiftsDetails, leavesDetails, attStartDate, attEndDate)}
+                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200 flex items-center gap-1"
+                  >
+                    📄 Xuất PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Bộ lọc */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-coffee-light/50 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Từ ngày</label>
+                  <input
+                    type="date"
+                    value={attStartDate}
+                    onChange={(e) => setAttStartDate(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Đến ngày</label>
+                  <input
+                    type="date"
+                    value={attEndDate}
+                    onChange={(e) => setAttEndDate(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Nhân viên</label>
+                  <select
+                    value={attUserId}
+                    onChange={(e) => setAttUserId(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  >
+                    <option value="all">Tất cả nhân viên</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.full_name} (@{u.username})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Thống kê dạng Card */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-3xl border border-coffee-light shadow-sm flex items-center space-x-4">
+                <div className="p-3 bg-coffee-accent/40 rounded-2xl text-coffee-primary">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-coffee-medium uppercase">Tổng ca làm</p>
+                  <h4 className="text-lg font-black text-coffee-dark">{totalApprovedShifts} ca</h4>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-coffee-light shadow-sm flex items-center space-x-4">
+                <div className="p-3 bg-green-50 rounded-2xl text-green-600">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-coffee-medium uppercase">Tổng giờ công</p>
+                  <h4 className="text-lg font-black text-coffee-dark">{totalApprovedHours.toFixed(1)} h</h4>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-coffee-light shadow-sm flex items-center space-x-4">
+                <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
+                  <CalendarDays className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-coffee-medium uppercase">Số ngày xin nghỉ</p>
+                  <h4 className="text-lg font-black text-coffee-dark">{totalLeaveDays} ngày</h4>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-coffee-light shadow-sm flex items-center space-x-4">
+                <div className="p-3 bg-red-50 rounded-2xl text-red-600">
+                  <X className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-coffee-medium uppercase">Tổng giờ nghỉ</p>
+                  <h4 className="text-lg font-black text-coffee-dark">{totalLeaveHours.toFixed(1)} h</h4>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-tabs điều hướng bảng */}
+            <div className="bg-white p-2 rounded-2xl border border-coffee-light flex space-x-1 shadow-sm w-fit text-xs">
+              <button
+                onClick={() => setAttendanceSubTab('summary')}
+                className={`px-4 py-2 rounded-xl font-bold transition ${
+                  attendanceSubTab === 'summary' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                }`}
+              >
+                Tổng hợp công
+              </button>
+              <button
+                onClick={() => setAttendanceSubTab('shifts')}
+                className={`px-4 py-2 rounded-xl font-bold transition ${
+                  attendanceSubTab === 'shifts' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                }`}
+              >
+                Lịch sử ca làm ({shiftsDetails.length})
+              </button>
+              <button
+                onClick={() => setAttendanceSubTab('leaves')}
+                className={`px-4 py-2 rounded-xl font-bold transition ${
+                  attendanceSubTab === 'leaves' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                }`}
+              >
+                Lịch sử nghỉ phép ({leavesDetails.length})
+              </button>
+            </div>
+
+            {/* Render các bảng dữ liệu */}
+            {attendanceSubTab === 'summary' && (
+              <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                        <th className="p-4">Nhân viên</th>
+                        <th className="p-4">Vai trò</th>
+                        <th className="p-4 text-center">Số ca làm (Đã duyệt)</th>
+                        <th className="p-4 text-right">Tổng giờ làm</th>
+                        <th className="p-4 text-center">Số ngày nghỉ (Đã duyệt)</th>
+                        <th className="p-4 text-right">Tổng giờ nghỉ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-coffee-light/50">
+                      {summaryRows.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
+                          <td className="p-4">
+                            <div className="font-bold text-coffee-dark">{row.staffName}</div>
+                            <div className="text-[10px] text-coffee-medium">@{row.username}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              row.role === 'Admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {row.role}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-bold text-coffee-dark">{row.totalShifts}</td>
+                          <td className="p-4 text-right font-extrabold text-green-700">{row.totalHours.toFixed(1)} giờ</td>
+                          <td className="p-4 text-center font-bold text-coffee-dark">{row.totalLeaveDays} ngày</td>
+                          <td className="p-4 text-right font-extrabold text-red-700">{row.totalLeaveHours.toFixed(1)} giờ</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {attendanceSubTab === 'shifts' && (
+              <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                        <th className="p-4">STT</th>
+                        <th className="p-4">Nhân viên</th>
+                        <th className="p-4">Ngày</th>
+                        <th className="p-4">Ca làm</th>
+                        <th className="p-4">Giờ vào thực tế</th>
+                        <th className="p-4">Giờ ra thực tế</th>
+                        <th className="p-4 text-right">Số giờ làm</th>
+                        <th className="p-4 text-center">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-coffee-light/50">
+                      {shiftsDetails.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
+                          <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
+                          <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
+                          <td className="p-4 text-coffee-medium">{row.date}</td>
+                          <td className="p-4 text-coffee-dark font-medium">{row.shiftName}</td>
+                          <td className="p-4 text-coffee-medium font-mono">{row.checkIn}</td>
+                          <td className="p-4 text-coffee-medium font-mono">{row.checkOut}</td>
+                          <td className="p-4 text-right font-bold text-coffee-dark">{row.hours.toFixed(1)} h</td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
+                              row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
+                              row.status === 'Từ chối' ? 'bg-red-100 text-red-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {row.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {attendanceSubTab === 'leaves' && (
+              <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                        <th className="p-4">STT</th>
+                        <th className="p-4">Nhân viên</th>
+                        <th className="p-4">Từ ngày</th>
+                        <th className="p-4">Đến ngày</th>
+                        <th className="p-4 text-center">Số ngày nghỉ</th>
+                        <th className="p-4">Lý do xin nghỉ</th>
+                        <th className="p-4 text-center">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-coffee-light/50">
+                      {leavesDetails.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
+                          <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
+                          <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
+                          <td className="p-4 text-coffee-dark">{row.startDate}</td>
+                          <td className="p-4 text-coffee-dark">{row.endDate}</td>
+                          <td className="p-4 text-center font-bold text-coffee-dark">{row.days} ngày</td>
+                          <td className="p-4 text-coffee-medium italic max-w-xs truncate" title={row.reason}>{row.reason}</td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
+                              row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {row.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* POPUP FORM CRUD SẢN PHẨM */}
       {isProductModalOpen && (
@@ -1398,6 +1807,32 @@ export default function AdminPage() {
                   onChange={(e) => setStaffName(e.target.value)}
                   className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
                   required
+                />
+              </div>
+
+              {/* Username */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Tên đăng nhập (Username)</label>
+                <input
+                  type="text"
+                  value={staffUsername}
+                  onChange={(e) => setStaffUsername(e.target.value)}
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  required
+                  disabled={!!editingStaff}
+                />
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Mật khẩu (Password)</label>
+                <input
+                  type="password"
+                  value={staffPassword}
+                  onChange={(e) => setStaffPassword(e.target.value)}
+                  placeholder={editingStaff ? "Để trống nếu không muốn đổi mật khẩu" : "Mật khẩu cho tài khoản mới"}
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  required={!editingStaff}
                 />
               </div>
 

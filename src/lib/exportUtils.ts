@@ -305,3 +305,249 @@ export function exportRevenueToPDF(
 
   doc.save(`BaoCaoDoanhThu_${startDate}_${endDate}.pdf`);
 }
+
+// === XUẤT BÁO CÁO CHẤM CÔNG ===
+
+export interface AttendanceSummary {
+  staffName: string;
+  username: string;
+  role: string;
+  totalShifts: number;
+  totalHours: number;
+  totalLeaveDays: number;
+  totalLeaveHours: number;
+}
+
+export interface AttendanceShiftDetail {
+  staffName: string;
+  date: string;
+  shiftName: string;
+  checkIn: string;
+  checkOut: string;
+  hours: number;
+  status: string;
+}
+
+export interface AttendanceLeaveDetail {
+  staffName: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+  status: string;
+}
+
+export function exportAttendanceToExcel(
+  summary: AttendanceSummary[],
+  shifts: AttendanceShiftDetail[],
+  leaves: AttendanceLeaveDetail[],
+  startDate: string,
+  endDate: string
+) {
+  const fromStr = new Date(startDate).toLocaleDateString('vi-VN');
+  const toStr = new Date(endDate).toLocaleDateString('vi-VN');
+
+  // Sheet 1: Tổng hợp công
+  const wsSummaryData: any[][] = [
+    ['BÁO CÁO CÔNG TỔNG HỢP - AVA COFFEE'],
+    [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
+    [],
+    ['Họ và tên', 'Tên đăng nhập', 'Vai trò', 'Số ca làm (Đã duyệt)', 'Tổng số giờ làm (giờ)', 'Số ngày xin nghỉ (ngày)', 'Tổng số giờ nghỉ (giờ)']
+  ];
+  summary.forEach(row => {
+    wsSummaryData.push([
+      row.staffName,
+      '@' + row.username,
+      row.role,
+      row.totalShifts,
+      Number(row.totalHours.toFixed(1)),
+      row.totalLeaveDays,
+      Number(row.totalLeaveHours.toFixed(1))
+    ]);
+  });
+  const wsSummary = XLSX.utils.aoa_to_sheet(wsSummaryData);
+  wsSummary['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+  wsSummary['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+  ];
+
+  // Sheet 2: Chi tiết ca làm
+  const wsShiftsData: any[][] = [
+    ['CHI TIẾT CA LÀM NHÂN VIÊN - AVA COFFEE'],
+    [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
+    [],
+    ['STT', 'Nhân viên', 'Ngày làm', 'Ca làm', 'Giờ vào thực tế', 'Giờ ra thực tế', 'Số giờ làm', 'Trạng thái']
+  ];
+  shifts.forEach((row, idx) => {
+    wsShiftsData.push([
+      idx + 1,
+      row.staffName,
+      row.date,
+      row.shiftName,
+      row.checkIn,
+      row.checkOut || '-',
+      Number(row.hours.toFixed(1)),
+      row.status
+    ]);
+  });
+  const wsShifts = XLSX.utils.aoa_to_sheet(wsShiftsData);
+  wsShifts['!cols'] = [{ wch: 8 }, { wch: 25 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
+  wsShifts['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
+  ];
+
+  // Sheet 3: Chi tiết nghỉ phép
+  const wsLeavesData: any[][] = [
+    ['CHI TIẾT YÊU CẦU NGHỈ PHÉP - AVA COFFEE'],
+    [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
+    [],
+    ['STT', 'Nhân viên', 'Từ ngày', 'Đến ngày', 'Số ngày', 'Lý do nghỉ', 'Trạng thái']
+  ];
+  leaves.forEach((row, idx) => {
+    wsLeavesData.push([
+      idx + 1,
+      row.staffName,
+      row.startDate,
+      row.endDate,
+      row.days,
+      row.reason,
+      row.status
+    ]);
+  });
+  const wsLeaves = XLSX.utils.aoa_to_sheet(wsLeavesData);
+  wsLeaves['!cols'] = [{ wch: 8 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 35 }, { wch: 15 }];
+  wsLeaves['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Tổng hợp công');
+  XLSX.utils.book_append_sheet(wb, wsShifts, 'Chi tiết ca làm');
+  XLSX.utils.book_append_sheet(wb, wsLeaves, 'Chi tiết nghỉ phép');
+  XLSX.writeFile(wb, `BaoCaoChamCong_${startDate}_${endDate}.xlsx`);
+}
+
+export function exportAttendanceToPDF(
+  summary: AttendanceSummary[],
+  shifts: AttendanceShiftDetail[],
+  leaves: AttendanceLeaveDetail[],
+  startDate: string,
+  endDate: string
+) {
+  const fromStr = new Date(startDate).toLocaleDateString('vi-VN');
+  const toStr = new Date(endDate).toLocaleDateString('vi-VN');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Đăng ký font Times New Roman để hiển thị tiếng Việt có dấu
+  doc.addFileToVFS('times.ttf', timesBase64);
+  doc.addFont('times.ttf', 'TimesNewRoman', 'normal');
+  doc.addFont('times.ttf', 'TimesNewRoman', 'bold');
+  doc.setFont('TimesNewRoman');
+
+  // Title
+  doc.setFontSize(16);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('BÁO CÁO CHẤM CÔNG VÀ NGHỈ PHÉP - AVA COFFEE', 105, 20, { align: 'center' });
+
+  // Subtitle
+  doc.setFontSize(10);
+  doc.setFont('TimesNewRoman', 'normal');
+  doc.text(`Thời gian: ${fromStr}  —  Đến ngày: ${toStr}`, 105, 28, { align: 'center' });
+
+  // Section 1: Tổng hợp công
+  doc.setFontSize(11);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('I. BẢNG TỔNG HỢP CÔNG NHÂN VIÊN', 14, 37);
+
+  const summaryData = summary.map(row => [
+    row.staffName,
+    '@' + row.username,
+    row.role,
+    row.totalShifts,
+    row.totalHours.toFixed(1) + ' giờ',
+    row.totalLeaveDays + ' ngày',
+    row.totalLeaveHours.toFixed(1) + ' giờ'
+  ]);
+
+  autoTable(doc, {
+    startY: 41,
+    head: [['Họ và tên', 'Username', 'Vai trò', 'Số ca làm', 'Tổng giờ làm', 'Số ngày nghỉ', 'Tổng giờ nghỉ']],
+    body: summaryData,
+    styles: { font: 'TimesNewRoman', fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [250, 246, 240] },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Trang 2: Chi tiết ca làm
+  doc.addPage();
+  
+  doc.setFontSize(11);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('II. CHI TIẾT CA LÀM NHÂN VIÊN', 14, 20);
+
+  const shiftsData = shifts.map((row, idx) => [
+    idx + 1,
+    row.staffName,
+    row.date,
+    row.shiftName,
+    row.checkIn,
+    row.checkOut || '-',
+    row.hours.toFixed(1) + ' h',
+    row.status
+  ]);
+
+  autoTable(doc, {
+    startY: 24,
+    head: [['STT', 'Nhân viên', 'Ngày', 'Ca làm', 'Giờ vào', 'Giờ ra', 'Số giờ', 'Trạng thái']],
+    body: shiftsData,
+    styles: { font: 'TimesNewRoman', fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    alternateRowStyles: { fillColor: [250, 246, 240] },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      7: { fontStyle: 'bold' }
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Trang 3: Chi tiết nghỉ phép nếu có
+  if (leaves.length > 0) {
+    doc.addPage();
+    doc.setFontSize(11);
+    doc.setFont('TimesNewRoman', 'bold');
+    doc.text('III. CHI TIẾT ĐƠN XIN NGHỈ PHÉP', 14, 20);
+
+    const leavesData = leaves.map((row, idx) => [
+      idx + 1,
+      row.staffName,
+      row.startDate,
+      row.endDate,
+      row.days + ' ngày',
+      row.reason,
+      row.status
+    ]);
+
+    autoTable(doc, {
+      startY: 24,
+      head: [['STT', 'Nhân viên', 'Từ ngày', 'Đến ngày', 'Số ngày', 'Lý do', 'Trạng thái']],
+      body: leavesData,
+      styles: { font: 'TimesNewRoman', fontSize: 7.5, cellPadding: 2 },
+      headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      alternateRowStyles: { fillColor: [250, 246, 240] },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        4: { cellWidth: 20 },
+        6: { fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  doc.save(`BaoCaoChamCong_${startDate}_${endDate}.pdf`);
+}
+
