@@ -1510,28 +1510,32 @@ export const db = {
       }
 
       if (isSupabaseConfigured && supabase) {
-        // Update Supabase tables
-        await supabase
-          .from('nguyenlieu')
-          .update({ so_luong_ton: ing?.stock_quantity })
-          .eq('id', payload.ingredient_id);
+        const updates: any[] = [];
+        updates.push(
+          supabase
+            .from('nguyenlieu')
+            .update({ so_luong_ton: ing?.stock_quantity })
+            .eq('id', payload.ingredient_id)
+        );
 
         if (payload.ingredient_id === 'ing_nuocduong') {
           const duong = ingredients.find(i => i.id === 'ing_duong');
-          if (duong) await supabase.from('nguyenlieu').update({ so_luong_ton: duong.stock_quantity }).eq('id', 'ing_duong');
+          if (duong) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: duong.stock_quantity }).eq('id', 'ing_duong'));
         } else if (payload.ingredient_id === 'ing_nuoccothongtra') {
           const ht = ingredients.find(i => i.id === 'ing_hongtra');
-          if (ht) await supabase.from('nguyenlieu').update({ so_luong_ton: ht.stock_quantity }).eq('id', 'ing_hongtra');
+          if (ht) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: ht.stock_quantity }).eq('id', 'ing_hongtra'));
         } else if (payload.ingredient_id === 'ing_kemmuoi') {
           const kb = ingredients.find(i => i.id === 'ing_kembeo');
-          if (kb) await supabase.from('nguyenlieu').update({ so_luong_ton: kb.stock_quantity }).eq('id', 'ing_kembeo');
+          if (kb) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: kb.stock_quantity }).eq('id', 'ing_kembeo'));
           const sd = ingredients.find(i => i.id === 'ing_suadac');
-          if (sd) await supabase.from('nguyenlieu').update({ so_luong_ton: sd.stock_quantity }).eq('id', 'ing_suadac');
+          if (sd) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: sd.stock_quantity }).eq('id', 'ing_suadac'));
           const st = ingredients.find(i => i.id === 'ing_suatuoi');
-          if (st) await supabase.from('nguyenlieu').update({ so_luong_ton: st.stock_quantity }).eq('id', 'ing_suatuoi');
+          if (st) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: st.stock_quantity }).eq('id', 'ing_suatuoi'));
           const mh = ingredients.find(i => i.id === 'ing_muoihong');
-          if (mh) await supabase.from('nguyenlieu').update({ so_luong_ton: mh.stock_quantity }).eq('id', 'ing_muoihong');
+          if (mh) updates.push(supabase.from('nguyenlieu').update({ so_luong_ton: mh.stock_quantity }).eq('id', 'ing_muoihong'));
         }
+
+        await Promise.all(updates);
       } else {
         mockDb.setIngredients(ingredients);
       }
@@ -1652,47 +1656,73 @@ export const db = {
       const ingredients = await this.getIngredients();
       let updated = false;
 
+      // Group ingredient changes
+      const ingChanges: { [id: string]: { restoreQty: number; productIds: string[] } } = {};
+
       for (const item of items) {
         const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
         for (const rec of itemRecipes) {
-          const ing = ingredients.find(i => i.id === rec.ingredient_id);
-          if (ing) {
-            const restoreQty = rec.quantity_needed * item.quantity;
-            ing.stock_quantity = Number(ing.stock_quantity) + restoreQty;
-            updated = true;
-
-            if (isSupabaseConfigured && supabase) {
-              await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id);
-              await supabase.from('lichsukho').insert([{
-                id: generateShortId('inv_'),
-                id_nguyen_lieu: ing.id,
-                so_luong_thay_doi: restoreQty,
-                loai_giao_dich: 'Khác',
-                chi_phi: 0,
-                ghi_chu: `Hoàn kho do hủy đơn hàng (Mã SP: ${item.product_id})`,
-                trang_thai: 'Đã duyệt'
-              }]);
-            } else {
-              const logs = mockDb.getInventoryLogs();
-              logs.push({
-                id: generateShortId('inv_'),
-                ingredient_id: ing.id,
-                custom_ingredient_name: null,
-                change_amount: restoreQty,
-                type: 'Khác' as const,
-                cost: 0,
-                note: `Hoàn kho do hủy đơn hàng (Mã SP: ${item.product_id})`,
-                staff_id: 'system',
-                created_at: new Date().toISOString(),
-                status: 'Đã duyệt' as const
-              });
-              mockDb.setInventoryLogs(logs);
-            }
+          const restoreQty = rec.quantity_needed * item.quantity;
+          if (!ingChanges[rec.ingredient_id]) {
+            ingChanges[rec.ingredient_id] = { restoreQty: 0, productIds: [] };
+          }
+          ingChanges[rec.ingredient_id].restoreQty += restoreQty;
+          if (!ingChanges[rec.ingredient_id].productIds.includes(item.product_id)) {
+            ingChanges[rec.ingredient_id].productIds.push(item.product_id);
           }
         }
       }
 
-      if (updated && (!isSupabaseConfigured || !supabase)) {
+      const dbUpdates: any[] = [];
+      const historyLogsToInsert: any[] = [];
+
+      for (const ingId in ingChanges) {
+        const ing = ingredients.find(i => i.id === ingId);
+        if (ing) {
+          const { restoreQty, productIds } = ingChanges[ingId];
+          ing.stock_quantity = Number(ing.stock_quantity) + restoreQty;
+          updated = true;
+
+          if (isSupabaseConfigured && supabase) {
+            dbUpdates.push(
+              supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id)
+            );
+            historyLogsToInsert.push({
+              id: generateShortId('inv_'),
+              id_nguyen_lieu: ing.id,
+              so_luong_thay_doi: restoreQty,
+              loai_giao_dich: 'Khác',
+              chi_phi: 0,
+              ghi_chu: `Hoàn kho do hủy đơn hàng (Mã SP: ${productIds.join(', ')})`,
+              trang_thai: 'Đã duyệt'
+            });
+          } else {
+            const logs = mockDb.getInventoryLogs();
+            logs.push({
+              id: generateShortId('inv_'),
+              ingredient_id: ing.id,
+              custom_ingredient_name: null,
+              change_amount: restoreQty,
+              type: 'Khác' as const,
+              cost: 0,
+              note: `Hoàn kho do hủy đơn hàng (Mã SP: ${productIds.join(', ')})`,
+              staff_id: 'system',
+              created_at: new Date().toISOString(),
+              status: 'Đã duyệt' as const
+            });
+            mockDb.setInventoryLogs(logs);
+          }
+        }
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        if (dbUpdates.length > 0) {
+          await Promise.all(dbUpdates);
+        }
+        if (historyLogsToInsert.length > 0) {
+          await supabase.from('lichsukho').insert(historyLogsToInsert);
+        }
+      } else if (updated) {
         mockDb.setIngredients(ingredients);
       }
     } catch (e) {
@@ -1707,47 +1737,71 @@ export const db = {
       const ingredients = await this.getIngredients();
       let updated = false;
 
+      const ingChanges: { [id: string]: { deductQty: number; productIds: string[] } } = {};
       for (const item of items) {
         const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
         for (const rec of itemRecipes) {
-          const ing = ingredients.find(i => i.id === rec.ingredient_id);
-          if (ing) {
-            const deductQty = rec.quantity_needed * item.quantity;
-            ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) - deductQty);
-            updated = true;
-
-            if (isSupabaseConfigured && supabase) {
-              await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id);
-              await supabase.from('lichsukho').insert([{
-                id: generateShortId('inv_'),
-                id_nguyen_lieu: ing.id,
-                so_luong_thay_doi: -deductQty,
-                loai_giao_dich: 'Bán hàng',
-                chi_phi: 0,
-                ghi_chu: `Khấu trừ tự động qua POS (Mã SP: ${item.product_id})`,
-                trang_thai: 'Đã duyệt'
-              }]);
-            } else {
-              const logs = mockDb.getInventoryLogs();
-              logs.push({
-                id: generateShortId('inv_'),
-                ingredient_id: ing.id,
-                custom_ingredient_name: null,
-                change_amount: -deductQty,
-                type: 'Bán hàng' as const,
-                cost: 0,
-                note: `Khấu trừ tự động qua POS (Mã SP: ${item.product_id})`,
-                staff_id: 'system',
-                created_at: new Date().toISOString(),
-                status: 'Đã duyệt' as const
-              });
-              mockDb.setInventoryLogs(logs);
-            }
+          const deductQty = rec.quantity_needed * item.quantity;
+          if (!ingChanges[rec.ingredient_id]) {
+            ingChanges[rec.ingredient_id] = { deductQty: 0, productIds: [] };
+          }
+          ingChanges[rec.ingredient_id].deductQty += deductQty;
+          if (!ingChanges[rec.ingredient_id].productIds.includes(item.product_id)) {
+            ingChanges[rec.ingredient_id].productIds.push(item.product_id);
           }
         }
       }
 
-      if (updated && (!isSupabaseConfigured || !supabase)) {
+      const dbUpdates: any[] = [];
+      const historyLogsToInsert: any[] = [];
+
+      for (const ingId in ingChanges) {
+        const ing = ingredients.find(i => i.id === ingId);
+        if (ing) {
+          const { deductQty, productIds } = ingChanges[ingId];
+          ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) - deductQty);
+          updated = true;
+
+          if (isSupabaseConfigured && supabase) {
+            dbUpdates.push(
+              supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id)
+            );
+            historyLogsToInsert.push({
+              id: generateShortId('inv_'),
+              id_nguyen_lieu: ing.id,
+              so_luong_thay_doi: -deductQty,
+              loai_giao_dich: 'Bán hàng',
+              chi_phi: 0,
+              ghi_chu: `Khấu trừ tự động qua POS (Mã SP: ${productIds.join(', ')})`,
+              trang_thai: 'Đã duyệt'
+            });
+          } else {
+            const logs = mockDb.getInventoryLogs();
+            logs.push({
+              id: generateShortId('inv_'),
+              ingredient_id: ing.id,
+              custom_ingredient_name: null,
+              change_amount: -deductQty,
+              type: 'Bán hàng' as const,
+              cost: 0,
+              note: `Khấu trừ tự động qua POS (Mã SP: ${productIds.join(', ')})`,
+              staff_id: 'system',
+              created_at: new Date().toISOString(),
+              status: 'Đã duyệt' as const
+            });
+            mockDb.setInventoryLogs(logs);
+          }
+        }
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        if (dbUpdates.length > 0) {
+          await Promise.all(dbUpdates);
+        }
+        if (historyLogsToInsert.length > 0) {
+          await supabase.from('lichsukho').insert(historyLogsToInsert);
+        }
+      } else if (updated) {
         mockDb.setIngredients(ingredients);
       }
     } catch (e) {
