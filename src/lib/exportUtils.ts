@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { timesBase64 } from './timesBase64';
 
 // === XUẤT BÁO CÁO KHO ===
 
@@ -57,7 +58,7 @@ export function exportInventoryToExcel(
   ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bao cao kho');
+  XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo kho');
   XLSX.writeFile(wb, `BaoCaoKho_${startDate}_${endDate}.xlsx`);
 }
 
@@ -71,13 +72,19 @@ export function exportInventoryToPDF(
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+  // Đăng ký font Times New Roman để hiển thị tiếng Việt có dấu
+  doc.addFileToVFS('times.ttf', timesBase64);
+  doc.addFont('times.ttf', 'TimesNewRoman', 'normal');
+  doc.addFont('times.ttf', 'TimesNewRoman', 'bold');
+  doc.setFont('TimesNewRoman');
+
   doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('BAO CAO KHO TONG HOP - AVA COFFEE', 105, 20, { align: 'center' });
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('BÁO CÁO KHO TỔNG HỢP - AVA COFFEE', 105, 20, { align: 'center' });
 
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Tu ngay: ${fromStr}  -  Den ngay: ${toStr}`, 105, 28, { align: 'center' });
+  doc.setFont('TimesNewRoman', 'normal');
+  doc.text(`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`, 105, 28, { align: 'center' });
 
   const tableData = rows.map(row => [
     row.name,
@@ -90,9 +97,10 @@ export function exportInventoryToPDF(
 
   autoTable(doc, {
     startY: 35,
-    head: [['Ten nguyen lieu', 'Don vi', 'Ton dau ky', 'SL nhap (+)', 'SL ban (-)', 'Ton cuoi ky']],
+    head: [['Tên nguyên liệu', 'Đơn vị', 'Tồn đầu kỳ', 'SL nhập (+)', 'SL bán (-)', 'Tồn cuối kỳ']],
     body: tableData,
     styles: {
+      font: 'TimesNewRoman',
       fontSize: 8,
       cellPadding: 3,
     },
@@ -138,7 +146,7 @@ interface RevenueData {
 }
 
 function fmtVND(n: number): string {
-  return n.toLocaleString('vi-VN') + 'd';
+  return n.toLocaleString('vi-VN') + 'đ';
 }
 
 export function exportRevenueToExcel(
@@ -150,22 +158,22 @@ export function exportRevenueToExcel(
   const toStr = new Date(endDate).toLocaleDateString('vi-VN');
 
   const wsData: any[][] = [
-    ['BAO CAO DOANH THU - AVA COFFEE'],
-    [`Tu ngay: ${fromStr}  -  Den ngay: ${toStr}`],
+    ['BÁO CÁO DOANH THU - AVA COFFEE'],
+    [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
     [],
-    ['TONG QUAN'],
-    ['Tong doanh thu (truoc giam gia)', fmtVND(data.grossRevenue)],
-    ['Giam gia', `-${fmtVND(data.totalDiscount)}`],
-    ['Chi phi nhap kho', `-${fmtVND(data.totalRestockCosts)}`],
-    ['Tong chi phi nhap / giam gia', `-${fmtVND(data.totalRestockExpenses)}`],
-    ['Doanh thu thuc te', fmtVND(data.netRevenue)],
+    ['TỔNG QUAN'],
+    ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
+    ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
+    ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
+    ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
+    ['Doanh thu thực tế', fmtVND(data.netRevenue)],
     [],
-    ['Tong so hoa don', `${data.paidOrders.length} don`],
-    ['Thanh toan tien mat', fmtVND(data.totalCash)],
-    ['Thanh toan chuyen khoan', fmtVND(data.totalTransfer)],
+    ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
+    ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
+    ['Thanh toán chuyển khoản', fmtVND(data.totalTransfer)],
     [],
-    ['CHI TIET GIAO DICH'],
-    ['STT', 'Ma don', 'Ngay', 'Ban', 'Hinh thuc', 'Tong tien', 'Giam gia', 'Thuc nhan']
+    ['CHI TIẾT GIAO DỊCH'],
+    ['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']
   ];
 
   data.paidOrders.forEach((order, idx) => {
@@ -174,7 +182,7 @@ export function exportRevenueToExcel(
       idx + 1,
       order.id.substring(0, 8).toUpperCase(),
       new Date(order.created_at).toLocaleDateString('vi-VN'),
-      order.tables?.table_name || 'Mang ve',
+      order.tables?.table_name || 'Mang về',
       order.payment_method,
       Number(order.total_amount) + disc,
       disc > 0 ? `-${fmtVND(disc)}` : '-',
@@ -203,7 +211,7 @@ export function exportRevenueToExcel(
   ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bao cao doanh thu');
+  XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo doanh thu');
   XLSX.writeFile(wb, `BaoCaoDoanhThu_${startDate}_${endDate}.xlsx`);
 }
 
@@ -217,33 +225,39 @@ export function exportRevenueToPDF(
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+  // Đăng ký font Times New Roman để hiển thị tiếng Việt có dấu
+  doc.addFileToVFS('times.ttf', timesBase64);
+  doc.addFont('times.ttf', 'TimesNewRoman', 'normal');
+  doc.addFont('times.ttf', 'TimesNewRoman', 'bold');
+  doc.setFont('TimesNewRoman');
+
   doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('BAO CAO DOANH THU - AVA COFFEE', 105, 20, { align: 'center' });
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('BÁO CÁO DOANH THU - AVA COFFEE', 105, 20, { align: 'center' });
 
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Tu ngay: ${fromStr}  -  Den ngay: ${toStr}`, 105, 28, { align: 'center' });
+  doc.setFont('TimesNewRoman', 'normal');
+  doc.text(`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`, 105, 28, { align: 'center' });
 
   doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TONG QUAN', 14, 38);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('TỔNG QUAN', 14, 38);
 
   autoTable(doc, {
     startY: 42,
-    head: [['Chi tieu', 'Gia tri']],
+    head: [['Chỉ tiêu', 'Giá trị']],
     body: [
-      ['Tong doanh thu (truoc giam gia)', fmtVND(data.grossRevenue)],
-      ['Giam gia', `-${fmtVND(data.totalDiscount)}`],
-      ['Chi phi nhap kho', `-${fmtVND(data.totalRestockCosts)}`],
-      ['Tong chi phi nhap / giam gia', `-${fmtVND(data.totalRestockExpenses)}`],
-      ['DOANH THU THUC TE', fmtVND(data.netRevenue)],
+      ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
+      ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
+      ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
+      ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
+      ['DOANH THU THỰC TẾ', fmtVND(data.netRevenue)],
       ['', ''],
-      ['Tong so hoa don', `${data.paidOrders.length} don`],
-      ['Tien mat', fmtVND(data.totalCash)],
-      ['Chuyen khoan', fmtVND(data.totalTransfer)],
+      ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
+      ['Tiền mặt', fmtVND(data.totalCash)],
+      ['Chuyển khoản', fmtVND(data.totalTransfer)],
     ],
-    styles: { fontSize: 9, cellPadding: 2.5 },
+    styles: { font: 'TimesNewRoman', fontSize: 9, cellPadding: 2.5 },
     headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold' },
     columnStyles: {
       0: { cellWidth: 80 },
@@ -256,8 +270,8 @@ export function exportRevenueToPDF(
   const finalY = (doc as any).lastAutoTable?.finalY || 110;
 
   doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('CHI TIET GIAO DICH', 14, finalY + 10);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('CHI TIẾT GIAO DỊCH', 14, finalY + 10);
 
   const txData = data.paidOrders.map((order, idx) => {
     const disc = Number(order.discount || 0);
@@ -265,7 +279,7 @@ export function exportRevenueToPDF(
       idx + 1,
       order.id.substring(0, 8).toUpperCase(),
       new Date(order.created_at).toLocaleDateString('vi-VN'),
-      order.tables?.table_name || 'Mang ve',
+      order.tables?.table_name || 'Mang về',
       order.payment_method,
       fmtVND(Number(order.total_amount) + disc),
       disc > 0 ? `-${fmtVND(disc)}` : '-',
@@ -275,9 +289,9 @@ export function exportRevenueToPDF(
 
   autoTable(doc, {
     startY: finalY + 14,
-    head: [['STT', 'Ma don', 'Ngay', 'Ban', 'Hinh thuc', 'Tong tien', 'Giam gia', 'Thuc nhan']],
+    head: [['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']],
     body: txData,
-    styles: { fontSize: 7, cellPadding: 2 },
+    styles: { font: 'TimesNewRoman', fontSize: 7, cellPadding: 2 },
     headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
     columnStyles: {
       0: { cellWidth: 10 },
