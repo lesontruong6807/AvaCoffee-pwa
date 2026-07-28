@@ -167,7 +167,7 @@ VALUES
 ('inv_test215', 'ing_suatuoi', NULL, -230, 'Bán hàng', 0, 'Khấu trừ sữa tươi (Cà phê sữa tươi + Cacao)', 'admin', '2026-07-21T22:00:00+07:00', 'Đã duyệt'),
 
 -- Tiêu hao ngày 22
-('inv_test224', 'ing_caphe', NULL, -18, 'Bán hàng', 0, 'Khấu trừ Cà phê đá x1', 'admin', '2026-07-22T22:00:00+07:00', 'Đã duyệt'),
+('inv_test224', 'ing_caphe', NULL, -18, 'Bán hàng', 0, 'Khấu trừ Cà phê đá x1', 'admin', '2026-07-22T22:00:00+07:00', 'Đã duyệt');
 
 -- ==========================================
 -- NGÀY 23/07/2026: Nhập thêm nguyên liệu & tiêu hao
