@@ -31,6 +31,14 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'stock' | 'logs'>('stock');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Bộ lọc lịch sử kho
+  const [logStartDate, setLogStartDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [logEndDate, setLogEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
   // Restock Modal
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [selectedIngId, setSelectedIngId] = useState<string>('');
@@ -204,6 +212,14 @@ export default function InventoryPage() {
     ing.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const startT = new Date(logStartDate + 'T00:00:00').getTime();
+  const endT = new Date(logEndDate + 'T23:59:59').getTime();
+
+  const filteredLogs = logs.filter(log => {
+    const t = new Date(log.created_at).getTime();
+    return t >= startT && t <= endT;
+  });
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 font-sans">
@@ -308,7 +324,7 @@ export default function InventoryPage() {
           }`}
         >
           <History className="w-4 h-4" />
-          <span>Lịch sử Nhập / Kiểm Kho ({logs.length})</span>
+          <span>Lịch sử Nhập / Kiểm Kho ({filteredLogs.length})</span>
         </button>
       </div>
 
@@ -446,13 +462,35 @@ export default function InventoryPage() {
             <span>Lịch sử Nhập xuất & Kiểm kho</span>
           </h3>
 
+          {/* Bộ lọc ngày */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-[#FAF6F0] rounded-2xl border border-coffee-light/60 text-xs">
+            <div className="space-y-1">
+              <label className="font-bold text-coffee-medium uppercase">Từ ngày</label>
+              <input
+                type="date"
+                value={logStartDate}
+                onChange={(e) => setLogStartDate(e.target.value)}
+                className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-bold text-coffee-medium uppercase">Đến ngày</label>
+              <input
+                type="date"
+                value={logEndDate}
+                onChange={(e) => setLogEndDate(e.target.value)}
+                className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+              />
+            </div>
+          </div>
+
           <div className="space-y-3">
-            {logs.length === 0 ? (
+            {filteredLogs.length === 0 ? (
               <div className="py-12 text-center text-coffee-medium/60 text-xs">
-                Chưa có dữ liệu nhật ký kho.
+                Chưa có dữ liệu nhật ký kho trong khoảng thời gian đã chọn.
               </div>
             ) : (
-              logs.map((log) => {
+              filteredLogs.map((log) => {
                 const isApproved = log.status === 'Đã duyệt';
                 const isRejected = log.status === 'Từ chối';
 

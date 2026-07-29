@@ -143,6 +143,7 @@ interface RevenueData {
     total_amount: number;
     discount?: number;
   }>;
+  restockLogs?: any[];
 }
 
 function fmtVND(n: number): string {
@@ -190,6 +191,21 @@ export function exportRevenueToExcel(
     ]);
   });
 
+  if (data.restockLogs && data.restockLogs.length > 0) {
+    wsData.push([]);
+    wsData.push(['CHI TIẾT TIỀN NHẬP KHO']);
+    wsData.push(['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Ghi chú/Lý do', 'Thành tiền']);
+    data.restockLogs.forEach((log, idx) => {
+      wsData.push([
+        idx + 1,
+        new Date(log.created_at).toLocaleDateString('vi-VN'),
+        log.ingredient_name,
+        log.note || 'Nhập kho',
+        `-${fmtVND(log.cost)}`
+      ]);
+    });
+  }
+
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
   ws['!cols'] = [
@@ -203,12 +219,19 @@ export function exportRevenueToExcel(
     { wch: 16 },
   ];
 
-  ws['!merges'] = [
+  const merges = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
     { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
     { s: { r: 14, c: 0 }, e: { r: 14, c: 7 } },
   ];
+
+  if (data.restockLogs && data.restockLogs.length > 0) {
+    const restockHeaderIdx = 15 + data.paidOrders.length + 1;
+    merges.push({ s: { r: restockHeaderIdx, c: 0 }, e: { r: restockHeaderIdx, c: 7 } });
+  }
+
+  ws['!merges'] = merges;
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo doanh thu');
@@ -302,6 +325,37 @@ export function exportRevenueToPDF(
     alternateRowStyles: { fillColor: [250, 246, 240] },
     margin: { left: 14, right: 14 },
   });
+
+  if (data.restockLogs && data.restockLogs.length > 0) {
+    doc.addPage();
+    doc.setFontSize(11);
+    doc.setFont('TimesNewRoman', 'bold');
+    doc.text('CHI TIẾT CHI PHÍ NHẬP KHO', 14, 20);
+
+    const restockTableData = data.restockLogs.map((log, idx) => [
+      idx + 1,
+      new Date(log.created_at).toLocaleDateString('vi-VN'),
+      log.ingredient_name,
+      log.note || 'Nhập kho',
+      `-${fmtVND(log.cost)}`
+    ]);
+
+    autoTable(doc, {
+      startY: 24,
+      head: [['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Ghi chú/Lý do', 'Thành tiền']],
+      body: restockTableData,
+      styles: { font: 'TimesNewRoman', fontSize: 8, cellPadding: 2.5 },
+      headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 45 },
+        4: { cellWidth: 35, halign: 'right', textColor: [200, 0, 0], fontStyle: 'bold' }
+      },
+      alternateRowStyles: { fillColor: [250, 246, 240] },
+      margin: { left: 14, right: 14 },
+    });
+  }
 
   doc.save(`BaoCaoDoanhThu_${startDate}_${endDate}.pdf`);
 }

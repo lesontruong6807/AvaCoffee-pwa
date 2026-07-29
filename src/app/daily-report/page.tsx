@@ -69,8 +69,8 @@ export default function DailyReportPage() {
   const calculateMetrics = (shiftOrders: any[], shiftLogs: any[]) => {
     const totalDiscount = shiftOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
     const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
-    const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
-    const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
+    const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
     
     // Tổng chi phí nhập kho + Giảm giá
     const restockCosts = shiftLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);

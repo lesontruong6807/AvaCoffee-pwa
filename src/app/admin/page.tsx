@@ -353,8 +353,8 @@ export default function AdminPage() {
 
   const totalDiscount = paidOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
   const grossRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
-  const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
-  const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
+  const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
   
   const totalRestockCosts = rangeRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
   const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
@@ -841,7 +841,8 @@ export default function AdminPage() {
               <button
                 onClick={() => exportRevenueToExcel({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
-                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders
+                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
+                  restockLogs: rangeRestockLogs
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
               >
@@ -850,7 +851,8 @@ export default function AdminPage() {
               <button
                 onClick={() => exportRevenueToPDF({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
-                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders
+                  netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
+                  restockLogs: rangeRestockLogs
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
               >
@@ -977,6 +979,52 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+          
+          {/* Chi tiết chi phí nhập kho */}
+          <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Chi Tiết Chi Phí Nhập Kho</h4>
+              <span className="text-xs text-coffee-medium">Tổng tiền nhập: <strong className="text-red-600">-{totalRestockCosts.toLocaleString('vi-VN')}đ</strong></span>
+            </div>
+
+            <div className="overflow-x-auto max-h-[300px]">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-coffee-light text-coffee-medium font-bold uppercase">
+                    <th className="py-2">Ngày</th>
+                    <th className="py-2">Nguyên liệu</th>
+                    <th className="py-2">Ghi chú/Lý do</th>
+                    <th className="py-2 text-right">Chi phí</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {rangeRestockLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-coffee-light/10 transition-colors">
+                      <td className="py-2.5 text-coffee-medium font-medium">
+                        {new Date(log.created_at).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="py-2.5 font-bold text-coffee-dark">
+                        {log.ingredient_name}
+                      </td>
+                      <td className="py-2.5 text-coffee-medium italic">
+                        {log.note || 'Nhập kho'}
+                      </td>
+                      <td className="py-2.5 text-right font-extrabold text-red-600">
+                        -{log.cost.toLocaleString('vi-VN')}đ
+                      </td>
+                    </tr>
+                  ))}
+                  {rangeRestockLogs.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-coffee-medium/60 italic">
+                        Không phát sinh chi phí nhập kho nào trong khoảng thời gian này.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

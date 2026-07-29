@@ -1759,6 +1759,21 @@ export const db = {
         }
       }
 
+      const todayStr = new Date().toISOString().split('T')[0];
+      const startOfDay = `${todayStr}T00:00:00+07:00`;
+      const endOfDay = `${todayStr}T23:59:59+07:00`;
+
+      let existingTodayLogs: any[] = [];
+      if (isSupabaseConfigured && supabase) {
+        const { data } = await supabase
+          .from('lichsukho')
+          .select('*')
+          .eq('loai_giao_dich', 'Bán hàng')
+          .gte('thoi_gian_tao', startOfDay)
+          .lte('thoi_gian_tao', endOfDay);
+        if (data) existingTodayLogs = data;
+      }
+
       const dbUpdates: any[] = [];
       const historyLogsToInsert: any[] = [];
 
@@ -1773,29 +1788,47 @@ export const db = {
             dbUpdates.push(
               supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', ing.id)
             );
-            historyLogsToInsert.push({
-              id: generateShortId('inv_'),
-              id_nguyen_lieu: ing.id,
-              so_luong_thay_doi: -deductQty,
-              loai_giao_dich: 'Bán hàng',
-              chi_phi: 0,
-              ghi_chu: `Khấu trừ tự động qua POS (Mã SP: ${productIds.join(', ')})`,
-              trang_thai: 'Đã duyệt'
-            });
+            
+            const existingLog = existingTodayLogs.find(l => l.id_nguyen_lieu === ing.id);
+            if (existingLog) {
+              const newQty = Number(existingLog.so_luong_thay_doi) - deductQty;
+              dbUpdates.push(
+                supabase.from('lichsukho').update({ so_luong_thay_doi: newQty }).eq('id', existingLog.id)
+              );
+            } else {
+              historyLogsToInsert.push({
+                id: generateShortId('inv_'),
+                id_nguyen_lieu: ing.id,
+                so_luong_thay_doi: -deductQty,
+                loai_giao_dich: 'Bán hàng',
+                chi_phi: 0,
+                ghi_chu: `Khấu trừ tổng hợp bán hàng POS ngày ${new Date().toLocaleDateString('vi-VN')}`,
+                trang_thai: 'Đã duyệt'
+              });
+            }
           } else {
             const logs = mockDb.getInventoryLogs();
-            logs.push({
-              id: generateShortId('inv_'),
-              ingredient_id: ing.id,
-              custom_ingredient_name: null,
-              change_amount: -deductQty,
-              type: 'Bán hàng' as const,
-              cost: 0,
-              note: `Khấu trừ tự động qua POS (Mã SP: ${productIds.join(', ')})`,
-              staff_id: 'system',
-              created_at: new Date().toISOString(),
-              status: 'Đã duyệt' as const
-            });
+            const existingMockLog = logs.find(l => 
+              l.ingredient_id === ing.id && 
+              l.type === 'Bán hàng' && 
+              l.created_at.startsWith(todayStr)
+            );
+            if (existingMockLog) {
+              existingMockLog.change_amount = Number(existingMockLog.change_amount) - deductQty;
+            } else {
+              logs.push({
+                id: generateShortId('inv_'),
+                ingredient_id: ing.id,
+                custom_ingredient_name: null,
+                change_amount: -deductQty,
+                type: 'Bán hàng' as const,
+                cost: 0,
+                note: `Khấu trừ tổng hợp bán hàng POS ngày ${new Date().toLocaleDateString('vi-VN')}`,
+                staff_id: 'system',
+                created_at: new Date().toISOString(),
+                status: 'Đã duyệt' as const
+              });
+            }
             mockDb.setInventoryLogs(logs);
           }
         }
