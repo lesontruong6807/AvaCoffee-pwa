@@ -879,11 +879,66 @@ export const db = {
 
   async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; discount?: number; items: any[] }) {
     const { table_id, staff_id, total_amount, discount = 0, items } = orderData;
-    const orderId = generateShortId('ord_');
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Ghi hóa đơn chính (hoadon) - thử kèm giam_gia trước, nếu lỗi thì thử lại không kèm
+      // 1. Lấy thông tin bàn trước để kiểm tra tên bàn
+      const { data: tableData } = await supabase
+        .from('danhsachban')
+        .select('ten_ban')
+        .eq('id', table_id)
+        .single();
+      
+      const isTakeaway = tableData?.ten_ban === 'Khách mang về';
+
+      if (!isTakeaway) {
+        // Kiểm tra xem có hóa đơn chưa thanh toán cho bàn này hay không
+        const { data: existingUnpaidOrder, error: unpaidError } = await supabase
+          .from('hoadon')
+          .select('*')
+          .eq('id_ban', table_id)
+          .eq('trang_thai_thanh_toan', 'Chưa thanh toán')
+          .order('ngay_tao', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!unpaidError && existingUnpaidOrder) {
+          const existingOrderId = existingUnpaidOrder.id;
+          const newTotalAmount = Number(existingUnpaidOrder.tong_tien || 0) + total_amount;
+          const newDiscount = Number(existingUnpaidOrder.giam_gia || 0) + discount;
+
+          // Cập nhật hóa đơn chính với tổng tiền mới và giảm giá mới
+          const { data: updatedOrder, error: updateErr } = await supabase
+            .from('hoadon')
+            .update({
+              tong_tien: newTotalAmount,
+              giam_gia: newDiscount
+            })
+            .eq('id', existingOrderId)
+            .select()
+            .single();
+
+          if (!updateErr && updatedOrder) {
+            const orderItemsToInsert = items.map(item => ({
+              id: generateShortId('item_'),
+              idhoadon: existingOrderId,
+              idsp: item.product_id,
+              ten_san_pham: item.name || 'Sản phẩm',
+              don_vi_tinh: item.don_vi_tinh || 'Ly',
+              don_gia: item.unit_price || item.price,
+              so_luong: item.quantity,
+              thanh_tien: item.subtotal,
+              ghi_chu: item.notes || ''
+            }));
+
+            await supabase.from('hoadondetail').insert(orderItemsToInsert);
+            return mapOrderToClient(updatedOrder);
+          }
+        }
+      }
+
+      // 2. Nếu chưa có, tạo hóa đơn mới như bình thường
+      const orderId = generateShortId('ord_');
       let order = null;
       let orderErr = null;
 
@@ -923,7 +978,6 @@ export const db = {
       }
 
       if (!orderErr && order) {
-        // Song song: Chuyển trạng thái bàn + Ghi chi tiết hóa đơn (items đã chứa name từ POS)
         const orderItemsToInsert = items.map(item => ({
           id: generateShortId('item_'),
           idhoadon: orderId,
@@ -946,6 +1000,42 @@ export const db = {
 
     // Mock DB Fallback
     const orders = mockDb.getOrders();
+    const tables = mockDb.getTables();
+    const targetTable = tables.find(t => t.id === table_id);
+    const isTakeaway = targetTable?.table_name === 'Khách mang về';
+
+    if (!isTakeaway) {
+      const existingUnpaidOrder = orders.find(o => o.table_id === table_id && o.payment_status === 'Chưa thanh toán');
+
+      if (existingUnpaidOrder) {
+        const existingOrderId = existingUnpaidOrder.id;
+        existingUnpaidOrder.total_amount = Number(existingUnpaidOrder.total_amount || 0) + total_amount;
+        existingUnpaidOrder.giam_gia = Number(existingUnpaidOrder.giam_gia || 0) + discount;
+
+        mockDb.setOrders(orders);
+
+        const orderItems = mockDb.getOrderItems();
+        const products = mockDb.getProducts();
+        const newItems = items.map((item) => {
+          const prod = products.find(p => p.id === item.product_id);
+          return {
+            id: generateShortId('item_'),
+            order_id: existingOrderId,
+            product_id: item.product_id,
+            ten_san_pham: prod ? prod.name : 'Sản phẩm',
+            don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
+            quantity: item.quantity,
+            unit_price: item.unit_price || item.price,
+            subtotal: item.subtotal,
+            ghi_chu: item.notes || ''
+          };
+        });
+        mockDb.setOrderItems([...orderItems, ...newItems]);
+        return existingUnpaidOrder;
+      }
+    }
+
+    const orderId = generateShortId('ord_');
     const newOrder = {
       id: orderId,
       table_id,
@@ -960,7 +1050,6 @@ export const db = {
     orders.push(newOrder);
     mockDb.setOrders(orders);
 
-    const tables = mockDb.getTables();
     const tIdx = tables.findIndex(t => t.id === table_id);
     if (tIdx !== -1) {
       tables[tIdx].status = 'Đang phục vụ';

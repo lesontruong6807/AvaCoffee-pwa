@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@devioarts/capacitor-tcpclient": "^0.2.1",
     "@supabase/supabase-js": "^2.110.8",
     "canvas-confetti": "^1.9.4",
     "jspdf": "^4.2.1",
@@ -20,6 +24,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",

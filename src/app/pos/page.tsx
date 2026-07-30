@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Capacitor } from '@capacitor/core';
 import { 
   db, 
   getCurrentUser, 
@@ -144,13 +145,15 @@ export default function PosPage() {
     setSavingOrder(true);
 
     try {
-      await db.createOrder({
+      const newOrder = await db.createOrder({
         table_id: selectedTable.id,
         staff_id: currentUser?.id || 'u1',
         total_amount: finalTotalAmount,
         discount: discountAmount,
         items: cart
       });
+
+
 
       // Tạo hiệu ứng confetti ăn mừng
       confetti({

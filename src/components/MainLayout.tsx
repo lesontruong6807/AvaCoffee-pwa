@@ -56,6 +56,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       setToastType(type || 'success');
     };
     window.addEventListener('show-toast', handleShowToast);
+
+
+
     return () => window.removeEventListener('show-toast', handleShowToast);
   }, []);
 

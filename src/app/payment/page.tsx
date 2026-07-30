@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Capacitor } from '@capacitor/core';
 import { db } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
@@ -15,7 +16,8 @@ import {
   CheckCircle,
   X,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  Printer
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -27,6 +29,7 @@ export default function PaymentPage() {
   const [loadingItems, setLoadingItems] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [isNative, setIsNative] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -53,6 +56,7 @@ export default function PaymentPage() {
   };
 
   useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
     loadOrders();
   }, []);
 
@@ -119,6 +123,34 @@ export default function PaymentPage() {
     } catch (e) {
       console.error("Lỗi khi hủy hóa đơn:", e);
       toast.error("Gặp lỗi khi hủy hóa đơn.");
+    }
+  };
+
+  // In lại hóa đơn thô (chỉ chạy trên thiết bị native Android)
+  const handlePrint = async () => {
+    if (!selectedOrder) return;
+    try {
+      const { printOrderDirect } = await import('@/lib/printerService');
+      
+      const itemsForPrint = orderItems.map(item => ({
+        name: item.products?.name || 'San pham',
+        price: item.unit_price || item.products?.price || 0,
+        quantity: item.quantity,
+        subtotal: item.subtotal
+      }));
+
+      await printOrderDirect({
+        tableName: selectedOrder.tables?.table_name || 'Ban khong xac dinh',
+        staffName: selectedOrder.users?.full_name || 'Nhan vien',
+        items: itemsForPrint,
+        discount: selectedOrder.discount || 0,
+        totalAmount: selectedOrder.total_amount,
+        orderId: selectedOrder.id
+      });
+      toast.success('Đã gửi lệnh in tới máy in!');
+    } catch (e) {
+      console.error('Lỗi khi in hóa đơn:', e);
+      toast.error('Lỗi in bill: Không thể kết nối tới máy in (192.168.1.232:9100)');
     }
   };
 
@@ -277,6 +309,15 @@ export default function PaymentPage() {
                           <Trash2 className="w-4 h-4" />
                           <span>Hủy đơn</span>
                         </button>
+                        {isNative && (
+                          <button
+                            onClick={handlePrint}
+                            className="px-5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl transition flex items-center space-x-2 text-xs font-bold shadow-sm"
+                          >
+                            <Printer className="w-4 h-4" />
+                            <span>In hóa đơn</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => setIsPayModalOpen(true)}
                           className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white rounded-xl transition flex items-center space-x-2 text-xs font-bold shadow shadow-coffee-primary/20"
