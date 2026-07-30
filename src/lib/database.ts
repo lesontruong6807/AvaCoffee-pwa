@@ -30,7 +30,8 @@ const MOCK_CATEGORIES = [
   { id: 'c_douongkhac', name: 'Thức uống khác' },
   { id: 'c_tra', name: 'Trà' },
   { id: 'c_yaourt', name: 'Yaourt' },
-  { id: 'c_soda', name: 'Soda' }
+  { id: 'c_soda', name: 'Soda' },
+  { id: 'c_nuocngot', name: 'Nước ngọt/suối' }
 ];
 
 const MOCK_PRODUCTS = [
@@ -209,6 +210,78 @@ const MOCK_PRODUCTS = [
     cost_price: 9000,
     image_url: '/products/S003.png',
     status: 'Còn hàng' as const
+  },
+  {
+    id: 'N001',
+    category_id: 'c_nuocngot',
+    name: '7-Up',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N001.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N002',
+    category_id: 'c_nuocngot',
+    name: 'Bò Húc',
+    price: 20000,
+    cost_price: 8000,
+    image_url: '/products/N002.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N003',
+    category_id: 'c_nuocngot',
+    name: 'Coca',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N003.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N004',
+    category_id: 'c_nuocngot',
+    name: 'Number 1',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N004.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N005',
+    category_id: 'c_nuocngot',
+    name: 'Nước suối',
+    price: 10000,
+    cost_price: 3000,
+    image_url: '/products/N005.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N006',
+    category_id: 'c_nuocngot',
+    name: 'Pepsi',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N006.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N007',
+    category_id: 'c_nuocngot',
+    name: 'Revive',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N007.jpg',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'N008',
+    category_id: 'c_nuocngot',
+    name: 'Sting',
+    price: 15000,
+    cost_price: 5000,
+    image_url: '/products/N008.jpg',
+    status: 'Còn hàng' as const
   }
 ];
 
@@ -256,7 +329,15 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_sirodao', name: 'Siro đào', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_sirovai', name: 'Siro vải', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_7up', name: '7-Up', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 10, quy_cach: 'chai' },
-  { id: 'ing_nuoccothongtra', name: 'Nước cốt hồng trà', unit: 'ml', stock_quantity: 1600, opening_stock: 1600, min_stock: 500, quy_cach: 'ml' }
+  { id: 'ing_nuoccothongtra', name: 'Nước cốt hồng trà', unit: 'ml', stock_quantity: 1600, opening_stock: 1600, min_stock: 500, quy_cach: 'ml' },
+  { id: 'ing_n001', name: '7-Up (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
+  { id: 'ing_n002', name: 'Bò Húc (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
+  { id: 'ing_n003', name: 'Coca (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
+  { id: 'ing_n004', name: 'Number 1 (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
+  { id: 'ing_n005', name: 'Nước suối (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
+  { id: 'ing_n006', name: 'Pepsi (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
+  { id: 'ing_n007', name: 'Revive (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
+  { id: 'ing_n008', name: 'Sting (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' }
 ];
 
 export const MOCK_RECIPES = [
@@ -370,7 +451,15 @@ export const MOCK_RECIPES = [
   { id: 'rec_s3_1', product_id: 'S003', ingredient_id: 'ing_7up', quantity_needed: 1, unit: 'chai' },
   { id: 'rec_s3_2', product_id: 'S003', ingredient_id: 'ing_mutvietquat', quantity_needed: 50, unit: 'ml' },
   { id: 'rec_s3_3', product_id: 'S003', ingredient_id: 'ing_nuocduong', quantity_needed: 10, unit: 'ml' },
-  { id: 'rec_s3_4', product_id: 'S003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' }
+  { id: 'rec_s3_4', product_id: 'S003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_n1', product_id: 'N001', ingredient_id: 'ing_n001', quantity_needed: 1, unit: 'lon' },
+  { id: 'rec_n2', product_id: 'N002', ingredient_id: 'ing_n002', quantity_needed: 1, unit: 'lon' },
+  { id: 'rec_n3', product_id: 'N003', ingredient_id: 'ing_n003', quantity_needed: 1, unit: 'lon' },
+  { id: 'rec_n4', product_id: 'N004', ingredient_id: 'ing_n004', quantity_needed: 1, unit: 'chai' },
+  { id: 'rec_n5', product_id: 'N005', ingredient_id: 'ing_n005', quantity_needed: 1, unit: 'chai' },
+  { id: 'rec_n6', product_id: 'N006', ingredient_id: 'ing_n006', quantity_needed: 1, unit: 'lon' },
+  { id: 'rec_n7', product_id: 'N007', ingredient_id: 'ing_n007', quantity_needed: 1, unit: 'chai' },
+  { id: 'rec_n8', product_id: 'N008', ingredient_id: 'ing_n008', quantity_needed: 1, unit: 'lon' }
 ];
 
 // Helper hiển thị tồn kho dạng ghép đơn vị (VD: 1kg + 982g, 1 bịch + 50g)

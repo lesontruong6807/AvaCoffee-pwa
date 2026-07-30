@@ -230,7 +230,8 @@ INSERT INTO public.danhmuc (id, ten_danh_muc) VALUES
 ('c_douongkhac', 'Thức uống khác'),
 ('c_tra', 'Trà'),
 ('c_yaourt', 'Yaourt'),
-('c_soda', 'Soda')
+('c_soda', 'Soda'),
+('c_nuocngot', 'Nước ngọt/suối')
 ON CONFLICT (ten_danh_muc) DO NOTHING;
 
 -- 4. Thêm sản phẩm mẫu (SanPham - Đã đổi Cà phê đen -> Cà phê đá, Cacao -> Cacao sữa)
@@ -262,7 +263,17 @@ INSERT INTO public.sanpham (id, id_danh_muc, ten_san_pham, don_vi_tinh, don_gia,
 -- Soda (S)
 ('S001', 'c_soda', 'Soda dâu', 'Ly', 25000, 9000, '/products/S001.png', 'Còn hàng'),
 ('S002', 'c_soda', 'Soda đào', 'Ly', 25000, 9000, '/products/S002.png', 'Còn hàng'),
-('S003', 'c_soda', 'Soda việt quất', 'Ly', 25000, 9000, '/products/S003.png', 'Còn hàng')
+('S003', 'c_soda', 'Soda việt quất', 'Ly', 25000, 9000, '/products/S003.png', 'Còn hàng'),
+
+-- Nước ngọt/suối (N)
+('N001', 'c_nuocngot', '7-Up', 'lon', 15000, 5000, '/products/N001.jpg', 'Còn hàng'),
+('N002', 'c_nuocngot', 'Bò Húc', 'lon', 20000, 8000, '/products/N002.jpg', 'Còn hàng'),
+('N003', 'c_nuocngot', 'Coca', 'lon', 15000, 5000, '/products/N003.jpg', 'Còn hàng'),
+('N004', 'c_nuocngot', 'Number 1', 'chai', 15000, 5000, '/products/N004.jpg', 'Còn hàng'),
+('N005', 'c_nuocngot', 'Nước suối', 'chai', 10000, 3000, '/products/N005.jpg', 'Còn hàng'),
+('N006', 'c_nuocngot', 'Pepsi', 'lon', 15000, 5000, '/products/N006.jpg', 'Còn hàng'),
+('N007', 'c_nuocngot', 'Revive', 'chai', 15000, 5000, '/products/N007.jpg', 'Còn hàng'),
+('N008', 'c_nuocngot', 'Sting', 'lon', 15000, 5000, '/products/N008.jpg', 'Còn hàng')
 ON CONFLICT (id) DO UPDATE 
 SET ten_san_pham = EXCLUDED.ten_san_pham, 
     don_gia = EXCLUDED.don_gia, 
@@ -299,7 +310,15 @@ INSERT INTO public.nguyenlieu (id, ten_nguyen_lieu, don_vi_tinh, so_luong_ton, t
 ('ing_sirodao', 'Siro đào', 'ml', 1000, 1000, 200, 'ml'),
 ('ing_sirovai', 'Siro vải', 'ml', 1000, 1000, 200, 'ml'),
 ('ing_7up', '7-Up', 'chai', 24, 24, 10, 'chai'),
-('ing_nuoccothongtra', 'Nước cốt hồng trà', 'ml', 1600, 1600, 500, 'ml')
+('ing_nuoccothongtra', 'Nước cốt hồng trà', 'ml', 1600, 1600, 500, 'ml'),
+('ing_n001', '7-Up (lon)', 'lon', 24, 24, 2, 'lon'),
+('ing_n002', 'Bò Húc (lon)', 'lon', 24, 24, 2, 'lon'),
+('ing_n003', 'Coca (lon)', 'lon', 24, 24, 2, 'lon'),
+('ing_n004', 'Number 1 (chai)', 'chai', 24, 24, 2, 'chai'),
+('ing_n005', 'Nước suối (chai)', 'chai', 24, 24, 2, 'chai'),
+('ing_n006', 'Pepsi (lon)', 'lon', 24, 24, 2, 'lon'),
+('ing_n007', 'Revive (chai)', 'chai', 24, 24, 2, 'chai'),
+('ing_n008', 'Sting (lon)', 'lon', 24, 24, 2, 'lon')
 ON CONFLICT (id) DO UPDATE
 SET ten_nguyen_lieu = EXCLUDED.ten_nguyen_lieu,
     don_vi_tinh = EXCLUDED.don_vi_tinh,
@@ -418,5 +437,13 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_s3_1', 'S003', 'ing_7up', 1, 'chai'),
 ('rec_s3_2', 'S003', 'ing_mutvietquat', 50, 'ml'),
 ('rec_s3_3', 'S003', 'ing_nuocduong', 10, 'ml'),
-('rec_s3_4', 'S003', 'ing_lyhoavan', 1, 'cái')
+('rec_s3_4', 'S003', 'ing_lyhoavan', 1, 'cái'),
+('rec_n1', 'N001', 'ing_n001', 1, 'lon'),
+('rec_n2', 'N002', 'ing_n002', 1, 'lon'),
+('rec_n3', 'N003', 'ing_n003', 1, 'lon'),
+('rec_n4', 'N004', 'ing_n004', 1, 'chai'),
+('rec_n5', 'N005', 'ing_n005', 1, 'chai'),
+('rec_n6', 'N006', 'ing_n006', 1, 'lon'),
+('rec_n7', 'N007', 'ing_n007', 1, 'chai'),
+('rec_n8', 'N008', 'ing_n008', 1, 'lon')
 ON CONFLICT (id) DO NOTHING;
