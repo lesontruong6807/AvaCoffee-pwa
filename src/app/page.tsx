@@ -139,15 +139,6 @@ export default function Home() {
 
   const actionCards = [
     {
-      name: 'Chấm công vào ca',
-      description: 'Bắt đầu ca làm việc, ghi nhận GPS vào ca.',
-      path: '/time-log?type=in',
-      icon: Clock,
-      color: 'bg-emerald-50 border-emerald-200 text-emerald-950',
-      badge: 'Vào ca',
-      group: 'daily'
-    },
-    {
       name: 'Bán hàng (POS)',
       description: 'Ghi đơn gọi món tại bàn, đồng bộ tức thì.',
       path: '/pos',
@@ -163,6 +154,15 @@ export default function Home() {
       icon: CreditCard,
       color: 'bg-blue-50 border-blue-200 text-blue-950',
       badge: stats.unpaidBills > 0 ? `${stats.unpaidBills} hóa đơn` : 'Trống',
+      group: 'daily'
+    },
+    {
+      name: 'Chấm công vào ca',
+      description: 'Bắt đầu ca làm việc, ghi nhận GPS vào ca.',
+      path: '/time-log?type=in',
+      icon: Clock,
+      color: 'bg-emerald-50 border-emerald-200 text-emerald-950',
+      badge: 'Vào ca',
       group: 'daily'
     },
     {

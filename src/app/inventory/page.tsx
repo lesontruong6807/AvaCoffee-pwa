@@ -70,18 +70,71 @@ export default function InventoryPage() {
     }
   };
 
+  const syncOfflineStocktakes = async () => {
+    if (typeof window === 'undefined' || !navigator.onLine) return;
+    const queue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+    if (queue.length === 0) return;
+    
+    let successCount = 0;
+    const remainingQueue = [];
+    
+    for (const payload of queue) {
+      try {
+        await db.submitStocktake(payload);
+        successCount++;
+      } catch (err) {
+        console.error('Lỗi đồng bộ offline stocktake:', err);
+        remainingQueue.push(payload);
+      }
+    }
+    
+    localStorage.setItem('ava_offline_stocktakes', JSON.stringify(remainingQueue));
+    if (successCount > 0) {
+      toast.success(`Đã tự động đồng bộ ${successCount} đơn kiểm kho ngoại tuyến!`);
+      loadData();
+    }
+  };
+
   useEffect(() => {
     setCurrentUser(getCurrentUser());
     loadData();
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', syncOfflineStocktakes);
+      syncOfflineStocktakes();
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', syncOfflineStocktakes);
+      }
+    };
   }, []);
 
   // Tính tổng chi phí nhập kho trong ngày
   const todayStr = new Date().toLocaleDateString('en-CA');
+
+  const getIngStats = (ingId: string) => {
+    const todayLogs = logs.filter(l => new Date(l.created_at).toLocaleDateString('en-CA') === todayStr && l.ingredient_id === ingId);
+    const refilled = todayLogs
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+    const sold = todayLogs
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    return { refilled, sold };
+  };
+
   const todayRestockCost = logs
     .filter(l => l.type === 'Nhập kho' && new Date(l.created_at).toLocaleDateString('en-CA') === todayStr)
     .reduce((sum, l) => sum + Number(l.cost || 0), 0);
 
-  const lowStockCount = ingredients.filter(i => i.min_stock !== null && Number(i.stock_quantity) <= Number(i.min_stock)).length;
+  const lowStockCount = ingredients.filter(i => {
+    if (i.min_stock === null) return false;
+    const { refilled, sold } = getIngStats(i.id);
+    const calculatedStock = Number(i.opening_stock) + refilled - sold;
+    return calculatedStock <= Number(i.min_stock);
+  }).length;
 
   // --- XỬ LÝ NHẬP THÊM (RESTOCK) ---
   const handleOpenRestock = (ingId?: string) => {
@@ -173,14 +226,26 @@ export default function InventoryPage() {
     if (!selectedIng) return;
 
     setSubmittingStocktake(true);
+    const payload = {
+      ingredient_id: stocktakeIngId,
+      actual_stock: Number(actualStock),
+      system_stock: Number(selectedIng.stock_quantity),
+      note: stocktakeNote.trim(),
+      staff_id: currentUser.id
+    };
+
     try {
-      await db.submitStocktake({
-        ingredient_id: stocktakeIngId,
-        actual_stock: Number(actualStock),
-        system_stock: Number(selectedIng.stock_quantity),
-        note: stocktakeNote.trim(),
-        staff_id: currentUser.id
-      });
+      if (typeof window !== 'undefined' && !navigator.onLine) {
+        const offlineQueue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+        offlineQueue.push(payload);
+        localStorage.setItem('ava_offline_stocktakes', JSON.stringify(offlineQueue));
+        
+        toast.success('Ngoại tuyến: Đã lưu tạm đơn kiểm kho trên thiết bị để đồng bộ sau!');
+        setIsStocktakeOpen(false);
+        return;
+      }
+
+      await db.submitStocktake(payload);
 
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.8 } });
       toast.success('Đã gửi yêu cầu kiểm kho để Admin phê duyệt!');
@@ -188,7 +253,15 @@ export default function InventoryPage() {
       await loadData();
     } catch (e) {
       console.error(e);
-      toast.error('Lỗi gửi kiểm kho.');
+      if (typeof window !== 'undefined') {
+        const offlineQueue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+        offlineQueue.push(payload);
+        localStorage.setItem('ava_offline_stocktakes', JSON.stringify(offlineQueue));
+        toast.success('Lỗi kết nối. Đã lưu tạm đơn kiểm kho trên thiết bị để tự động đồng bộ!');
+        setIsStocktakeOpen(false);
+      } else {
+        toast.error('Lỗi gửi kiểm kho.');
+      }
     } finally {
       setSubmittingStocktake(false);
     }
@@ -196,17 +269,6 @@ export default function InventoryPage() {
 
   const selectedRestockIngredient = ingredients.find(i => i.id === selectedIngId);
   const selectedStocktakeIngredient = ingredients.find(i => i.id === stocktakeIngId);
-
-  const getIngStats = (ingId: string) => {
-    const todayLogs = logs.filter(l => new Date(l.created_at).toLocaleDateString('en-CA') === todayStr && l.ingredient_id === ingId);
-    const refilled = todayLogs
-      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
-      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-    const sold = todayLogs
-      .filter(l => l.type === 'Bán hàng')
-      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
-    return { refilled, sold };
-  };
 
   const filteredIngredients = ingredients.filter(ing => 
     ing.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -366,7 +428,7 @@ export default function InventoryPage() {
                       SL nhập (+)
                     </th>
                     <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
-                      SL bán (-)
+                      SL xuất (-)
                     </th>
                     <th className="p-3.5 w-40 font-black text-coffee-primary border-r border-coffee-light/60">
                       Tồn thực tế
@@ -378,10 +440,11 @@ export default function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-coffee-light/50">
                   {filteredIngredients.map((ing) => {
-                    const isLowStock = ing.min_stock !== null && Number(ing.stock_quantity) <= Number(ing.min_stock);
-                    const formattedStock = formatIngredientStock(ing.stock_quantity, ing.unit, ing.quy_cach);
-                    const formattedOpening = formatIngredientStock(ing.opening_stock, ing.unit, ing.quy_cach);
                     const { refilled, sold } = getIngStats(ing.id);
+                    const calculatedStock = Number(ing.opening_stock) + refilled - sold;
+                    const isLowStock = ing.min_stock !== null && calculatedStock <= Number(ing.min_stock);
+                    const formattedStock = formatIngredientStock(calculatedStock, ing.unit, ing.quy_cach);
+                    const formattedOpening = formatIngredientStock(ing.opening_stock, ing.unit, ing.quy_cach);
 
                     // Formatter for Refill and Sales values
                     const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
@@ -612,42 +675,7 @@ export default function InventoryPage() {
                 </div>
               )}
 
-              {/* THÔNG BÁO TỰ ĐỘNG TRỪ NGUYÊN LIỆU CHO 3 MÓN TỰ PHA CHẾ */}
-              {selectedIngId === 'ing_nuocduong' && (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-xs text-amber-900 space-y-1">
-                  <p className="font-extrabold flex items-center space-x-1 text-amber-800">
-                    <Info className="w-4 h-4 shrink-0" />
-                    <span>Món tự pha chế: Nước đường</span>
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    Mỗi lần pha chế 1200ml Nước đường, kho sẽ tự động trừ <strong>1kg Đường (1 bao)</strong> trong kho!
-                  </p>
-                </div>
-              )}
 
-              {selectedIngId === 'ing_nuoccothongtra' && (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-xs text-amber-900 space-y-1">
-                  <p className="font-extrabold flex items-center space-x-1 text-amber-800">
-                    <Info className="w-4 h-4 shrink-0" />
-                    <span>Món tự pha chế: Nước cốt hồng trà</span>
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    Mỗi lần pha chế 1600ml Nước cốt hồng trà, kho sẽ tự động trừ <strong>100g Hồng trà (1 bịch)</strong> trong kho!
-                  </p>
-                </div>
-              )}
-
-              {selectedIngId === 'ing_kemmuoi' && (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-xs text-amber-900 space-y-1">
-                  <p className="font-extrabold flex items-center space-x-1 text-amber-800">
-                    <Info className="w-4 h-4 shrink-0" />
-                    <span>Món tự pha chế: Kem muối</span>
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    Mỗi lần pha chế 900ml Kem muối, kho sẽ tự động trừ <strong>1 hộp Kem béo, 20g Sữa đặc, 30ml Sữa tươi, 5g Muối hồng</strong> trong kho!
-                  </p>
-                </div>
-              )}
 
               {/* Ghi chú */}
               <div className="space-y-1.5">

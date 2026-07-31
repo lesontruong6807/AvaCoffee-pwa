@@ -8,5 +8,10 @@ export const toast = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: msg, type: 'error' } }));
     }
+  },
+  info: (msg: string) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: msg, type: 'info' } }));
+    }
   }
 };

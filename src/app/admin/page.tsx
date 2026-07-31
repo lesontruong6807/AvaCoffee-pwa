@@ -200,6 +200,34 @@ export default function AdminPage() {
     }
   };
 
+  // Duyệt hàng loạt tất cả đơn chờ duyệt trong sub-tab hiện tại
+  const handleApproveAll = async () => {
+    const isConfirmed = window.confirm('Bạn có chắc chắn muốn PHÊ DUYỆT TẤT CẢ các đơn đang chờ duyệt trong mục này không?');
+    if (!isConfirmed) return;
+
+    try {
+      if (approvalSubTab === 'time') {
+        const pendingIds = timeLogs.filter(l => l.status === 'Chờ duyệt').map(l => l.id);
+        if (pendingIds.length === 0) { toast.info('Không có đơn chấm công nào chờ duyệt.'); return; }
+        await db.approveAllTimeLogs(pendingIds, 'Đã duyệt');
+      } else if (approvalSubTab === 'leave') {
+        const pendingIds = leaveRequests.filter(r => r.status === 'Chờ duyệt').map(r => r.id);
+        if (pendingIds.length === 0) { toast.info('Không có đơn nghỉ phép nào chờ duyệt.'); return; }
+        await db.approveAllLeaveRequests(pendingIds, 'Đã duyệt');
+      } else if (approvalSubTab === 'inventory') {
+        const pendingIds = inventoryLogs.filter(l => l.status === 'Chờ duyệt').map(l => l.id);
+        if (pendingIds.length === 0) { toast.info('Không có đơn kho nào chờ duyệt.'); return; }
+        await db.approveAllInventoryLogs(pendingIds, 'Đã duyệt');
+      }
+
+      confetti({ particleCount: 100, spread: 80 });
+      toast.success('Đã phê duyệt hàng loạt thành công!');
+      await loadAllData();
+    } catch (e) {
+      toast.error('Gặp lỗi khi phê duyệt hàng loạt.');
+    }
+  };
+
   // --- LÓGIC CRUD SẢN PHẨM ---
   const openAddProduct = () => {
     setEditingProduct(null);
@@ -535,6 +563,15 @@ export default function AdminPage() {
                 Duyệt Kho & Kiểm Kho
               </button>
             </div>
+
+            {/* Nút Duyệt tất cả */}
+            <button
+              onClick={handleApproveAll}
+              className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-extrabold text-xs rounded-2xl transition shadow-md shadow-green-600/10 flex items-center space-x-1.5 shrink-0"
+            >
+              <Check className="w-4 h-4" />
+              <span>Duyệt tất cả</span>
+            </button>
           </div>
 
           {/* DUYỆT CHẤM CÔNG */}

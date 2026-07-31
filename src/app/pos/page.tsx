@@ -56,20 +56,54 @@ export default function PosPage() {
 
   useEffect(() => {
     async function loadData() {
+      // 1. Đọc dữ liệu từ cache trước để hiển thị ngay lập tức (Offline-first / Fast Load)
+      let cachedTables = null;
+      let cachedCategories = null;
+      let cachedProducts = null;
+      
+      try {
+        const storedTables = localStorage.getItem('ava_pos_cache_tables');
+        const storedCategories = localStorage.getItem('ava_pos_cache_categories');
+        const storedProducts = localStorage.getItem('ava_pos_cache_products');
+        
+        if (storedTables) cachedTables = JSON.parse(storedTables);
+        if (storedCategories) cachedCategories = JSON.parse(storedCategories);
+        if (storedProducts) cachedProducts = JSON.parse(storedProducts);
+        
+        if (cachedTables && cachedCategories && cachedProducts) {
+          setTables(cachedTables);
+          setCategories(cachedCategories);
+          setProducts(cachedProducts);
+          setLoading(false); // Hiển thị UI ngay lập tức
+        }
+      } catch (cacheErr) {
+        console.warn('Lỗi đọc cache POS:', cacheErr);
+      }
+
       try {
         const [tablesData, categoriesData, productsData] = await Promise.all([
           db.getTables(),
           db.getCategories(),
           db.getProducts()
         ]);
+        
         setTables(tablesData);
         setCategories(categoriesData);
         setProducts(productsData);
-        setCurrentUser(getCurrentUser());
+        
+        // Lưu lại cache mới nhất
+        try {
+          localStorage.setItem('ava_pos_cache_tables', JSON.stringify(tablesData));
+          localStorage.setItem('ava_pos_cache_categories', JSON.stringify(categoriesData));
+          localStorage.setItem('ava_pos_cache_products', JSON.stringify(productsData));
+        } catch (saveErr) {
+          console.warn('Lỗi lưu cache POS:', saveErr);
+        }
       } catch (error) {
-        console.error('Lỗi khi tải dữ liệu POS:', error);
+        console.error('Lỗi khi tải dữ liệu POS từ server:', error);
       } finally {
         setLoading(false);
+        setCurrentUser(getCurrentUser());
       }
     }
     loadData();
@@ -144,6 +178,15 @@ export default function PosPage() {
     if (!selectedTable || cart.length === 0) return;
     setSavingOrder(true);
 
+    const oldTables = [...tables];
+    
+    // Optimistic Update: Cập nhật trạng thái bàn sang Đang phục vụ ngay lập tức trên UI
+    if (selectedTable.id !== 'tb7') { // Khách mang về không đổi trạng thái
+      setTables(prev => prev.map(tb => 
+        tb.id === selectedTable.id ? { ...tb, status: 'Đang phục vụ' } : tb
+      ));
+    }
+
     try {
       const newOrder = await db.createOrder({
         table_id: selectedTable.id,
@@ -152,8 +195,6 @@ export default function PosPage() {
         discount: discountAmount,
         items: cart
       });
-
-
 
       // Tạo hiệu ứng confetti ăn mừng
       confetti({
@@ -165,7 +206,7 @@ export default function PosPage() {
       toast.success(`Đặt món thành công cho ${selectedTable.table_name}!`);
       clearCart();
       
-      // Reload bàn
+      // Reload bàn chính thức
       const updatedTables = await db.getTables();
       setTables(updatedTables);
 
@@ -173,6 +214,8 @@ export default function PosPage() {
       setPosStep('table');
     } catch (e) {
       console.error('Lỗi lưu đơn hàng:', e);
+      // Rollback trạng thái bàn nếu lỗi
+      setTables(oldTables);
       toast.error('Không thể lưu đơn hàng. Vui lòng thử lại!');
     } finally {
       setSavingOrder(false);

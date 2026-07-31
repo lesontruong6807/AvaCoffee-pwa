@@ -3,20 +3,20 @@ Nguyên liệu (tên/ đơn vị/ mức tồn tối thiểu):
 2. Cacao AVA/ kg/ 200g
 3. Bột Matcha/ bịch 500gr/ 50gr
 4. Trà săn mây/ bịch 300gr/ 1 bịch
-5. Hồng trà/ bịch 100gr/ 5 bịch
-6. Sữa đặc/ hộp 1200gr/ 2 hộp
+5. Hồng trà/ bịch 150gr/ 3 bịch
+6. Sữa đặc/ hộp 1284gr/ 2 hộp
 7. Sữa tươi/ hộp 1000 ml/ 2 hộp
 8. Ly đen AVA/ cái/ 50 cái
 9. Ly trắng AVA/ cái/ 50 cái
 10. Ly trắng hoa văn AVA/ cái/ 50 cái
-11. Ống hút thường/ bịch
-12. Ống hút trái cây/ bịch
+11. Ống hút đen/ bịch
+12. Ống hút trắng (nhỏ)/ bịch
 13. Muỗng/ bịch
 14. Túi mang đi/ kg
 15. Đường/ bao 1kg
 16. Nước đường/ ml/ 200ml
 17. Kem béo/ hộp/ 1 hộp
-18. Muối hồng/ gr/ 10gr
+18. Muối Iot/ gr/ 10gr
 19. Kem muối/ ml/ 120ml
 20. Sữa chua/ hộp/ 4 hộp
 21. Mứt dâu/ ml/ 200ml
@@ -25,8 +25,11 @@ Nguyên liệu (tên/ đơn vị/ mức tồn tối thiểu):
 24. Siro dâu/ ml/ 200ml
 25. Siro đào/ ml/ 200ml
 26. Siro vải/ ml/ 200ml
-27. 7-Up/ chai/ 10 chai
+27. 7-Up/ chai 390ml/ 3 chai
 28. Nước cốt hồng trà/ ml/ 500ml
+29. Ly trà tắc/ cái/ 20 cái
+30. Topping muối biển/ bịch 500gr/ 100gr
+31. Ống hút trắng (to)/ bịch
 
 Công thức pha nguyên liệu (để vô kho)
 1. Nước đường: 1 bao đường 1kg + 600ml nước -> 1200ml nước đường
@@ -50,6 +53,6 @@ Công thức pha nước:
 14. Yaourt đá: 1 hộp sữa chua, 50g sữa đặc, 20ml cốt chanh (½ quả), 1 Ly trắng hoa văn AVA
 15. Yaourt dâu: 1 hộp sữa chua, 30g sữa đặc, 50ml mứt dâu, 15ml cốt chanh, 1 Ly trắng hoa văn AVA
 16. Yaourt việt quất: 1 hộp sữa chua, 30g sữa đặc, 50ml mứt việt quất, 15ml cốt chanh, 1 Ly trắng hoa văn AVA
-17. Soda dâu: 1 chai 7-Up, 40ml mứt dâu, 10ml siro dâu, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-18. Soda đào: 1 chai 7-Up, 30ml mứt đào, 20ml siro đào, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-19. Soda việt quất: 1 chai 7-Up, 50ml mứt việt quất, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+17. Soda dâu: 195ml 7-Up (chai), 40ml mứt dâu, 10ml siro dâu, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+18. Soda đào: 195ml 7-Up (chai), 30ml mứt đào, 20ml siro đào, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+19. Soda việt quất: 195ml 7-Up (chai), 50ml mứt việt quất, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
