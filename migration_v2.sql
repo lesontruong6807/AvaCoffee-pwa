@@ -207,3 +207,9 @@ BEGIN
     END LOOP;
 END;
 $$;
+
+-- 10. Đổi ly cho Cacao kem muối, Matcha kem muối, và các dòng Yaourt sang 'ing_lytrang'
+UPDATE public.congthuc 
+SET id_nguyen_lieu = 'ing_lytrang' 
+WHERE id_nguyen_lieu = 'ing_lyhoavan' 
+  AND id_san_pham IN ('TUK002', 'TUK004', 'Y001', 'Y002', 'Y003');

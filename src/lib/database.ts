@@ -386,7 +386,7 @@ export const MOCK_RECIPES = [
   { id: 'rec_tuk2_suadac_km', product_id: 'TUK002', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_tuk2_suatuoi_km', product_id: 'TUK002', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
   { id: 'rec_tuk2_muoi', product_id: 'TUK002', ingredient_id: 'ing_muoihong', quantity_needed: 0.33, unit: 'g' },
-  { id: 'rec_tuk2_5', product_id: 'TUK002', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_tuk2_5', product_id: 'TUK002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 8. Matcha Latte
   { id: 'rec_tuk3_1', product_id: 'TUK003', ingredient_id: 'ing_matcha', quantity_needed: 3.5, unit: 'g' },
@@ -402,7 +402,7 @@ export const MOCK_RECIPES = [
   { id: 'rec_tuk4_suadac_km', product_id: 'TUK004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_tuk4_suatuoi_km', product_id: 'TUK004', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
   { id: 'rec_tuk4_muoi', product_id: 'TUK004', ingredient_id: 'ing_muoihong', quantity_needed: 0.33, unit: 'g' },
-  { id: 'rec_tuk4_5', product_id: 'TUK004', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_tuk4_5', product_id: 'TUK004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 10. Trà tắc
   { id: 'rec_t1_hongtra', product_id: 'T001', ingredient_id: 'ing_hongtra', quantity_needed: 1.875, unit: 'bịch' },
@@ -428,19 +428,19 @@ export const MOCK_RECIPES = [
   // 14. Yaourt đá
   { id: 'rec_y1_1', product_id: 'Y001', ingredient_id: 'ing_suachua', quantity_needed: 1, unit: 'hộp' },
   { id: 'rec_y1_2', product_id: 'Y001', ingredient_id: 'ing_suadac', quantity_needed: 50, unit: 'g' },
-  { id: 'rec_y1_3', product_id: 'Y001', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_y1_3', product_id: 'Y001', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 15. Yaourt dâu
   { id: 'rec_y2_1', product_id: 'Y002', ingredient_id: 'ing_suachua', quantity_needed: 1, unit: 'hộp' },
   { id: 'rec_y2_2', product_id: 'Y002', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_y2_3', product_id: 'Y002', ingredient_id: 'ing_mutdau', quantity_needed: 50, unit: 'ml' },
-  { id: 'rec_y2_4', product_id: 'Y002', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_y2_4', product_id: 'Y002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 16. Yaourt việt quất
   { id: 'rec_y3_1', product_id: 'Y003', ingredient_id: 'ing_suachua', quantity_needed: 1, unit: 'hộp' },
   { id: 'rec_y3_2', product_id: 'Y003', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_y3_3', product_id: 'Y003', ingredient_id: 'ing_mutvietquat', quantity_needed: 50, unit: 'ml' },
-  { id: 'rec_y3_4', product_id: 'Y003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_y3_4', product_id: 'Y003', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 17. Soda dâu
   { id: 'rec_s1_1', product_id: 'S001', ingredient_id: 'ing_7up', quantity_needed: 0.5, unit: 'chai' },

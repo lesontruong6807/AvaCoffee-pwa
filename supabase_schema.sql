@@ -373,7 +373,7 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_tuk2_suadac_km', 'TUK002', 'ing_suadac', 1.33, 'g'),
 ('rec_tuk2_suatuoi_km', 'TUK002', 'ing_suatuoi', 2, 'ml'),
 ('rec_tuk2_muoi', 'TUK002', 'ing_muoihong', 0.33, 'g'),
-('rec_tuk2_5', 'TUK002', 'ing_lyhoavan', 1, 'cái'),
+('rec_tuk2_5', 'TUK002', 'ing_lytrang', 1, 'cái'),
 
 -- 8. Matcha Latte
 ('rec_tuk3_1', 'TUK003', 'ing_matcha', 3.5, 'g'),
@@ -389,7 +389,7 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_tuk4_suadac_km', 'TUK004', 'ing_suadac', 1.33, 'g'),
 ('rec_tuk4_suatuoi_km', 'TUK004', 'ing_suatuoi', 2, 'ml'),
 ('rec_tuk4_muoi', 'TUK004', 'ing_muoihong', 0.33, 'g'),
-('rec_tuk4_5', 'TUK004', 'ing_lyhoavan', 1, 'cái'),
+('rec_tuk4_5', 'TUK004', 'ing_lytrang', 1, 'cái'),
 
 -- 10. Trà tắc (300ml cốt trà → 1.875 bịch hồng trà)
 ('rec_t1_hongtra', 'T001', 'ing_hongtra', 1.875, 'bịch'),
@@ -415,19 +415,19 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 -- 14. Yaourt đá
 ('rec_y1_1', 'Y001', 'ing_suachua', 1, 'hộp'),
 ('rec_y1_2', 'Y001', 'ing_suadac', 50, 'g'),
-('rec_y1_3', 'Y001', 'ing_lyhoavan', 1, 'cái'),
+('rec_y1_3', 'Y001', 'ing_lytrang', 1, 'cái'),
 
 -- 15. Yaourt dâu
 ('rec_y2_1', 'Y002', 'ing_suachua', 1, 'hộp'),
 ('rec_y2_2', 'Y002', 'ing_suadac', 30, 'g'),
 ('rec_y2_3', 'Y002', 'ing_mutdau', 50, 'ml'),
-('rec_y2_4', 'Y002', 'ing_lyhoavan', 1, 'cái'),
+('rec_y2_4', 'Y002', 'ing_lytrang', 1, 'cái'),
 
 -- 16. Yaourt việt quất
 ('rec_y3_1', 'Y003', 'ing_suachua', 1, 'hộp'),
 ('rec_y3_2', 'Y003', 'ing_suadac', 30, 'g'),
 ('rec_y3_3', 'Y003', 'ing_mutvietquat', 50, 'ml'),
-('rec_y3_4', 'Y003', 'ing_lyhoavan', 1, 'cái'),
+('rec_y3_4', 'Y003', 'ing_lytrang', 1, 'cái'),
 
 -- 17. Soda dâu (0.5 chai 7-Up = 195ml)
 ('rec_s1_1', 'S001', 'ing_7up', 0.5, 'chai'),
