@@ -306,8 +306,8 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_cacao', name: 'Cacao AVA', unit: 'g', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: '1kg' },
   { id: 'ing_matcha', name: 'Bột Matcha', unit: 'g', stock_quantity: 500, opening_stock: 500, min_stock: 50, quy_cach: '500g' },
   { id: 'ing_trasanmay', name: 'Trà săn mây', unit: 'g', stock_quantity: 600, opening_stock: 600, min_stock: 300, quy_cach: '300g' },
-  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'bịch', stock_quantity: 10, opening_stock: 10, min_stock: 2, quy_cach: '150g' },
-  { id: 'ing_suadac', name: 'Sữa đặc', unit: 'hộp', stock_quantity: 5, opening_stock: 5, min_stock: 1, quy_cach: '1284g' },
+  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'g', stock_quantity: 1500, opening_stock: 1500, min_stock: 300, quy_cach: '150g' },
+  { id: 'ing_suadac', name: 'Sữa đặc', unit: 'g', stock_quantity: 6420, opening_stock: 6420, min_stock: 1284, quy_cach: '1284g' },
   { id: 'ing_suatuoi', name: 'Sữa tươi', unit: 'ml', stock_quantity: 5000, opening_stock: 5000, min_stock: 2000, quy_cach: '1000ml' },
   { id: 'ing_lyden', name: 'Ly đen AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
   { id: 'ing_lytrang', name: 'Ly trắng AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
@@ -502,6 +502,22 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
     if (quyCach === '100g') {
       const bich = Math.floor(qty / 100);
       const g = Math.round(qty % 100);
+      if (bich > 0) {
+        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
+      }
+      return `${g}g`;
+    }
+    if (quyCach === '1284g') {
+      const hop = Math.floor(qty / 1284);
+      const g = Math.round(qty % 1284);
+      if (hop > 0) {
+        return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
+      }
+      return `${g}g`;
+    }
+    if (quyCach === '150g') {
+      const bich = Math.floor(qty / 150);
+      const g = Math.round(qty % 150);
       if (bich > 0) {
         return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       }
@@ -973,6 +989,12 @@ export const db = {
         ...item,
         products: products.find(p => p.id === item.product_id) || null
       }));
+  },  async getAllOrderItems() {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('hoadondetail').select('*');
+      if (!error && data) return data.map(mapOrderItemToClient).filter(Boolean) as any[];
+    }
+    return mockDb.getOrderItems();
   },
 
   async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; discount?: number; items: any[] }) {

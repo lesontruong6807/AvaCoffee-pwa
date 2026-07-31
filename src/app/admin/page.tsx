@@ -42,6 +42,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
+  const [allOrderItems, setAllOrderItems] = useState<any[]>([]);
 
   // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
   const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
@@ -80,7 +81,7 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
@@ -88,7 +89,8 @@ export default function AdminPage() {
         db.getCategories(),
         db.getUsers(),
         db.getInventoryLogs(),
-        db.getIngredients()
+        db.getIngredients(),
+        db.getAllOrderItems()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -98,6 +100,7 @@ export default function AdminPage() {
       setUsers(usrs);
       setInventoryLogs(invLogs);
       setIngredients(ings);
+      setAllOrderItems(ordItems);
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -381,8 +384,22 @@ export default function AdminPage() {
 
   const totalDiscount = paidOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
   const grossRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
-  const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
-  const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.discount || 0), 0);
+  const actualRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+
+  // Tính tổng giá vốn các món đã bán trong giai đoạn
+  const totalCOGS = paidOrders.reduce((sum, order) => {
+    const items = allOrderItems.filter(item => item.order_id === order.id);
+    const orderCost = items.reduce((itemSum, item) => {
+      const prod = products.find(p => p.id === item.product_id);
+      const costPrice = prod ? Number(prod.cost_price || 0) : 0;
+      return itemSum + (item.quantity * costPrice);
+    }, 0);
+    return sum + orderCost;
+  }, 0);
+
+  const netProfit = actualRevenue - totalCOGS;
   
   const totalRestockCosts = rangeRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
   const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
@@ -879,7 +896,7 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToExcel({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
               >
@@ -889,7 +906,7 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToPDF({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
               >
@@ -899,11 +916,11 @@ export default function AdminPage() {
           </div>
 
           {/* Dashboard Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">TỔNG DOANH THU</span>
-                <h4 className="font-black text-2xl text-coffee-primary">{grossRevenue.toLocaleString('vi-VN')}đ</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ</span>
+                <h4 className="font-black text-xl text-coffee-primary">{actualRevenue.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-green-50 rounded-2xl text-green-700">
                 <DollarSign className="w-6 h-6" />
@@ -912,18 +929,30 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">HÓA ĐƠN THÀNH CÔNG</span>
-                <h4 className="font-black text-2xl text-coffee-primary">{paidOrders.length} đơn</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">TỔNG GIÁ VỐN MÓN</span>
+                <h4 className="font-black text-xl text-amber-700">{totalCOGS.toLocaleString('vi-VN')}đ</h4>
               </div>
-              <div className="p-3 bg-blue-50 rounded-2xl text-blue-700">
-                <ShoppingBag className="w-6 h-6" />
+              <div className="p-3 bg-amber-50 rounded-2xl text-amber-700">
+                <TrendingUp className="w-6 h-6 rotate-180" />
               </div>
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP / GIẢM GIÁ</span>
-                <h4 className="font-black text-2xl text-red-600">-{totalRestockExpenses.toLocaleString('vi-VN')}đ</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">LỢI NHUẬN RÒNG</span>
+                <h4 className={`font-black text-xl ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {netProfit.toLocaleString('vi-VN')}đ
+                </h4>
+              </div>
+              <div className={`p-3 rounded-2xl ${netProfit >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP KHO</span>
+                <h4 className="font-black text-xl text-red-600">-{totalRestockCosts.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-red-50 rounded-2xl text-red-700">
                 <TrendingUp className="w-6 h-6 rotate-180" />
@@ -932,11 +961,11 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ</span>
-                <h4 className="font-black text-2xl text-emerald-700">{netMonthRevenue.toLocaleString('vi-VN')}đ</h4>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">HÓA ĐƠN THÀNH CÔNG</span>
+                <h4 className="font-black text-xl text-blue-700">{paidOrders.length} đơn</h4>
               </div>
-              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-700">
-                <ShieldCheck className="w-6 h-6" />
+              <div className="p-3 bg-blue-50 rounded-2xl text-blue-700">
+                <ShoppingBag className="w-6 h-6" />
               </div>
             </div>
           </div>

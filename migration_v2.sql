@@ -19,12 +19,12 @@ DELETE FROM public.nguyenlieu WHERE id IN ('ing_nuocduong', 'ing_nuoccothongtra'
 -- 4. Cập nhật tên, đơn vị và quy cách của các nguyên liệu hiện có
 -- Hồng trà
 UPDATE public.nguyenlieu 
-SET don_vi_tinh = 'bịch', quy_cach = '150g', muc_canh_bao = 2 
+SET don_vi_tinh = 'g', quy_cach = '150g', muc_canh_bao = 300 
 WHERE id = 'ing_hongtra';
 
 -- Sữa đặc
 UPDATE public.nguyenlieu 
-SET don_vi_tinh = 'hộp', quy_cach = '1284g', muc_canh_bao = 1 
+SET don_vi_tinh = 'g', quy_cach = '1284g', muc_canh_bao = 1284 
 WHERE id = 'ing_suadac';
 
 -- Muối hồng đổi thành Muối Iot

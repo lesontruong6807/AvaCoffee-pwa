@@ -135,6 +135,8 @@ interface RevenueData {
   netRevenue: number;
   totalCash: number;
   totalTransfer: number;
+  totalCOGS?: number;
+  netProfit?: number;
   paidOrders: Array<{
     id: string;
     created_at: string;
@@ -165,9 +167,12 @@ export function exportRevenueToExcel(
     ['TỔNG QUAN'],
     ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
     ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
+    ['Doanh thu thực tế', fmtVND(data.grossRevenue - data.totalDiscount)],
+    ['Tổng vốn (giá vốn món bán)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+    ['Lợi nhuận ròng', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
     ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
     ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
-    ['Doanh thu thực tế', fmtVND(data.netRevenue)],
+    ['Hiệu số Doanh thu - Chi phí', fmtVND(data.netRevenue)],
     [],
     ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
     ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
@@ -272,9 +277,12 @@ export function exportRevenueToPDF(
     body: [
       ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
       ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
+      ['Doanh thu thực tế (đã giảm giá)', fmtVND(data.grossRevenue - data.totalDiscount)],
+      ['Tổng vốn (giá vốn món bán)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+      ['LỢI NHUẬN RÒNG', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
       ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
       ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
-      ['DOANH THU THỰC TẾ', fmtVND(data.netRevenue)],
+      ['Hiệu số Doanh thu - Chi phí', fmtVND(data.netRevenue)],
       ['', ''],
       ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
       ['Tiền mặt', fmtVND(data.totalCash)],
