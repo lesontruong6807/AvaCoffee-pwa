@@ -133,3 +133,77 @@ WHERE id_nguyen_lieu = 'ing_7up' AND id_san_pham IN ('S001', 'S002', 'S003');
 CREATE INDEX IF NOT EXISTS idx_hoadon_ngay_tao ON public.hoadon (ngay_tao);
 CREATE INDEX IF NOT EXISTS idx_lichsukho_nguyen_lieu_thoi_gian ON public.lichsukho (id_nguyen_lieu, thoi_gian_tao);
 CREATE INDEX IF NOT EXISTS idx_chamcong_nhan_vien_gio_vao ON public.chamcong (id_nhan_vien, gio_vao);
+
+-- 9. THIẾT LẬP TỰ ĐỘNG TÍNH TOÁN GIÁ VỐN (AUTOMATIC COST RECALCULATION)
+
+-- Cập nhật đơn giá nhập mẫu cho các nguyên liệu hiện tại (nếu chưa có giá)
+UPDATE public.nguyenlieu SET don_gia_nhap = 200 WHERE id = 'ing_caphe' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 250 WHERE id = 'ing_cacao' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 600 WHERE id = 'ing_matcha' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 300 WHERE id = 'ing_trasanmay' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 30000 WHERE id = 'ing_hongtra' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 40000 WHERE id = 'ing_suadac' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 35 WHERE id = 'ing_suatuoi' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 1500 WHERE id = 'ing_lyden' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 1500 WHERE id = 'ing_lytrang' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 1500 WHERE id = 'ing_lyhoavan' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 20 WHERE id = 'ing_duong' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 30000 WHERE id = 'ing_kembeo' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 50 WHERE id = 'ing_muoihong' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+UPDATE public.nguyenlieu SET don_gia_nhap = 10000 WHERE id = 'ing_7up' AND (don_gia_nhap IS NULL OR don_gia_nhap = 0);
+
+-- Tạo hàm tính giá vốn của 1 sản phẩm
+CREATE OR REPLACE FUNCTION public.fn_recalculate_product_cost(p_id TEXT)
+RETURNS NUMERIC AS $$
+DECLARE
+    v_total_cost NUMERIC := 0;
+BEGIN
+    SELECT COALESCE(SUM(c.so_luong_can * n.don_gia_nhap), 0)
+    INTO v_total_cost
+    FROM public.congthuc c
+    JOIN public.nguyenlieu n ON c.id_nguyen_lieu = n.id
+    WHERE c.id_san_pham = p_id;
+
+    -- Cập nhật trực tiếp vào trường gia_von của bảng sanpham
+    UPDATE public.sanpham
+    SET gia_von = ROUND(v_total_cost, 2)
+    WHERE id = p_id;
+
+    RETURN v_total_cost;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Tạo trigger function khi thay đổi đơn giá nhập của nguyên liệu
+CREATE OR REPLACE FUNCTION public.tg_recalculate_cost_on_ingredient_change()
+RETURNS TRIGGER AS $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT DISTINCT id_san_pham 
+        FROM public.congthuc 
+        WHERE id_nguyen_lieu = NEW.id
+    LOOP
+        PERFORM public.fn_recalculate_product_cost(r.id_san_pham);
+    END LOOP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Tạo trigger trên bảng nguyenlieu
+DROP TRIGGER IF EXISTS trg_recalculate_cost ON public.nguyenlieu;
+CREATE TRIGGER trg_recalculate_cost
+AFTER UPDATE OF don_gia_nhap ON public.nguyenlieu
+FOR EACH ROW
+EXECUTE FUNCTION public.tg_recalculate_cost_on_ingredient_change();
+
+-- Chạy cập nhật giá vốn lần đầu tiên cho tất cả sản phẩm đang có
+DO $$
+DECLARE
+    prod RECORD;
+BEGIN
+    FOR prod IN SELECT id FROM public.sanpham LOOP
+        PERFORM public.fn_recalculate_product_cost(prod.id);
+    END LOOP;
+END;
+$$;
