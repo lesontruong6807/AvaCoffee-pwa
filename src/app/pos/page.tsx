@@ -355,7 +355,7 @@ export default function PosPage() {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           {/* Menu bên trái (2/3 chiều rộng) */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 pb-28 lg:pb-0">
             {/* Thanh Tìm Kiếm & Danh Mục */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
               <div className="relative">

@@ -1047,24 +1047,57 @@ export const db = {
             .single();
 
           if (!updateErr && updatedOrder) {
-            const orderItemsToInsert = items.map(item => {
+            // Tải các chi tiết hóa đơn cũ của hóa đơn này
+            const { data: existingDetails } = await supabase
+              .from('hoadondetail')
+              .select('*')
+              .eq('idhoadon', existingOrderId);
+
+            const dbInserts: any[] = [];
+            const dbUpdates: any[] = [];
+
+            for (const item of items) {
+              const matchedDetail = existingDetails?.find(d => d.idsp === item.product_id);
               const dbProd = dbProducts?.find(p => p.id === item.product_id);
               const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
-              return {
-                id: generateShortId('item_'),
-                idhoadon: existingOrderId,
-                idsp: item.product_id,
-                ten_san_pham: item.name || 'Sản phẩm',
-                don_vi_tinh: item.don_vi_tinh || 'Ly',
-                don_gia: item.unit_price || item.price,
-                so_luong: item.quantity,
-                thanh_tien: item.subtotal,
-                ghi_chu: item.notes || '',
-                gia_von: costPrice
-              };
-            });
 
-            await supabase.from('hoadondetail').insert(orderItemsToInsert);
+              if (matchedDetail) {
+                // Đã có -> Cập nhật số lượng và thành tiền
+                const newQty = Number(matchedDetail.so_luong || 0) + item.quantity;
+                const newSubtotal = Number(matchedDetail.thanh_tien || 0) + item.subtotal;
+                dbUpdates.push(
+                  supabase
+                    .from('hoadondetail')
+                    .update({
+                      so_luong: newQty,
+                      thanh_tien: newSubtotal
+                    })
+                    .eq('id', matchedDetail.id)
+                );
+              } else {
+                // Chưa có -> Thêm mới
+                dbInserts.push({
+                  id: generateShortId('item_'),
+                  idhoadon: existingOrderId,
+                  idsp: item.product_id,
+                  ten_san_pham: item.name || 'Sản phẩm',
+                  don_vi_tinh: item.don_vi_tinh || 'Ly',
+                  don_gia: item.unit_price || item.price,
+                  so_luong: item.quantity,
+                  thanh_tien: item.subtotal,
+                  ghi_chu: item.notes || '',
+                  gia_von: costPrice
+                });
+              }
+            }
+
+            if (dbUpdates.length > 0) {
+              await Promise.all(dbUpdates);
+            }
+            if (dbInserts.length > 0) {
+              await supabase.from('hoadondetail').insert(dbInserts);
+            }
+
             return mapOrderToClient(updatedOrder);
           }
         }
@@ -1154,22 +1187,31 @@ export const db = {
 
         const orderItems = mockDb.getOrderItems();
         const products = mockDb.getProducts();
-        const newItems = items.map((item) => {
-          const prod = products.find(p => p.id === item.product_id);
-          return {
-            id: generateShortId('item_'),
-            order_id: existingOrderId,
-            product_id: item.product_id,
-            ten_san_pham: prod ? prod.name : 'Sản phẩm',
-            don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
-            quantity: item.quantity,
-            unit_price: item.unit_price || item.price,
-            subtotal: item.subtotal,
-            ghi_chu: item.notes || '',
-            gia_von: prod ? Number(prod.cost_price || 0) : 0
-          };
+
+        items.forEach((item) => {
+          const matchedItem = orderItems.find(
+            oi => oi.order_id === existingOrderId && oi.product_id === item.product_id
+          );
+          if (matchedItem) {
+            matchedItem.quantity = Number(matchedItem.quantity || 0) + item.quantity;
+            matchedItem.subtotal = Number(matchedItem.subtotal || 0) + item.subtotal;
+          } else {
+            const prod = products.find(p => p.id === item.product_id);
+            orderItems.push({
+              id: generateShortId('item_'),
+              order_id: existingOrderId,
+              product_id: item.product_id,
+              ten_san_pham: prod ? prod.name : 'Sản phẩm',
+              don_vi_tinh: prod ? (prod as any).don_vi_tinh : 'Ly',
+              quantity: item.quantity,
+              unit_price: item.unit_price || item.price,
+              subtotal: item.subtotal,
+              ghi_chu: item.notes || '',
+              gia_von: prod ? Number(prod.cost_price || 0) : 0
+            });
+          }
         });
-        mockDb.setOrderItems([...orderItems, ...newItems]);
+        mockDb.setOrderItems(orderItems);
         return existingUnpaidOrder;
       }
     }
