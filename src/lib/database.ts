@@ -1373,6 +1373,69 @@ export const db = {
     return false;
   },
 
+  async deleteOrderItem(orderId: string, itemId: string) {
+    if (isSupabaseConfigured && supabase) {
+      // 1. Xóa món ăn khỏi chi tiết
+      await supabase.from('hoadondetail').delete().eq('id', itemId);
+
+      // 2. Lấy danh sách món ăn còn lại
+      const { data: remaining } = await supabase
+        .from('hoadondetail')
+        .select('thanh_tien')
+        .eq('idhoadon', orderId);
+
+      if (!remaining || remaining.length === 0) {
+        // Hóa đơn không còn món nào -> Hủy/Xóa luôn hóa đơn
+        await this.cancelOrder(orderId);
+        return { orderDeleted: true };
+      }
+
+      // 3. Tính toán lại tổng tiền và giảm giá
+      const sumRemaining = remaining.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
+      const { data: order } = await supabase.from('hoadon').select('giam_gia').eq('id', orderId).single();
+      const newDiscount = Math.min(sumRemaining, Number(order?.giam_gia || 0));
+      const newTotal = Math.max(0, sumRemaining - newDiscount);
+
+      // 4. Cập nhật hóa đơn
+      await supabase
+        .from('hoadon')
+        .update({
+          tong_tien: newTotal,
+          giam_gia: newDiscount
+        })
+        .eq('id', orderId);
+
+      return { orderDeleted: false, newTotal, newDiscount };
+    }
+
+    // Mock DB Fallback
+    const orderItems = mockDb.getOrderItems();
+    const itemIdx = orderItems.findIndex(item => item.id === itemId);
+    if (itemIdx !== -1) {
+      orderItems.splice(itemIdx, 1);
+      mockDb.setOrderItems(orderItems);
+    }
+
+    const remaining = orderItems.filter(item => item.order_id === orderId);
+    if (remaining.length === 0) {
+      await this.cancelOrder(orderId);
+      return { orderDeleted: true };
+    }
+
+    const sumRemaining = remaining.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    const orders = mockDb.getOrders();
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      const newDiscount = Math.min(sumRemaining, Number(order.giam_gia || 0));
+      order.giam_gia = newDiscount;
+      order.total_amount = Math.max(0, sumRemaining - newDiscount);
+      mockDb.setOrders(orders);
+      return { orderDeleted: false, newTotal: order.total_amount, newDiscount };
+    }
+
+    return { orderDeleted: false, newTotal: 0, newDiscount: 0 };
+  },
+
   // --- TIME LOGS (chamcong) ---
   async getTimeLogs() {
     if (isSupabaseConfigured && supabase) {

@@ -126,6 +126,37 @@ export default function PaymentPage() {
     }
   };
 
+  // Xóa một món cụ thể khỏi hóa đơn
+  const handleDeleteOrderItem = async (itemId: string, itemName: string) => {
+    if (!selectedOrder) return;
+    const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa món "${itemName}" khỏi hóa đơn này không?`);
+    if (!confirmDelete) return;
+
+    setLoadingItems(true);
+    try {
+      const result = await db.deleteOrderItem(selectedOrder.id, itemId);
+      toast.success(`Đã xóa món ${itemName} khỏi hóa đơn.`);
+      
+      if (result.orderDeleted) {
+        setSelectedOrder(null);
+        setOrderItems([]);
+        toast.info("Hóa đơn đã được hủy tự động vì không còn món ăn nào.");
+      } else {
+        // Tải lại chi tiết món ăn còn lại
+        const items = await db.getOrderItems(selectedOrder.id);
+        setOrderItems(items);
+      }
+      
+      // Tải lại danh sách hóa đơn chưa thanh toán
+      await loadOrders();
+    } catch (err) {
+      console.error("Lỗi khi xóa món ăn:", err);
+      toast.error("Không thể xóa món ăn.");
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
   // In lại hóa đơn thô (chỉ chạy trên thiết bị native Android)
   const handlePrint = async () => {
     if (!selectedOrder) return;
@@ -260,17 +291,24 @@ export default function PaymentPage() {
                           </div>
                         ) : (
                           <div className="border border-coffee-light bg-white rounded-2xl overflow-hidden divide-y divide-coffee-light/50">
-                            {orderItems.map((item) => (
+                             {orderItems.map((item) => (
                               <div key={item.id} className="flex justify-between items-center p-3.5 text-xs">
                                 <div className="space-y-0.5">
                                   <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn đã xoá'}</p>
                                   <p className="text-[10px] text-coffee-medium">Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ</p>
                                 </div>
-                                <div className="flex items-center space-x-6">
+                                <div className="flex items-center space-x-4">
                                   <span className="font-bold text-coffee-medium">x {item.quantity}</span>
                                   <span className="font-extrabold text-coffee-dark w-16 text-right">
                                     {item.subtotal.toLocaleString('vi-VN')}đ
                                   </span>
+                                  <button
+                                    onClick={() => handleDeleteOrderItem(item.id, item.products?.name || 'Sản phẩm')}
+                                    title="Xóa món khỏi hóa đơn"
+                                    className="p-1.5 text-red-500 hover:bg-red-55 hover:text-red-700 rounded-lg transition"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
                             ))}
