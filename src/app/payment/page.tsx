@@ -30,6 +30,35 @@ export default function PaymentPage() {
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [isNative, setIsNative] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+
+  const getDisplayedItems = () => {
+    const isEditing = editingOrderId === selectedOrder?.id;
+    if (!isEditing) return orderItems;
+
+    const items: any[] = [];
+    orderItems.forEach((item) => {
+      if (item.quantity && item.quantity >= 2) {
+        for (let i = 0; i < item.quantity; i++) {
+          items.push({
+            ...item,
+            id: `${item.id}-split-${i}`,
+            originalId: item.id, // Lưu lại ID gốc trong DB
+            quantity: 1,
+            subtotal: item.unit_price || item.products?.price || 0,
+            isSplit: true
+          });
+        }
+      } else {
+        items.push({
+          ...item,
+          originalId: item.id,
+          isSplit: false
+        });
+      }
+    });
+    return items;
+  };
 
   const loadOrders = async () => {
     try {
@@ -127,19 +156,20 @@ export default function PaymentPage() {
   };
 
   // Xóa một món cụ thể khỏi hóa đơn
-  const handleDeleteOrderItem = async (itemId: string, itemName: string) => {
+  const handleDeleteOrderItem = async (itemId: string, itemName: string, isSplit?: boolean) => {
     if (!selectedOrder) return;
     const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa món "${itemName}" khỏi hóa đơn này không?`);
     if (!confirmDelete) return;
 
     setLoadingItems(true);
     try {
-      const result = await db.deleteOrderItem(selectedOrder.id, itemId);
+      const result = await db.deleteOrderItem(selectedOrder.id, itemId, isSplit ? 1 : 0);
       toast.success(`Đã xóa món ${itemName} khỏi hóa đơn.`);
       
       if (result.orderDeleted) {
         setSelectedOrder(null);
         setOrderItems([]);
+        setEditingOrderId(null);
         toast.info("Hóa đơn đã được hủy tự động vì không còn món ăn nào.");
       } else {
         // Tải lại chi tiết món ăn còn lại
@@ -236,8 +266,10 @@ export default function PaymentPage() {
                       if (isSelected) {
                         setSelectedOrder(null);
                         setOrderItems([]);
+                        setEditingOrderId(null);
                       } else {
                         setSelectedOrder(order);
+                        setEditingOrderId(null);
                       }
                     }}
                     className="w-full flex items-center justify-between p-5 text-left transition hover:bg-[#FAF6F0]/30"
@@ -284,14 +316,39 @@ export default function PaymentPage() {
 
                       {/* Items List */}
                       <div className="space-y-3">
-                        <h5 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Danh sách món ăn</h5>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => {
+                                if (editingOrderId === selectedOrder.id) {
+                                  setEditingOrderId(null);
+                                } else {
+                                  setEditingOrderId(selectedOrder.id);
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition uppercase tracking-wider ${
+                                editingOrderId === selectedOrder.id
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-white text-coffee-primary border-coffee-light hover:bg-[#FAF6F0]'
+                              }`}
+                            >
+                              {editingOrderId === selectedOrder.id ? 'Hoàn tất' : 'Sửa'}
+                            </button>
+                            <h5 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Danh sách món ăn</h5>
+                          </div>
+                          {editingOrderId === selectedOrder.id && (
+                            <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                              Chế độ tách món lẻ
+                            </span>
+                          )}
+                        </div>
                         {loadingItems ? (
                           <div className="py-4 flex justify-center">
                             <Loader2 className="w-5 h-5 text-coffee-primary animate-spin" />
                           </div>
                         ) : (
                           <div className="border border-coffee-light bg-white rounded-2xl overflow-hidden divide-y divide-coffee-light/50">
-                             {orderItems.map((item) => (
+                             {getDisplayedItems().map((item) => (
                               <div key={item.id} className="flex justify-between items-center p-3.5 text-xs">
                                 <div className="space-y-0.5">
                                   <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn đã xoá'}</p>
@@ -302,13 +359,15 @@ export default function PaymentPage() {
                                   <span className="font-extrabold text-coffee-dark w-16 text-right">
                                     {item.subtotal.toLocaleString('vi-VN')}đ
                                   </span>
-                                  <button
-                                    onClick={() => handleDeleteOrderItem(item.id, item.products?.name || 'Sản phẩm')}
-                                    title="Xóa món khỏi hóa đơn"
-                                    className="p-1.5 text-red-500 hover:bg-red-55 hover:text-red-700 rounded-lg transition"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {editingOrderId === selectedOrder.id && (
+                                    <button
+                                      onClick={() => handleDeleteOrderItem(item.originalId || item.id, item.products?.name || 'Sản phẩm', item.isSplit)}
+                                      title="Xóa món khỏi hóa đơn"
+                                      className="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             ))}

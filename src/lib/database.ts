@@ -1373,10 +1373,38 @@ export const db = {
     return false;
   },
 
-  async deleteOrderItem(orderId: string, itemId: string) {
+  async deleteOrderItem(orderId: string, itemId: string, quantityToRemove?: number) {
     if (isSupabaseConfigured && supabase) {
-      // 1. Xóa món ăn khỏi chi tiết
-      await supabase.from('hoadondetail').delete().eq('id', itemId);
+      if (quantityToRemove && quantityToRemove > 0) {
+        // Lấy chi tiết món ăn hiện tại
+        const { data: detail } = await supabase
+          .from('hoadondetail')
+          .select('so_luong, don_gia')
+          .eq('id', itemId)
+          .single();
+
+        if (detail) {
+          const currentQty = Number(detail.so_luong || 0);
+          if (currentQty > quantityToRemove) {
+            // Cập nhật giảm bớt số lượng
+            const newQty = currentQty - quantityToRemove;
+            const newSubtotal = newQty * Number(detail.don_gia || 0);
+            await supabase
+              .from('hoadondetail')
+              .update({
+                so_luong: newQty,
+                thanh_tien: newSubtotal
+              })
+              .eq('id', itemId);
+          } else {
+            // Xóa luôn
+            await supabase.from('hoadondetail').delete().eq('id', itemId);
+          }
+        }
+      } else {
+        // Xóa hoàn toàn món ăn khỏi chi tiết
+        await supabase.from('hoadondetail').delete().eq('id', itemId);
+      }
 
       // 2. Lấy danh sách món ăn còn lại
       const { data: remaining } = await supabase
@@ -1412,7 +1440,14 @@ export const db = {
     const orderItems = mockDb.getOrderItems();
     const itemIdx = orderItems.findIndex(item => item.id === itemId);
     if (itemIdx !== -1) {
-      orderItems.splice(itemIdx, 1);
+      const item = orderItems[itemIdx];
+      const currentQty = Number(item.quantity || 0);
+      if (quantityToRemove && quantityToRemove > 0 && currentQty > quantityToRemove) {
+        item.quantity = currentQty - quantityToRemove;
+        item.subtotal = item.quantity * Number(item.unit_price || 0);
+      } else {
+        orderItems.splice(itemIdx, 1);
+      }
       mockDb.setOrderItems(orderItems);
     }
 
