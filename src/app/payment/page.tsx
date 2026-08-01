@@ -17,7 +17,8 @@ import {
   X,
   Loader2,
   ArrowLeft,
-  Printer
+  Printer,
+  Pencil
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -326,13 +327,14 @@ export default function PaymentPage() {
                                   setEditingOrderId(selectedOrder.id);
                                 }
                               }}
-                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition uppercase tracking-wider ${
+                              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-[10px] font-black border transition uppercase tracking-wider ${
                                 editingOrderId === selectedOrder.id
                                   ? 'bg-amber-100 text-amber-800 border-amber-300'
                                   : 'bg-white text-coffee-primary border-coffee-light hover:bg-[#FAF6F0]'
                               }`}
                             >
-                              {editingOrderId === selectedOrder.id ? 'Hoàn tất' : 'Sửa'}
+                              <Pencil className="w-3 h-3" />
+                              <span>{editingOrderId === selectedOrder.id ? 'Hoàn tất' : 'Sửa'}</span>
                             </button>
                             <h5 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Danh sách món ăn</h5>
                           </div>

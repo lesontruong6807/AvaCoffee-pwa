@@ -355,7 +355,7 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 11, unit: 'g' },
   { id: 'rec_cp3_2', product_id: 'CP003', ingredient_id: 'ing_suadac', quantity_needed: 25, unit: 'g' },
   { id: 'rec_cp3_3', product_id: 'CP003', ingredient_id: 'ing_suatuoi', quantity_needed: 100, unit: 'ml' },
-  { id: 'rec_cp3_4', product_id: 'CP003', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_cp3_4', product_id: 'CP003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
   // 4. Cà phê muối
   { id: 'rec_cp4_1', product_id: 'CP004', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
@@ -406,6 +406,7 @@ export const MOCK_RECIPES = [
 
   // 10. Trà tắc
   { id: 'rec_t1_hongtra', product_id: 'T001', ingredient_id: 'ing_hongtra', quantity_needed: 1.875, unit: 'bịch' },
+  { id: 'rec_t1_lytratac', product_id: 'T001', ingredient_id: 'ing_lytratac', quantity_needed: 1, unit: 'cái' },
 
   // 11. Trà dâu
   { id: 'rec_t2_hongtra', product_id: 'T002', ingredient_id: 'ing_hongtra', quantity_needed: 0.9375, unit: 'bịch' },

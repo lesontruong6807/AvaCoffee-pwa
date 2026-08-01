@@ -147,6 +147,14 @@ interface RevenueData {
     discount?: number;
   }>;
   restockLogs?: any[];
+  sales?: {
+    sortedSales: Array<{ name: string; quantity: number }>;
+    lyDen: number;
+    lyTrang: number;
+    lyHoaVan: number;
+    lyTraTac: number;
+    totalLy: number;
+  };
 }
 
 function fmtVND(n: number): string {
@@ -208,6 +216,26 @@ export function exportRevenueToExcel(
         log.ingredient_name,
         log.note || 'Nhập kho',
         `-${fmtVND(log.cost)}`
+      ]);
+    });
+  }
+
+  if (data.sales) {
+    wsData.push([]);
+    wsData.push(['BÁO CÁO BÁN HÀNG & SỬ DỤNG LY']);
+    wsData.push(['Tổng Ly đã bán', data.sales.totalLy]);
+    wsData.push(['Ly Đen AVA', data.sales.lyDen]);
+    wsData.push(['Ly Trắng AVA', data.sales.lyTrang]);
+    wsData.push(['Ly Hoa Văn', data.sales.lyHoaVan]);
+    wsData.push(['Ly Trà Tắc', data.sales.lyTraTac]);
+    wsData.push([]);
+    wsData.push(['CHI TIẾT MÓN ĂN ĐÃ BÁN (SẮP XẾP GIẢM DẦN)']);
+    wsData.push(['STT', 'Tên sản phẩm', 'Số lượng bán']);
+    data.sales.sortedSales.forEach((item, idx) => {
+      wsData.push([
+        idx + 1,
+        item.name,
+        `${item.quantity} ly`
       ]);
     });
   }
@@ -360,6 +388,61 @@ export function exportRevenueToPDF(
         1: { cellWidth: 25 },
         2: { cellWidth: 45 },
         4: { cellWidth: 35, halign: 'right', textColor: [200, 0, 0], fontStyle: 'bold' }
+      },
+      alternateRowStyles: { fillColor: [250, 246, 240] },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  if (data.sales) {
+    doc.addPage();
+    doc.setFontSize(11);
+    doc.setFont('TimesNewRoman', 'bold');
+    doc.text('BÁO CÁO BÁN HÀNG & THỐNG KÊ LY', 14, 20);
+
+    // Bảng thống kê các loại ly
+    autoTable(doc, {
+      startY: 24,
+      head: [['Loại ly', 'Số lượng dùng']],
+      body: [
+        ['Tổng Ly đã bán', String(data.sales.totalLy)],
+        ['Ly Đen AVA', String(data.sales.lyDen)],
+        ['Ly Trắng AVA', String(data.sales.lyTrang)],
+        ['Ly Hoa Văn', String(data.sales.lyHoaVan)],
+        ['Ly Trà Tắc', String(data.sales.lyTraTac)],
+      ],
+      styles: { font: 'TimesNewRoman', fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 60, halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+      theme: 'grid',
+    });
+
+    const salesY = (doc as any).lastAutoTable?.finalY || 60;
+
+    doc.setFontSize(11);
+    doc.setFont('TimesNewRoman', 'bold');
+    doc.text('CHI TIẾT MÓN ĂN ĐÃ BÁN (XẾP HẠNG GIẢM DẦN)', 14, salesY + 10);
+
+    const salesBody = data.sales.sortedSales.map((item, idx) => [
+      idx + 1,
+      item.name,
+      `${item.quantity} ly`
+    ]);
+
+    autoTable(doc, {
+      startY: salesY + 14,
+      head: [['STT', 'Tên sản phẩm', 'Số lượng bán']],
+      body: salesBody,
+      styles: { font: 'TimesNewRoman', fontSize: 8, cellPadding: 2.5 },
+      headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 90 },
+        2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
       },
       alternateRowStyles: { fillColor: [250, 246, 240] },
       margin: { left: 14, right: 14 },

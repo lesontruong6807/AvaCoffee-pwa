@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [allOrderItems, setAllOrderItems] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [recipes, setRecipes] = useState<any[]>([]);
 
   // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
   const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
@@ -139,7 +140,7 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems, exps] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems, exps, recs] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
@@ -149,7 +150,8 @@ export default function AdminPage() {
         db.getInventoryLogs(),
         db.getIngredients(),
         db.getAllOrderItems(),
-        db.getExpenses()
+        db.getExpenses(),
+        db.getRecipes()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -161,6 +163,7 @@ export default function AdminPage() {
       setIngredients(ings);
       setAllOrderItems(ordItems);
       setExpenses(exps);
+      setRecipes(recs);
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -471,6 +474,49 @@ export default function AdminPage() {
   const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
   const netMonthRevenue = grossRevenue - totalRestockExpenses;
   const totalRevenue = grossRevenue;
+
+  // --- Tính toán thống kê bán hàng Admin ---
+  const rangeOrderItems = allOrderItems.filter(item => paidOrders.some(o => o.id === item.order_id));
+  const salesMap: { [key: string]: { name: string; quantity: number } } = {};
+  
+  rangeOrderItems.forEach(item => {
+    const prodId = item.product_id;
+    const qty = Number(item.quantity || 0);
+    if (!salesMap[prodId]) {
+      salesMap[prodId] = {
+        name: item.products?.name || item.ten_san_pham || 'Sản phẩm',
+        quantity: 0
+      };
+    }
+    salesMap[prodId].quantity += qty;
+  });
+
+  const sortedSales = Object.values(salesMap).sort((a, b) => b.quantity - a.quantity);
+
+  let lyDen = 0;
+  let lyTrang = 0;
+  let lyHoaVan = 0;
+  let lyTraTac = 0;
+
+  rangeOrderItems.forEach(item => {
+    const prodId = item.product_id;
+    const qty = Number(item.quantity || 0);
+    const prodRecipes = recipes.filter(r => r.product_id === prodId);
+    
+    prodRecipes.forEach(r => {
+      if (r.ingredient_id === 'ing_lyden') {
+        lyDen += Number(r.quantity_needed || 0) * qty;
+      } else if (r.ingredient_id === 'ing_lytrang') {
+        lyTrang += Number(r.quantity_needed || 0) * qty;
+      } else if (r.ingredient_id === 'ing_lyhoavan') {
+        lyHoaVan += Number(r.quantity_needed || 0) * qty;
+      } else if (r.ingredient_id === 'ing_lytratac') {
+        lyTraTac += Number(r.quantity_needed || 0) * qty;
+      }
+    });
+  });
+
+  const totalLy = lyDen + lyTrang + lyHoaVan + lyTraTac;
 
 
   // --- LÓGIC BÁO CÁO KHO THEO KHOẢNG NGÀY ---
@@ -974,7 +1020,15 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToExcel({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses,
+                  sales: {
+                    sortedSales,
+                    lyDen,
+                    lyTrang,
+                    lyHoaVan,
+                    lyTraTac,
+                    totalLy
+                  }
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
               >
@@ -984,7 +1038,15 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToPDF({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses,
+                  sales: {
+                    sortedSales,
+                    lyDen,
+                    lyTrang,
+                    lyHoaVan,
+                    lyTraTac,
+                    totalLy
+                  }
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
               >
@@ -1124,6 +1186,65 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          {/* Báo cáo bán hàng (Món ăn & Ly) - ADMIN */}
+          <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
+            <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider flex items-center justify-between border-b border-coffee-light pb-2.5">
+              <span>📊 Báo cáo sản phẩm & ly bán ra theo giai đoạn</span>
+              <span className="text-xs text-coffee-medium">Tổng ly đã dùng: <strong>{totalLy} ly</strong></span>
+            </h4>
+
+            {/* Grid Thống Kê Các Loại Ly */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 bg-[#FAF6F0] p-5 rounded-2xl border border-coffee-light/60">
+              <div className="text-center space-y-1">
+                <span className="text-[10px] text-coffee-medium uppercase font-bold block">Tổng số ly</span>
+                <span className="font-black text-lg text-coffee-primary">{totalLy}</span>
+              </div>
+              <div className="text-center space-y-1 border-l border-coffee-light/60">
+                <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Đen AVA</span>
+                <span className="font-black text-lg text-coffee-dark">{lyDen}</span>
+              </div>
+              <div className="text-center space-y-1 border-l border-coffee-light/60">
+                <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trắng AVA</span>
+                <span className="font-black text-lg text-coffee-dark">{lyTrang}</span>
+              </div>
+              <div className="text-center space-y-1 border-l border-coffee-light/60">
+                <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Hoa Văn</span>
+                <span className="font-black text-lg text-coffee-dark">{lyHoaVan}</span>
+              </div>
+              <div className="text-center space-y-1 border-l border-coffee-light/60">
+                <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trà Tắc</span>
+                <span className="font-black text-lg text-coffee-dark">{lyTraTac}</span>
+              </div>
+            </div>
+
+            {/* Bảng liệt kê chi tiết các món ăn bán chạy nhất */}
+            <div className="space-y-3">
+              <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider block">Danh sách món ăn bán ra (Xếp theo số lượng giảm dần)</span>
+              {sortedSales.length === 0 ? (
+                <p className="text-xs text-coffee-medium/70 italic text-center py-6">Không có dữ liệu món ăn bán ra trong khoảng thời gian này.</p>
+              ) : (
+                <div className="overflow-hidden border border-coffee-light rounded-2xl bg-white divide-y divide-coffee-light/60">
+                  {sortedSales.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center p-3.5 text-xs hover:bg-[#FAF6F0]/20 transition">
+                      <div className="flex items-center space-x-3">
+                        <span className="w-5 h-5 bg-coffee-light text-coffee-primary rounded-full flex items-center justify-center font-bold text-[10px]">
+                          {idx + 1}
+                        </span>
+                        <span className="font-extrabold text-coffee-dark">{item.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <span className="font-mono text-coffee-medium text-[11px]">Số lượng đã bán:</span>
+                        <span className="font-black text-coffee-primary bg-coffee-accent/20 px-2.5 py-0.5 rounded-lg">
+                          {item.quantity} ly
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           

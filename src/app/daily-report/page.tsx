@@ -8,6 +8,8 @@ import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Cal
 export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [recipes, setRecipes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeShiftFilter, setActiveShiftFilter] = useState<'morning' | 'afternoon' | 'both'>('both');
@@ -16,12 +18,16 @@ export default function DailyReportPage() {
     setCurrentUser(getCurrentUser());
     async function loadData() {
       try {
-        const [allOrders, allLogs] = await Promise.all([
+        const [allOrders, allLogs, allItems, allRecipes] = await Promise.all([
           db.getOrders(),
-          db.getInventoryLogs()
+          db.getInventoryLogs(),
+          db.getAllOrderItems(),
+          db.getRecipes()
         ]);
         setOrders(allOrders);
         setInventoryLogs(allLogs);
+        setOrderItems(allItems);
+        setRecipes(allRecipes);
       } catch (e) {
         console.error('Lỗi khi tải hóa đơn báo cáo:', e);
       } finally {
@@ -82,6 +88,49 @@ export default function DailyReportPage() {
     // Doanh thu thực tế sau khi trừ chi phí nhập & giảm giá
     const netRevenue = grossRevenue - restockExpenses;
 
+    // --- Tính toán thống kê bán hàng ---
+    const shiftItems = orderItems.filter(item => shiftOrders.some(o => o.id === item.order_id));
+    const salesMap: { [key: string]: { name: string; quantity: number } } = {};
+    
+    shiftItems.forEach(item => {
+      const prodId = item.product_id;
+      const qty = Number(item.quantity || 0);
+      if (!salesMap[prodId]) {
+        salesMap[prodId] = {
+          name: item.products?.name || item.ten_san_pham || 'Sản phẩm',
+          quantity: 0
+        };
+      }
+      salesMap[prodId].quantity += qty;
+    });
+
+    const sortedSales = Object.values(salesMap).sort((a, b) => b.quantity - a.quantity);
+
+    let lyDen = 0;
+    let lyTrang = 0;
+    let lyHoaVan = 0;
+    let lyTraTac = 0;
+
+    shiftItems.forEach(item => {
+      const prodId = item.product_id;
+      const qty = Number(item.quantity || 0);
+      const prodRecipes = recipes.filter(r => r.product_id === prodId);
+      
+      prodRecipes.forEach(r => {
+        if (r.ingredient_id === 'ing_lyden') {
+          lyDen += Number(r.quantity_needed || 0) * qty;
+        } else if (r.ingredient_id === 'ing_lytrang') {
+          lyTrang += Number(r.quantity_needed || 0) * qty;
+        } else if (r.ingredient_id === 'ing_lyhoavan') {
+          lyHoaVan += Number(r.quantity_needed || 0) * qty;
+        } else if (r.ingredient_id === 'ing_lytratac') {
+          lyTraTac += Number(r.quantity_needed || 0) * qty;
+        }
+      });
+    });
+
+    const totalLy = lyDen + lyTrang + lyHoaVan + lyTraTac;
+
     return {
       orders: shiftOrders,
       grossRevenue,
@@ -90,7 +139,15 @@ export default function DailyReportPage() {
       restockExpenses,
       restockItems,
       currentCash,
-      netRevenue
+      netRevenue,
+      sales: {
+        sortedSales,
+        lyDen,
+        lyTrang,
+        lyHoaVan,
+        lyTraTac,
+        totalLy
+      }
     };
   };
 
@@ -255,6 +312,65 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
           <div className="p-2.5 bg-amber-50 rounded-xl text-amber-700">
             <ShieldCheck className="w-5 h-5" />
           </div>
+        </div>
+      </div>
+
+      {/* Báo cáo bán hàng (Món ăn & Ly) */}
+      <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-4">
+        <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider flex items-center justify-between border-b border-coffee-light pb-2.5">
+          <span>📊 Báo cáo bán hàng (Món ăn & Ly)</span>
+          <span className="text-[10px] text-coffee-medium font-bold uppercase">Tổng cộng: {metrics.sales.totalLy} ly</span>
+        </h4>
+
+        {/* Thống kê chi tiết các loại ly */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light/60">
+          <div className="text-center space-y-0.5">
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Tổng Ly</span>
+            <span className="font-black text-base text-coffee-primary">{metrics.sales.totalLy}</span>
+          </div>
+          <div className="text-center space-y-0.5 border-l border-coffee-light/60">
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Đen AVA</span>
+            <span className="font-black text-base text-coffee-dark">{metrics.sales.lyDen}</span>
+          </div>
+          <div className="text-center space-y-0.5 border-l border-coffee-light/60">
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trắng AVA</span>
+            <span className="font-black text-base text-coffee-dark">{metrics.sales.lyTrang}</span>
+          </div>
+          <div className="text-center space-y-0.5 border-l border-coffee-light/60">
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Hoa Văn</span>
+            <span className="font-black text-base text-coffee-dark">{metrics.sales.lyHoaVan}</span>
+          </div>
+          <div className="text-center space-y-0.5 border-l border-coffee-light/60">
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trà Tắc</span>
+            <span className="font-black text-base text-coffee-dark">{metrics.sales.lyTraTac}</span>
+          </div>
+        </div>
+
+        {/* Danh sách món ăn đã bán */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider block">Món ăn bán ra (Xếp theo số lượng)</span>
+          {metrics.sales.sortedSales.length === 0 ? (
+            <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa bán được món nào trong ca.</p>
+          ) : (
+            <div className="border border-coffee-light rounded-xl overflow-hidden divide-y divide-coffee-light/50 bg-white">
+              {metrics.sales.sortedSales.map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center p-3 text-xs hover:bg-[#FAF6F0]/20 transition">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="w-5 h-5 bg-coffee-light text-coffee-primary rounded-full flex items-center justify-center font-bold text-[10px]">
+                      {idx + 1}
+                    </span>
+                    <span className="font-bold text-coffee-dark">{item.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="font-mono text-coffee-medium text-[11px]">Đã bán:</span>
+                    <span className="font-extrabold text-coffee-primary bg-coffee-accent/20 px-2 py-0.5 rounded-lg text-xs">
+                      {item.quantity} ly
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
