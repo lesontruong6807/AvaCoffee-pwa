@@ -30,7 +30,7 @@ import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exp
 
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'inventory' | 'products' | 'staff' | 'attendance'>('approvals');
+  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'inventory' | 'products' | 'staff' | 'attendance' | 'expenses'>('approvals');
   const [loading, setLoading] = useState(true);
 
   // Dữ liệu quản trị
@@ -43,6 +43,7 @@ export default function AdminPage() {
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [allOrderItems, setAllOrderItems] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
 
   // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
   const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
@@ -66,6 +67,22 @@ export default function AdminPage() {
   const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<'Admin' | 'User'>('User');
 
+  // Trạng thái Quản lý Chi phí vận hành
+  const [expStartDate, setExpStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [expEndDate, setExpEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [isExpModalOpen, setIsExpModalOpen] = useState(false);
+  const [expName, setExpName] = useState('');
+  const [expType, setExpType] = useState<'co_dinh' | 'bien_dong'>('bien_dong');
+  const [expAmount, setExpAmount] = useState('');
+  const [expDate, setExpDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [expNotes, setExpNotes] = useState('');
+
   // Bộ lọc Báo cáo Chấm công
   const [attStartDate, setAttStartDate] = useState(() => {
     const d = new Date();
@@ -78,10 +95,51 @@ export default function AdminPage() {
   const [attUserId, setAttUserId] = useState('all');
   const [attendanceSubTab, setAttendanceSubTab] = useState<'summary' | 'shifts' | 'leaves'>('summary');
 
+  const handleSaveExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (!expName.trim() || !expAmount || Number(expAmount) <= 0) {
+      toast.error('Vui lòng nhập tên chi phí và số tiền hợp lệ!');
+      return;
+    }
+    try {
+      await db.createExpense({
+        name: expName.trim(),
+        type: expType,
+        amount: Number(expAmount),
+        date: expDate,
+        staff_id: currentUser.id,
+        notes: expNotes.trim()
+      });
+      toast.success('Đã lưu chi phí vận hành thành công!');
+      setIsExpModalOpen(false);
+      setExpName('');
+      setExpType('bien_dong');
+      setExpAmount('');
+      setExpDate(new Date().toISOString().split('T')[0]);
+      setExpNotes('');
+      loadAllData();
+    } catch (err) {
+      toast.error('Không thể lưu chi phí.');
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (confirm('Bạn có chắc chắn muốn xoá khoản chi phí này không?')) {
+      try {
+        await db.deleteExpense(id);
+        toast.success('Đã xoá khoản chi phí.');
+        loadAllData();
+      } catch (err) {
+        toast.error('Không thể xoá chi phí.');
+      }
+    }
+  };
+
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems, exps] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
@@ -90,7 +148,8 @@ export default function AdminPage() {
         db.getUsers(),
         db.getInventoryLogs(),
         db.getIngredients(),
-        db.getAllOrderItems()
+        db.getAllOrderItems(),
+        db.getExpenses()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -101,6 +160,7 @@ export default function AdminPage() {
       setInventoryLogs(invLogs);
       setIngredients(ings);
       setAllOrderItems(ordItems);
+      setExpenses(exps);
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -388,23 +448,30 @@ export default function AdminPage() {
   const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
 
-  // Tính tổng giá vốn các món đã bán trong giai đoạn
+  // Tính tổng giá vốn các món đã bán trong giai đoạn (sử dụng snapshot gia_von từ hoadondetail)
   const totalCOGS = paidOrders.reduce((sum, order) => {
     const items = allOrderItems.filter(item => item.order_id === order.id);
     const orderCost = items.reduce((itemSum, item) => {
-      const prod = products.find(p => p.id === item.product_id);
-      const costPrice = prod ? Number(prod.cost_price || 0) : 0;
+      const costPrice = Number(item.cost_price || 0);
       return itemSum + (item.quantity * costPrice);
     }, 0);
     return sum + orderCost;
   }, 0);
 
-  const netProfit = actualRevenue - totalCOGS;
+  // Chi phí vận hành trong khoảng thời gian được chọn
+  const rangeExpenses = expenses.filter(e => {
+    const t = new Date(e.date + 'T00:00:00').getTime();
+    return t >= repStartT && t <= repEndT;
+  });
+  const totalExpenses = rangeExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const netProfit = actualRevenue - totalCOGS - totalExpenses;
   
   const totalRestockCosts = rangeRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
   const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
   const netMonthRevenue = grossRevenue - totalRestockExpenses;
   const totalRevenue = grossRevenue;
+
 
   // --- LÓGIC BÁO CÁO KHO THEO KHOẢNG NGÀY ---
   const getLogAppliedAmount = (log: any) => {
@@ -542,6 +609,17 @@ export default function AdminPage() {
         >
           <Clock className="w-4.5 h-4.5" />
           <span>Báo cáo chấm công</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('expenses')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'expenses'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <DollarSign className="w-4.5 h-4.5" />
+          <span>Chi phí vận hành</span>
         </button>
       </div>
 
@@ -896,7 +974,7 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToExcel({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-[10px] font-bold rounded-xl transition border border-green-200"
               >
@@ -906,12 +984,13 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToPDF({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
                 }, repStartDate, repEndDate)}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-xl transition border border-red-200"
               >
                 📄 Xuất PDF
               </button>
+
             </div>
           </div>
 
@@ -919,7 +998,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THỰC TẾ</span>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">DOANH THU THUẦN</span>
                 <h4 className="font-black text-xl text-coffee-primary">{actualRevenue.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-green-50 rounded-2xl text-green-700">
@@ -929,10 +1008,30 @@ export default function AdminPage() {
 
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">TỔNG GIÁ VỐN MÓN</span>
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">TỔNG GIÁ VỐN (COGS)</span>
                 <h4 className="font-black text-xl text-amber-700">{totalCOGS.toLocaleString('vi-VN')}đ</h4>
               </div>
               <div className="p-3 bg-amber-50 rounded-2xl text-amber-700">
+                <TrendingUp className="w-6 h-6 rotate-180" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">LỢI NHUẬN GỘP</span>
+                <h4 className="font-black text-xl text-emerald-700">{(actualRevenue - totalCOGS).toLocaleString('vi-VN')}đ</h4>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-700">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ VẬN HÀNH</span>
+                <h4 className="font-black text-xl text-red-600">-{totalExpenses.toLocaleString('vi-VN')}đ</h4>
+              </div>
+              <div className="p-3 bg-red-50 rounded-2xl text-red-700">
                 <TrendingUp className="w-6 h-6 rotate-180" />
               </div>
             </div>
@@ -946,26 +1045,6 @@ export default function AdminPage() {
               </div>
               <div className={`p-3 rounded-2xl ${netProfit >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                 <ShieldCheck className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">CHI PHÍ NHẬP KHO</span>
-                <h4 className="font-black text-xl text-red-600">-{totalRestockCosts.toLocaleString('vi-VN')}đ</h4>
-              </div>
-              <div className="p-3 bg-red-50 rounded-2xl text-red-700">
-                <TrendingUp className="w-6 h-6 rotate-180" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">HÓA ĐƠN THÀNH CÔNG</span>
-                <h4 className="font-black text-xl text-blue-700">{paidOrders.length} đơn</h4>
-              </div>
-              <div className="p-3 bg-blue-50 rounded-2xl text-blue-700">
-                <ShoppingBag className="w-6 h-6" />
               </div>
             </div>
           </div>
@@ -1807,6 +1886,189 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {adminTab === 'expenses' && (
+        <div className="space-y-6">
+          {/* Bộ lọc khoảng ngày */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3.5 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Từ ngày:</span>
+                <input
+                  type="date"
+                  value={expStartDate}
+                  onChange={(e) => setExpStartDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-coffee-medium">Đến ngày:</span>
+                <input
+                  type="date"
+                  value={expEndDate}
+                  onChange={(e) => setExpEndDate(e.target.value)}
+                  className="h-10 px-3 bg-[#FAF6F0] rounded-xl border-none focus:ring-1 focus:ring-coffee-primary font-bold text-coffee-dark"
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setIsExpModalOpen(true)}
+              className="px-4 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white text-xs font-bold rounded-xl transition flex items-center space-x-2 shadow-sm shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm chi phí vận hành</span>
+            </button>
+          </div>
+
+          {/* Bảng chi phí */}
+          <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-coffee-light">
+              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">Chi tiết chi phí vận hành</h3>
+              <p className="text-xs text-coffee-medium mt-1">Tổng cộng chi phí trong khoảng thời gian này: <strong className="text-red-600">{expenses.filter(e => e.date >= expStartDate && e.date <= expEndDate).reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('vi-VN')}đ</strong></p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                    <th className="p-4">STT</th>
+                    <th className="p-4">Ngày chi</th>
+                    <th className="p-4">Tên chi phí</th>
+                    <th className="p-4">Phân loại</th>
+                    <th className="p-4">Người ghi nhận</th>
+                    <th className="p-4 text-right">Số tiền</th>
+                    <th className="p-4">Ghi chú</th>
+                    <th className="p-4 text-center">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {expenses
+                    .filter(e => e.date >= expStartDate && e.date <= expEndDate)
+                    .map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-coffee-light/20 transition-colors">
+                        <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
+                        <td className="p-4 text-coffee-dark font-medium">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
+                        <td className="p-4 font-bold text-coffee-dark">{item.name}</td>
+                        <td className="p-4 text-coffee-dark">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${item.type === 'co_dinh' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                            {item.type === 'co_dinh' ? 'Cố định' : 'Biến động'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-coffee-medium">{item.staff_name}</td>
+                        <td className="p-4 text-right font-black text-coffee-dark">{item.amount.toLocaleString('vi-VN')}đ</td>
+                        <td className="p-4 text-coffee-medium max-w-xs truncate" title={item.notes}>{item.notes || '-'}</td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => handleDeleteExpense(item.id)}
+                            className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition"
+                            title="Xóa khoản chi"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {expenses.filter(e => e.date >= expStartDate && e.date <= expEndDate).length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-coffee-medium text-xs">
+                        Không tìm thấy khoản chi phí vận hành nào trong khoảng thời gian đã chọn.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP FORM THÊM CHI PHÍ VẬN HÀNH */}
+      {isExpModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
+            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
+              <h3 className="font-extrabold text-lg text-coffee-dark">
+                Ghi nhận Chi phí vận hành mới
+              </h3>
+              <button onClick={() => setIsExpModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveExpense} className="space-y-4 text-xs">
+              {/* Tên chi phí */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Tên chi phí</label>
+                <input
+                  type="text"
+                  value={expName}
+                  onChange={(e) => setExpName(e.target.value)}
+                  placeholder="Ví dụ: Tiền điện tháng 8, Tiền mặt bằng..."
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  required
+                />
+              </div>
+
+              {/* Loại chi phí & Ngày chi */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-coffee-medium uppercase">Phân loại</label>
+                  <select
+                    value={expType}
+                    onChange={(e) => setExpType(e.target.value as any)}
+                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  >
+                    <option value="bien_dong">Biến động (Biến phí)</option>
+                    <option value="co_dinh">Cố định (Định phí)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-coffee-medium uppercase">Ngày chi</label>
+                  <input
+                    type="date"
+                    value={expDate}
+                    onChange={(e) => setExpDate(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Số tiền */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Số tiền chi (VND)</label>
+                <input
+                  type="number"
+                  value={expAmount}
+                  onChange={(e) => setExpAmount(e.target.value)}
+                  placeholder="Nhập số tiền..."
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  required
+                />
+              </div>
+
+              {/* Ghi chú */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Ghi chú</label>
+                <textarea
+                  value={expNotes}
+                  onChange={(e) => setExpNotes(e.target.value)}
+                  placeholder="Ghi chú chi tiết thêm..."
+                  rows={3}
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold rounded-2xl shadow transition"
+              >
+                Lưu khoản chi
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* POPUP FORM CRUD SẢN PHẨM */}
       {isProductModalOpen && (

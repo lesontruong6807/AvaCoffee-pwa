@@ -137,6 +137,7 @@ interface RevenueData {
   totalTransfer: number;
   totalCOGS?: number;
   netProfit?: number;
+  totalExpenses?: number;
   paidOrders: Array<{
     id: string;
     created_at: string;
@@ -165,10 +166,10 @@ export function exportRevenueToExcel(
     [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
     [],
     ['TỔNG QUAN'],
-    ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
-    ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
-    ['Doanh thu thực tế', fmtVND(data.grossRevenue - data.totalDiscount)],
-    ['Tổng vốn (giá vốn món bán)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+    ['Doanh thu thuần (Thực nhận)', fmtVND(data.grossRevenue - data.totalDiscount)],
+    ['Tổng giá vốn (COGS)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+    ['Lợi nhuận gộp', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
+    ['Chi phí vận hành', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
     ['Lợi nhuận ròng', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
     ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
     ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
@@ -275,10 +276,10 @@ export function exportRevenueToPDF(
     startY: 42,
     head: [['Chỉ tiêu', 'Giá trị']],
     body: [
-      ['Tổng doanh thu (trước giảm giá)', fmtVND(data.grossRevenue)],
-      ['Giảm giá', `-${fmtVND(data.totalDiscount)}`],
-      ['Doanh thu thực tế (đã giảm giá)', fmtVND(data.grossRevenue - data.totalDiscount)],
-      ['Tổng vốn (giá vốn món bán)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+      ['Doanh thu thuần (Thực nhận)', fmtVND(data.grossRevenue - data.totalDiscount)],
+      ['Tổng giá vốn (COGS)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+      ['LỢI NHUẬN GỘP', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
+      ['Chi phí vận hành', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
       ['LỢI NHUẬN RÒNG', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
       ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
       ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],

@@ -684,6 +684,7 @@ const mapOrderItemToClient = (oi: any) => oi ? {
   unit_price: Number(oi.don_gia),
   subtotal: Number(oi.thanh_tien),
   ghi_chu: oi.ghi_chu || '',
+  cost_price: Number(oi.gia_von || 0),
   products: {
     name: oi.ten_san_pham,
     image_url: oi.sanpham?.hinh_anh || ''
@@ -1002,6 +1003,13 @@ export const db = {
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
+      // Tải trước giá vốn của các sản phẩm để ghi nhận snapshot gia_von vào hoadondetail
+      const productIds = items.map(item => item.product_id);
+      const { data: dbProducts } = await supabase
+        .from('sanpham')
+        .select('id, gia_von')
+        .in('id', productIds);
+
       // 1. Lấy thông tin bàn trước để kiểm tra tên bàn
       const { data: tableData } = await supabase
         .from('danhsachban')
@@ -1039,17 +1047,22 @@ export const db = {
             .single();
 
           if (!updateErr && updatedOrder) {
-            const orderItemsToInsert = items.map(item => ({
-              id: generateShortId('item_'),
-              idhoadon: existingOrderId,
-              idsp: item.product_id,
-              ten_san_pham: item.name || 'Sản phẩm',
-              don_vi_tinh: item.don_vi_tinh || 'Ly',
-              don_gia: item.unit_price || item.price,
-              so_luong: item.quantity,
-              thanh_tien: item.subtotal,
-              ghi_chu: item.notes || ''
-            }));
+            const orderItemsToInsert = items.map(item => {
+              const dbProd = dbProducts?.find(p => p.id === item.product_id);
+              const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+              return {
+                id: generateShortId('item_'),
+                idhoadon: existingOrderId,
+                idsp: item.product_id,
+                ten_san_pham: item.name || 'Sản phẩm',
+                don_vi_tinh: item.don_vi_tinh || 'Ly',
+                don_gia: item.unit_price || item.price,
+                so_luong: item.quantity,
+                thanh_tien: item.subtotal,
+                ghi_chu: item.notes || '',
+                gia_von: costPrice
+              };
+            });
 
             await supabase.from('hoadondetail').insert(orderItemsToInsert);
             return mapOrderToClient(updatedOrder);
@@ -1098,17 +1111,22 @@ export const db = {
       }
 
       if (!orderErr && order) {
-        const orderItemsToInsert = items.map(item => ({
-          id: generateShortId('item_'),
-          idhoadon: orderId,
-          idsp: item.product_id,
-          ten_san_pham: item.name || 'Sản phẩm',
-          don_vi_tinh: item.don_vi_tinh || 'Ly',
-          don_gia: item.unit_price || item.price,
-          so_luong: item.quantity,
-          thanh_tien: item.subtotal,
-          ghi_chu: item.notes || ''
-        }));
+        const orderItemsToInsert = items.map(item => {
+          const dbProd = dbProducts?.find(p => p.id === item.product_id);
+          const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+          return {
+            id: generateShortId('item_'),
+            idhoadon: orderId,
+            idsp: item.product_id,
+            ten_san_pham: item.name || 'Sản phẩm',
+            don_vi_tinh: item.don_vi_tinh || 'Ly',
+            don_gia: item.unit_price || item.price,
+            so_luong: item.quantity,
+            thanh_tien: item.subtotal,
+            ghi_chu: item.notes || '',
+            gia_von: costPrice
+          };
+        });
 
         await Promise.all([
           supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id),
@@ -1147,7 +1165,8 @@ export const db = {
             quantity: item.quantity,
             unit_price: item.unit_price || item.price,
             subtotal: item.subtotal,
-            ghi_chu: item.notes || ''
+            ghi_chu: item.notes || '',
+            gia_von: prod ? Number(prod.cost_price || 0) : 0
           };
         });
         mockDb.setOrderItems([...orderItems, ...newItems]);
@@ -1189,7 +1208,8 @@ export const db = {
         quantity: item.quantity,
         unit_price: item.unit_price || item.price,
         subtotal: item.subtotal,
-        ghi_chu: item.notes || ''
+        ghi_chu: item.notes || '',
+        gia_von: prod ? Number(prod.cost_price || 0) : 0
       };
     });
     mockDb.setOrderItems([...orderItems, ...newItems]);
@@ -1593,13 +1613,15 @@ export const db = {
           opening_stock: Number(ing.ton_dau_ngay !== null ? ing.ton_dau_ngay : ing.so_luong_ton),
           min_stock: ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : null,
           quy_cach: ing.quy_cach,
-          don_gia_nhap: Number(ing.don_gia_nhap || 0)
+          don_gia_nhap: Number(ing.don_gia_nhap || 0),
+          gia_von_trung_binh: Number(ing.gia_von_trung_binh || ing.don_gia_nhap || 0)
         }));
       }
     }
     return mockDb.getIngredients().map(ing => ({
       ...ing,
-      don_gia_nhap: Number((ing as any).don_gia_nhap || 0)
+      don_gia_nhap: Number((ing as any).don_gia_nhap || 0),
+      gia_von_trung_binh: Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0)
     }));
   },
 
@@ -1705,30 +1727,57 @@ export const db = {
 
     // 1. Nếu là món có trong danh mục kho -> Cộng tồn kho ngay lập tức
     if (!isCustom && payload.ingredient_id) {
-      const ing = ingredients.find(i => i.id === payload.ingredient_id);
-      const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
-      if (ing) {
-        ing.stock_quantity = Number(ing.stock_quantity) + payload.change_amount;
-        (ing as any).don_gia_nhap = donGiaNhap;
-      }
-
       if (isSupabaseConfigured && supabase) {
-        await supabase
-          .from('nguyenlieu')
-          .update({ 
-            so_luong_ton: ing?.stock_quantity,
-            don_gia_nhap: donGiaNhap
-          })
-          .eq('id', payload.ingredient_id);
-      } else {
-        mockDb.setIngredients(ingredients);
-      }
+        // Tạo phiếu nhập kho và chi tiết phiếu nhập -> Kích hoạt trigger tự động cập nhật nguyenlieu và gia_von_trung_binh
+        const phieuId = generateShortId('phieu_');
+        const maPhieu = 'PNK-' + generateShortId('').toUpperCase();
+        const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
+        
+        await supabase.from('phieunhapkho').insert({
+          id: phieuId,
+          ma_phieu: maPhieu,
+          id_nhan_vien: payload.staff_id,
+          nha_cung_cap: 'AVA Coffee Supplier',
+          tong_tien: payload.cost,
+          ghi_chu: payload.note || 'Nhập kho nguyên liệu',
+          ngay_nhap: new Date().toISOString()
+        });
 
-      // Tự động tính toán lại giá vốn của các sản phẩm sử dụng nguyên liệu này
-      try {
-        await this.recalculateProductsCostPriceByIngredient(payload.ingredient_id);
-      } catch (err) {
-        console.error('Error recalculating cost price:', err);
+        await supabase.from('chitietnhapkho').insert({
+          id: generateShortId('ct_'),
+          id_phieu_nhap: phieuId,
+          id_nguyen_lieu: payload.ingredient_id,
+          so_luong: payload.change_amount,
+          don_gia_nhap: donGiaNhap,
+          thanh_tien: payload.cost
+        });
+      } else {
+        const ing = ingredients.find(i => i.id === payload.ingredient_id);
+        const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
+        if (ing) {
+          const v_ton_hien_tai = Number(ing.stock_quantity || 0);
+          const v_gia_von_cu = Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0);
+          const newQty = v_ton_hien_tai + payload.change_amount;
+          
+          let newGiaVon = 0;
+          if (newQty > 0) {
+            newGiaVon = ((v_ton_hien_tai * v_gia_von_cu) + payload.cost) / newQty;
+          } else {
+            newGiaVon = donGiaNhap;
+          }
+          
+          ing.stock_quantity = newQty;
+          (ing as any).don_gia_nhap = donGiaNhap;
+          (ing as any).gia_von_trung_binh = newGiaVon;
+          mockDb.setIngredients(ingredients);
+        }
+
+        // Tự động tính toán lại giá vốn của các sản phẩm sử dụng nguyên liệu này (offline fallback)
+        try {
+          await this.recalculateProductsCostPriceByIngredient(payload.ingredient_id);
+        } catch (err) {
+          console.error('Error recalculating cost price:', err);
+        }
       }
     }
 
@@ -1880,8 +1929,8 @@ export const db = {
       let totalCost = 0;
       for (const recipe of productRecipes) {
         const ing = allIngredients.find(i => i.id === recipe.ingredient_id);
-        const donGiaNhap = ing ? ((ing as any).don_gia_nhap || 0) : 0;
-        totalCost += recipe.quantity_needed * donGiaNhap;
+        const costPrice = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+        totalCost += recipe.quantity_needed * costPrice;
       }
       
       totalCost = Math.round(totalCost * 100) / 100;
@@ -2113,5 +2162,111 @@ export const db = {
     } catch (e) {
       console.error('Lỗi khi khấu trừ tồn kho bán hàng:', e);
     }
+  },
+
+  // --- OPERATIONAL EXPENSES (chiphivanhang) ---
+  async getExpenses(startDate?: string, endDate?: string) {
+    if (isSupabaseConfigured && supabase) {
+      let query = supabase.from('chiphivanhang').select(`
+        *,
+        nguoidung (ho_ten)
+      `);
+      if (startDate) {
+        query = query.gte('ngay_chi', startDate);
+      }
+      if (endDate) {
+        query = query.lte('ngay_chi', endDate);
+      }
+      const { data, error } = await query.order('ngay_chi', { ascending: false });
+      if (!error && data) {
+        return data.map(item => ({
+          id: item.id,
+          name: item.ten_chi_phi,
+          type: item.loai_chi_phi, // 'co_dinh' or 'bien_dong'
+          amount: Number(item.so_tien),
+          date: item.ngay_chi,
+          staff_id: item.id_nhan_vien,
+          notes: item.ghi_chu || '',
+          staff_name: item.nguoidung?.ho_ten || 'Không rõ'
+        }));
+      }
+    }
+    
+    // Mock DB Fallback
+    const expenses = getStorageItem<any[]>('ava_expenses', []);
+    const users = mockDb.getUsers();
+    let filtered = expenses;
+    if (startDate) {
+      filtered = filtered.filter(e => e.date >= startDate);
+    }
+    if (endDate) {
+      filtered = filtered.filter(e => e.date <= endDate);
+    }
+    return filtered.map(e => ({
+      ...e,
+      staff_name: users.find(u => u.id === e.staff_id)?.full_name || 'Không rõ'
+    })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+
+  async createExpense(payload: {
+    name: string;
+    type: 'co_dinh' | 'bien_dong';
+    amount: number;
+    date: string;
+    staff_id: string;
+    notes?: string;
+  }) {
+    const id = generateShortId('exp_');
+    const newExpense = {
+      id,
+      ten_chi_phi: payload.name,
+      loai_chi_phi: payload.type,
+      so_tien: payload.amount,
+      ngay_chi: payload.date,
+      id_nhan_vien: payload.staff_id,
+      ghi_chu: payload.notes || ''
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('chiphivanhang').insert([newExpense]).select().single();
+      if (!error && data) {
+        return {
+          id: data.id,
+          name: data.ten_chi_phi,
+          type: data.loai_chi_phi,
+          amount: Number(data.so_tien),
+          date: data.ngay_chi,
+          staff_id: data.id_nhan_vien,
+          notes: data.ghi_chu || ''
+        };
+      }
+    }
+
+    const expenses = getStorageItem<any[]>('ava_expenses', []);
+    const clientExpense = {
+      id,
+      name: payload.name,
+      type: payload.type,
+      amount: payload.amount,
+      date: payload.date,
+      staff_id: payload.staff_id,
+      notes: payload.notes || ''
+    };
+    expenses.push(clientExpense);
+    setStorageItem('ava_expenses', expenses);
+    return clientExpense;
+  },
+
+  async deleteExpense(id: string) {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('chiphivanhang').delete().eq('id', id);
+      if (!error) return true;
+    }
+
+    const expenses = getStorageItem<any[]>('ava_expenses', []);
+    const filtered = expenses.filter(e => e.id !== id);
+    setStorageItem('ava_expenses', filtered);
+    return true;
   }
 };
+
