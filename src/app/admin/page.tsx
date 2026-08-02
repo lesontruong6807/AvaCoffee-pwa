@@ -477,18 +477,22 @@ export default function AdminPage() {
 
   // --- Tính toán thống kê bán hàng Admin ---
   const rangeOrderItems = allOrderItems.filter(item => paidOrders.some(o => o.id === item.order_id));
-  const salesMap: { [key: string]: { name: string; quantity: number } } = {};
+  const salesMap: { [key: string]: { name: string; quantity: number; price: number; subtotal: number } } = {};
   
   rangeOrderItems.forEach(item => {
     const prodId = item.product_id;
     const qty = Number(item.quantity || 0);
+    const price = Number(item.unit_price || item.products?.price || 0);
     if (!salesMap[prodId]) {
       salesMap[prodId] = {
         name: item.products?.name || item.ten_san_pham || 'Sản phẩm',
-        quantity: 0
+        quantity: 0,
+        price: price,
+        subtotal: 0
       };
     }
     salesMap[prodId].quantity += qty;
+    salesMap[prodId].subtotal += (qty * price);
   });
 
   const sortedSales = Object.values(salesMap).sort((a, b) => b.quantity - a.quantity);
@@ -1226,23 +1230,37 @@ export default function AdminPage() {
               {sortedSales.length === 0 ? (
                 <p className="text-xs text-coffee-medium/70 italic text-center py-6">Không có dữ liệu món ăn bán ra trong khoảng thời gian này.</p>
               ) : (
-                <div className="overflow-hidden border border-coffee-light rounded-2xl bg-white divide-y divide-coffee-light/60">
-                  {sortedSales.map((item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center p-3.5 text-xs hover:bg-[#FAF6F0]/20 transition">
-                      <div className="flex items-center space-x-3">
-                        <span className="w-5 h-5 bg-coffee-light text-coffee-primary rounded-full flex items-center justify-center font-bold text-[10px]">
-                          {idx + 1}
-                        </span>
-                        <span className="font-extrabold text-coffee-dark">{item.name}</span>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className="font-mono text-coffee-medium text-[11px]">Số lượng đã bán:</span>
-                        <span className="font-black text-coffee-primary bg-coffee-accent/20 px-2.5 py-0.5 rounded-lg">
-                          {item.quantity} ly
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto border border-coffee-light rounded-2xl bg-white shadow-sm">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px]">
+                        <th className="p-3.5 w-12 text-center">STT</th>
+                        <th className="p-3.5">Tên món</th>
+                        <th className="p-3.5 text-center">Số lượng</th>
+                        <th className="p-3.5 text-right">Đơn giá</th>
+                        <th className="p-3.5 text-right">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-coffee-light/50">
+                      {sortedSales.map((item: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition">
+                          <td className="p-3.5 text-center text-coffee-medium font-bold">{idx + 1}</td>
+                          <td className="p-3.5 font-extrabold text-coffee-dark">{item.name}</td>
+                          <td className="p-3.5 text-center">
+                            <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2.5 py-0.5 rounded-lg text-[11px]">
+                              {item.quantity} ly
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right font-medium text-coffee-medium">
+                            {item.price.toLocaleString('vi-VN')}đ
+                          </td>
+                          <td className="p-3.5 text-right font-black text-coffee-primary">
+                            {item.subtotal.toLocaleString('vi-VN')}đ
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

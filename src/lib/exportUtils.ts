@@ -148,7 +148,7 @@ interface RevenueData {
   }>;
   restockLogs?: any[];
   sales?: {
-    sortedSales: Array<{ name: string; quantity: number }>;
+    sortedSales: Array<{ name: string; quantity: number; price: number; subtotal: number }>;
     lyDen: number;
     lyTrang: number;
     lyHoaVan: number;
@@ -230,12 +230,14 @@ export function exportRevenueToExcel(
     wsData.push(['Ly Trà Tắc', data.sales.lyTraTac]);
     wsData.push([]);
     wsData.push(['CHI TIẾT MÓN ĂN ĐÃ BÁN (SẮP XẾP GIẢM DẦN)']);
-    wsData.push(['STT', 'Tên sản phẩm', 'Số lượng bán']);
+    wsData.push(['STT', 'Tên sản phẩm', 'Số lượng bán', 'Đơn giá', 'Thành tiền']);
     data.sales.sortedSales.forEach((item, idx) => {
       wsData.push([
         idx + 1,
         item.name,
-        `${item.quantity} ly`
+        `${item.quantity} ly`,
+        fmtVND(item.price),
+        fmtVND(item.subtotal)
       ]);
     });
   }
@@ -430,19 +432,23 @@ export function exportRevenueToPDF(
     const salesBody = data.sales.sortedSales.map((item, idx) => [
       idx + 1,
       item.name,
-      `${item.quantity} ly`
+      `${item.quantity} ly`,
+      fmtVND(item.price),
+      fmtVND(item.subtotal)
     ]);
 
     autoTable(doc, {
       startY: salesY + 14,
-      head: [['STT', 'Tên sản phẩm', 'Số lượng bán']],
+      head: [['STT', 'Tên sản phẩm', 'Số lượng bán', 'Đơn giá', 'Thành tiền']],
       body: salesBody,
       styles: { font: 'TimesNewRoman', fontSize: 8, cellPadding: 2.5 },
       headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       columnStyles: {
-        0: { cellWidth: 15 },
-        1: { cellWidth: 90 },
-        2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 15, halign: 'center' },
+        1: { cellWidth: 75 },
+        2: { cellWidth: 25, halign: 'center' },
+        3: { cellWidth: 25, halign: 'right' },
+        4: { cellWidth: 40, halign: 'right', fontStyle: 'bold' }
       },
       alternateRowStyles: { fillColor: [250, 246, 240] },
       margin: { left: 14, right: 14 },
