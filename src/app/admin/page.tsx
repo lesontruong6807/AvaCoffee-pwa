@@ -1150,47 +1150,6 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-
-            {/* Danh sách giao dịch bán hàng đã thanh toán */}
-            <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
-              <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch gần đây</h4>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-coffee-light text-coffee-medium font-bold">
-                      <th className="py-2">Mã đơn</th>
-                      <th className="py-2">Ngày</th>
-                      <th className="py-2">Bàn</th>
-                      <th className="py-2">Thanh toán</th>
-                      <th className="py-2 text-right">Tổng tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-coffee-light/50">
-                    {paidOrders.slice(0, 5).map((order) => (
-                      <tr key={order.id}>
-                        <td className="py-2.5 font-mono text-[10px] text-coffee-medium">{order.id.substring(0, 8).toUpperCase()}</td>
-                        <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
-                        <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
-                        <td className="py-2.5">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
-                            order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {order.payment_method}
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
-                      </tr>
-                    ))}
-                    {paidOrders.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="py-6 text-center text-coffee-medium/60">Chưa có giao dịch thanh toán nào hôm nay.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
 
           {/* Báo cáo bán hàng (Món ăn & Ly) - ADMIN */}
@@ -1231,9 +1190,9 @@ export default function AdminPage() {
                 <p className="text-xs text-coffee-medium/70 italic text-center py-6">Không có dữ liệu món ăn bán ra trong khoảng thời gian này.</p>
               ) : (
                 <div className="overflow-x-auto border border-coffee-light rounded-2xl bg-white shadow-sm">
-                  <table className="w-full text-xs text-left">
+                  <table className="w-full text-xs text-left min-w-[500px]">
                     <thead>
-                      <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px]">
+                      <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px] whitespace-nowrap">
                         <th className="p-3.5 w-12 text-center">STT</th>
                         <th className="p-3.5">Tên món</th>
                         <th className="p-3.5 text-center">Số lượng</th>
@@ -1243,11 +1202,11 @@ export default function AdminPage() {
                     </thead>
                     <tbody className="divide-y divide-coffee-light/50">
                       {sortedSales.map((item: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition">
+                        <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition whitespace-nowrap">
                           <td className="p-3.5 text-center text-coffee-medium font-bold">{idx + 1}</td>
                           <td className="p-3.5 font-extrabold text-coffee-dark">{item.name}</td>
                           <td className="p-3.5 text-center">
-                            <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2.5 py-0.5 rounded-lg text-[11px]">
+                            <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2.5 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
                               {item.quantity} ly
                             </span>
                           </td>
@@ -1305,6 +1264,47 @@ export default function AdminPage() {
                       <td colSpan={4} className="py-6 text-center text-coffee-medium/60 italic">
                         Không phát sinh chi phí nhập kho nào trong khoảng thời gian này.
                       </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Danh sách giao dịch bán hàng đã thanh toán (ĐÃ ĐƯA XUỐNG DƯỚI CÙNG) */}
+          <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
+            <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch gần đây</h4>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-coffee-light text-coffee-medium font-bold">
+                    <th className="py-2">Mã đơn</th>
+                    <th className="py-2">Ngày</th>
+                    <th className="py-2">Bàn</th>
+                    <th className="py-2">Thanh toán</th>
+                    <th className="py-2 text-right">Tổng tiền</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {paidOrders.slice(0, 5).map((order) => (
+                    <tr key={order.id}>
+                      <td className="py-2.5 font-mono text-[10px] text-coffee-medium">{order.id.substring(0, 8).toUpperCase()}</td>
+                      <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
+                      <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
+                      <td className="py-2.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
+                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {order.payment_method}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
+                    </tr>
+                  ))}
+                  {paidOrders.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-coffee-medium/60">Chưa có giao dịch thanh toán nào hôm nay.</td>
                     </tr>
                   )}
                 </tbody>

@@ -185,25 +185,8 @@ export function exportRevenueToExcel(
     [],
     ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
     ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
-    ['Thanh toán chuyển khoản', fmtVND(data.totalTransfer)],
-    [],
-    ['CHI TIẾT GIAO DỊCH'],
-    ['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']
+    ['Thanh toán chuyển khoản', fmtVND(data.totalTransfer)]
   ];
-
-  data.paidOrders.forEach((order, idx) => {
-    const disc = Number(order.discount || 0);
-    wsData.push([
-      idx + 1,
-      order.id.substring(0, 8).toUpperCase(),
-      new Date(order.created_at).toLocaleDateString('vi-VN'),
-      order.tables?.table_name || 'Mang về',
-      order.payment_method,
-      Number(order.total_amount) + disc,
-      disc > 0 ? `-${fmtVND(disc)}` : '-',
-      fmtVND(Number(order.total_amount))
-    ]);
-  });
 
   if (data.restockLogs && data.restockLogs.length > 0) {
     wsData.push([]);
@@ -241,6 +224,23 @@ export function exportRevenueToExcel(
       ]);
     });
   }
+
+  wsData.push([]);
+  wsData.push(['CHI TIẾT GIAO DỊCH']);
+  wsData.push(['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']);
+  data.paidOrders.forEach((order, idx) => {
+    const disc = Number(order.discount || 0);
+    wsData.push([
+      idx + 1,
+      order.id.substring(0, 8).toUpperCase(),
+      new Date(order.created_at).toLocaleDateString('vi-VN'),
+      order.tables?.table_name || 'Mang về',
+      order.payment_method,
+      Number(order.total_amount) + disc,
+      disc > 0 ? `-${fmtVND(disc)}` : '-',
+      fmtVND(Number(order.total_amount))
+    ]);
+  });
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
@@ -327,42 +327,6 @@ export function exportRevenueToPDF(
     },
     margin: { left: 14, right: 14 },
     theme: 'grid',
-  });
-
-  const finalY = (doc as any).lastAutoTable?.finalY || 110;
-
-  doc.setFontSize(11);
-  doc.setFont('TimesNewRoman', 'bold');
-  doc.text('CHI TIẾT GIAO DỊCH', 14, finalY + 10);
-
-  const txData = data.paidOrders.map((order, idx) => {
-    const disc = Number(order.discount || 0);
-    return [
-      idx + 1,
-      order.id.substring(0, 8).toUpperCase(),
-      new Date(order.created_at).toLocaleDateString('vi-VN'),
-      order.tables?.table_name || 'Mang về',
-      order.payment_method,
-      fmtVND(Number(order.total_amount) + disc),
-      disc > 0 ? `-${fmtVND(disc)}` : '-',
-      fmtVND(Number(order.total_amount))
-    ];
-  });
-
-  autoTable(doc, {
-    startY: finalY + 14,
-    head: [['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']],
-    body: txData,
-    styles: { font: 'TimesNewRoman', fontSize: 7, cellPadding: 2 },
-    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-    columnStyles: {
-      0: { cellWidth: 10 },
-      5: { halign: 'right' },
-      6: { halign: 'right', textColor: [200, 0, 0] },
-      7: { halign: 'right', fontStyle: 'bold' },
-    },
-    alternateRowStyles: { fillColor: [250, 246, 240] },
-    margin: { left: 14, right: 14 },
   });
 
   if (data.restockLogs && data.restockLogs.length > 0) {
@@ -454,6 +418,42 @@ export function exportRevenueToPDF(
       margin: { left: 14, right: 14 },
     });
   }
+
+  // ĐƯA CHI TIẾT GIAO DỊCH XUỐNG DƯỚI CÙNG (Trên một trang mới)
+  doc.addPage();
+  doc.setFontSize(11);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('CHI TIẾT GIAO DỊCH', 14, 20);
+
+  const txData = data.paidOrders.map((order, idx) => {
+    const disc = Number(order.discount || 0);
+    return [
+      idx + 1,
+      order.id.substring(0, 8).toUpperCase(),
+      new Date(order.created_at).toLocaleDateString('vi-VN'),
+      order.tables?.table_name || 'Mang về',
+      order.payment_method,
+      fmtVND(Number(order.total_amount) + disc),
+      disc > 0 ? `-${fmtVND(disc)}` : '-',
+      fmtVND(Number(order.total_amount))
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 24,
+    head: [['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']],
+    body: txData,
+    styles: { font: 'TimesNewRoman', fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      5: { halign: 'right' },
+      6: { halign: 'right', textColor: [200, 0, 0] },
+      7: { halign: 'right', fontStyle: 'bold' },
+    },
+    alternateRowStyles: { fillColor: [250, 246, 240] },
+    margin: { left: 14, right: 14 },
+  });
 
   doc.save(`BaoCaoDoanhThu_${startDate}_${endDate}.pdf`);
 }

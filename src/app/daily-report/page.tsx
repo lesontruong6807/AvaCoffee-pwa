@@ -357,9 +357,9 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
             <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa bán được món nào trong ca.</p>
           ) : (
             <div className="overflow-x-auto border border-coffee-light rounded-2xl bg-white shadow-sm">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left min-w-[500px]">
                 <thead>
-                  <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px]">
+                  <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px] whitespace-nowrap">
                     <th className="p-3 w-12 text-center">STT</th>
                     <th className="p-3">Tên món</th>
                     <th className="p-3 text-center">Số lượng</th>
@@ -369,11 +369,11 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
                 </thead>
                 <tbody className="divide-y divide-coffee-light/50">
                   {metrics.sales.sortedSales.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition">
+                    <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition whitespace-nowrap">
                       <td className="p-3 text-center text-coffee-medium font-bold">{idx + 1}</td>
                       <td className="p-3 font-extrabold text-coffee-dark">{item.name}</td>
                       <td className="p-3 text-center">
-                        <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2 py-0.5 rounded-lg text-[11px]">
+                        <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
                           {item.quantity} ly
                         </span>
                       </td>
@@ -424,52 +424,7 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
         </div>
       </div>
 
-      {/* Lịch sử đơn hàng trong ca */}
-      <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-3">
-        <h4 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Hóa đơn trong ca</h4>
-        {metrics.orders.length === 0 ? (
-          <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa có giao dịch phát sinh trong ca này.</p>
-        ) : (
-          <div className="space-y-3">
-            <div className="divide-y divide-coffee-light/60">
-              {metrics.orders.slice(0, 10).map((order: any) => {
-                const date = new Date(order.created_at);
-                const hh = String(date.getHours()).padStart(2, '0');
-                const mm = String(date.getMinutes()).padStart(2, '0');
-                const dd = String(date.getDate()).padStart(2, '0');
-                const mMonth = String(date.getMonth() + 1).padStart(2, '0');
-                const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
-                return (
-                  <div key={order.id} className="py-3.5 space-y-2 text-xs">
-                    {/* Hàng 1: Mã HĐ và Giờ */}
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
-                      <span className="text-[10px] text-coffee-medium font-medium">{timeFormatted}</span>
-                    </div>
-                    {/* Hàng 2: Bàn, hình thức thanh toán, tổng tiền */}
-                    <div className="flex justify-between items-center text-[11px]">
-                      <div className="flex items-center space-x-2.5">
-                        <span className="font-semibold text-coffee-dark bg-coffee-light px-2 py-0.5 rounded">{order.tables?.table_name || 'Khách mang về'}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
-                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {order.payment_method}
-                        </span>
-                      </div>
-                      <span className="font-extrabold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {metrics.orders.length > 10 && (
-              <p className="text-[10px] text-coffee-medium text-center pt-2 italic border-t border-coffee-light/40">Hiển thị 10 hóa đơn gần nhất...</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* BẢNG DÒNG TIỀN NGAY DƯỚI HÓA ĐƠN TRONG CA */}
+      {/* BẢNG DÒNG TIỀN NGAY DƯỚI HÌNH THỨC THANH TOÁN */}
       <div className="bg-[#FAF6F0] p-5 rounded-3xl border border-coffee-light space-y-3 text-xs shadow-sm">
         <h4 className="font-extrabold text-sm text-coffee-dark flex items-center justify-between border-b border-coffee-light/80 pb-2.5">
           <span>💵 Bảng Tính Dòng Tiền Thực Tế Ca</span>
@@ -512,6 +467,51 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
             <span>{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
           </div>
         </div>
+      </div>
+
+      {/* Lịch sử đơn hàng trong ca (ĐÃ ĐƯA XUỐNG DƯỚI CÙNG) */}
+      <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-3">
+        <h4 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Hóa đơn trong ca</h4>
+        {metrics.orders.length === 0 ? (
+          <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa có giao dịch phát sinh trong ca này.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="divide-y divide-coffee-light/60">
+              {metrics.orders.slice(0, 10).map((order: any) => {
+                const date = new Date(order.created_at);
+                const hh = String(date.getHours()).padStart(2, '0');
+                const mm = String(date.getMinutes()).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mMonth = String(date.getMonth() + 1).padStart(2, '0');
+                const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
+                return (
+                  <div key={order.id} className="py-3.5 space-y-2 text-xs">
+                    {/* Hàng 1: Mã HĐ và Giờ */}
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
+                      <span className="text-[10px] text-coffee-medium font-medium">{timeFormatted}</span>
+                    </div>
+                    {/* Hàng 2: Bàn, hình thức thanh toán, tổng tiền */}
+                    <div className="flex justify-between items-center text-[11px]">
+                      <div className="flex items-center space-x-2.5">
+                        <span className="font-semibold text-coffee-dark bg-coffee-light px-2 py-0.5 rounded">{order.tables?.table_name || 'Khách mang về'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
+                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {order.payment_method}
+                        </span>
+                      </div>
+                      <span className="font-extrabold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {metrics.orders.length > 10 && (
+              <p className="text-[10px] text-coffee-medium text-center pt-2 italic border-t border-coffee-light/40">Hiển thị 10 hóa đơn gần nhất...</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
