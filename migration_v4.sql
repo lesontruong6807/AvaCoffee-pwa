@@ -1,4 +1,4 @@
--- MIGRATION V4: CẬP NHẬT CÔNG THỨC TRÀ TẮC & CÀ PHÊ SỮA TƯƠI & CACAO/MATCHA KEM MUỐI
+-- MIGRATION V4: CẬP NHẬT CÔNG THỨC TRÀ TẮC & CÀ PHÊ SỮA TƯƠI & CACAO/MATCHA KEM MUỐI & YAOURT
 
 -- 1. Cập nhật công thức Trà tắc (T001) thêm Ly trà tắc (ing_lytratac)
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh)
@@ -19,3 +19,18 @@ WHERE id_san_pham = 'TUK002' AND id_nguyen_lieu = 'ing_lyhoavan';
 UPDATE public.congthuc 
 SET id_nguyen_lieu = 'ing_lytrang' 
 WHERE id_san_pham = 'TUK004' AND id_nguyen_lieu = 'ing_lyhoavan';
+
+-- 5. Cập nhật công thức Yaourt đá (Y001) đổi Ly hoa văn (ing_lyhoavan) thành Ly trắng (ing_lytrang)
+UPDATE public.congthuc 
+SET id_nguyen_lieu = 'ing_lytrang' 
+WHERE id_san_pham = 'Y001' AND id_nguyen_lieu = 'ing_lyhoavan';
+
+-- 6. Cập nhật công thức Yaourt dâu (Y002) đổi Ly hoa văn (ing_lyhoavan) thành Ly trắng (ing_lytrang)
+UPDATE public.congthuc 
+SET id_nguyen_lieu = 'ing_lytrang' 
+WHERE id_san_pham = 'Y002' AND id_nguyen_lieu = 'ing_lyhoavan';
+
+-- 7. Cập nhật công thức Yaourt việt quất (Y003) đổi Ly hoa văn (ing_lyhoavan) thành Ly trắng (ing_lytrang)
+UPDATE public.congthuc 
+SET id_nguyen_lieu = 'ing_lytrang' 
+WHERE id_san_pham = 'Y003' AND id_nguyen_lieu = 'ing_lyhoavan';
