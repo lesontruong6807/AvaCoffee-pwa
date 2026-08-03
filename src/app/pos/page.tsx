@@ -37,6 +37,7 @@ export default function PosPage() {
   const [tables, setTables] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [yesterdaySales, setYesterdaySales] = useState<{ [productId: string]: number }>({});
   const [loading, setLoading] = useState(true);
 
   // Trạng thái giỏ hàng & Quy trình POS
@@ -81,15 +82,17 @@ export default function PosPage() {
       }
 
       try {
-        const [tablesData, categoriesData, productsData] = await Promise.all([
+        const [tablesData, categoriesData, productsData, yestSalesData] = await Promise.all([
           db.getTables(),
           db.getCategories(),
-          db.getProducts()
+          db.getProducts(),
+          db.getYesterdayProductSales()
         ]);
         
         setTables(tablesData);
         setCategories(categoriesData);
         setProducts(productsData);
+        setYesterdaySales(yestSalesData);
         
         // Lưu lại cache mới nhất
         try {
@@ -224,12 +227,40 @@ export default function PosPage() {
 
   // --- RENDERS ---
 
-  // Lọc sản phẩm
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
-    return matchesSearch && matchesCategory;
-  });
+  // Lọc và sắp xếp sản phẩm (Ưu tiên bán chạy hôm qua -> Thứ tự nhóm món -> Tên món)
+  const filteredProducts = products
+    .filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      // 1. Ưu tiên 1: Số lượng bán ra ngày hôm qua (giảm dần)
+      const salesA = yesterdaySales[a.id] || 0;
+      const salesB = yesterdaySales[b.id] || 0;
+      if (salesB !== salesA) {
+        return salesB - salesA;
+      }
+
+      // 2. Ưu tiên 2: Thứ tự nhóm món (Cà phê -> Trà -> Yaourt -> Khác -> Soda -> Nước ngọt -> Món ăn)
+      const categorySortOrder: { [key: string]: number } = {
+        'c_caphe': 1,
+        'c_tra': 2,
+        'c_yaourt': 3,
+        'c_douongkhac': 4,
+        'c_soda': 5,
+        'c_nuocngot': 6,
+        'c_monan': 7
+      };
+      const orderA = categorySortOrder[a.category_id] || 99;
+      const orderB = categorySortOrder[b.category_id] || 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      // 3. Ưu tiên 3: Tên món theo bảng chữ cái tiếng Việt
+      return a.name.localeCompare(b.name, 'vi');
+    });
 
   return (
     <div className="w-full space-y-6">

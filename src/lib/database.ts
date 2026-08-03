@@ -1439,6 +1439,62 @@ export const db = {
     }
   },
 
+  async getYesterdayProductSales(): Promise<{ [productId: string]: number }> {
+    const yesterdaySales: { [productId: string]: number } = {};
+    try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toDateString();
+
+      if (isSupabaseConfigured && supabase) {
+        const yest = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const yestStr = yest.toISOString().split('T')[0];
+        const startOfYest = `${yestStr}T00:00:00+07:00`;
+        const endOfYest = `${yestStr}T23:59:59+07:00`;
+
+        const { data: orders } = await supabase
+          .from('hoadon')
+          .select('id')
+          .eq('trang_thai_thanh_toan', 'Đã thanh toán')
+          .gte('ngay_thanh_toan', startOfYest)
+          .lte('ngay_thanh_toan', endOfYest);
+
+        if (orders && orders.length > 0) {
+          const orderIds = orders.map(o => o.id);
+          const { data: items } = await supabase
+            .from('hoadondetail')
+            .select('idsp, so_luong')
+            .in('idhoadon', orderIds);
+
+          if (items) {
+            items.forEach(item => {
+              yesterdaySales[item.idsp] = (yesterdaySales[item.idsp] || 0) + Number(item.so_luong || 0);
+            });
+          }
+        }
+        return yesterdaySales;
+      }
+
+      // Mock DB Fallback
+      const orders = mockDb.getOrders().filter(o => {
+        if (o.payment_status !== 'Đã thanh toán') return false;
+        const date = new Date(o.created_at || o.paid_at);
+        return date.toDateString() === yesterdayStr;
+      });
+
+      const orderItems = mockDb.getOrderItems();
+      orders.forEach(order => {
+        const items = orderItems.filter(item => item.order_id === order.id);
+        items.forEach(item => {
+          yesterdaySales[item.product_id] = (yesterdaySales[item.product_id] || 0) + Number(item.quantity || 0);
+        });
+      });
+    } catch (e) {
+      console.error('Lỗi khi lấy doanh số hôm qua:', e);
+    }
+    return yesterdaySales;
+  },
+
   async deleteOrderItem(orderId: string, itemId: string, quantityToRemove?: number) {
     if (isSupabaseConfigured && supabase) {
       if (quantityToRemove && quantityToRemove > 0) {
