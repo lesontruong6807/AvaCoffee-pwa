@@ -14,26 +14,28 @@ export default function DailyReportPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeShiftFilter, setActiveShiftFilter] = useState<'morning' | 'afternoon' | 'both'>('both');
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [allOrders, allLogs, allItems, allRecipes] = await Promise.all([
+        db.getOrders(),
+        db.getInventoryLogs(),
+        db.getAllOrderItems(),
+        db.getRecipes()
+      ]);
+      setOrders(allOrders);
+      setInventoryLogs(allLogs);
+      setOrderItems(allItems);
+      setRecipes(allRecipes);
+    } catch (e) {
+      console.error('Lỗi khi tải hóa đơn báo cáo:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     setCurrentUser(getCurrentUser());
-    async function loadData() {
-      try {
-        const [allOrders, allLogs, allItems, allRecipes] = await Promise.all([
-          db.getOrders(),
-          db.getInventoryLogs(),
-          db.getAllOrderItems(),
-          db.getRecipes()
-        ]);
-        setOrders(allOrders);
-        setInventoryLogs(allLogs);
-        setOrderItems(allItems);
-        setRecipes(allRecipes);
-      } catch (e) {
-        console.error('Lỗi khi tải hóa đơn báo cáo:', e);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
   }, []);
 
@@ -238,7 +240,7 @@ export default function DailyReportPage() {
               {bothShifts.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={bothShifts} />
+          <ShiftMetricsSection metrics={bothShifts} onRefresh={loadData} />
         </div>
       ) : activeShiftFilter === 'morning' ? (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -251,7 +253,7 @@ export default function DailyReportPage() {
               {morning.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={morning} />
+          <ShiftMetricsSection metrics={morning} onRefresh={loadData} />
         </div>
       ) : (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -264,7 +266,7 @@ export default function DailyReportPage() {
               {afternoon.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={afternoon} />
+          <ShiftMetricsSection metrics={afternoon} onRefresh={loadData} />
         </div>
       )}
     </div>
@@ -272,7 +274,36 @@ export default function DailyReportPage() {
 }
 
 // Component phụ hiển thị các chỉ số chi tiết cho từng ca
-function ShiftMetricsSection({ metrics }: { metrics: any }) {
+function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: () => void }) {
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+
+  const handleCancelOrder = async (orderId: string) => {
+    const isConfirm = window.confirm(
+      `⚠️ CẢNH BÁO: Bạn có chắc chắn muốn HỦY HÓA ĐƠN #${orderId.substring(0, 6)} không?\n\n` +
+      `- Thao tác này sẽ XÓA VĨNH VIỄN hóa đơn khỏi hệ thống.\n` +
+      `- Nguyên liệu đã trừ của các món trong hóa đơn này sẽ được HOÀN LẠI KHO.\n` +
+      `- Số tiền của hóa đơn sẽ bị trừ ra khỏi doanh thu ca.\n\n` +
+      `Bạn có muốn tiếp tục?`
+    );
+    if (!isConfirm) return;
+
+    setCancelingId(orderId);
+    try {
+      const success = await db.cancelPaidOrder(orderId);
+      if (success) {
+        alert('Đã hủy hóa đơn và hoàn kho nguyên liệu thành công!');
+        onRefresh();
+      } else {
+        alert('Lỗi: Không thể hủy hóa đơn. Vui lòng kiểm tra kết nối.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Đã xảy ra lỗi khi hủy hóa đơn.');
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Chỉ số chính */}
@@ -287,7 +318,6 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
           </div>
         </div>
 
-        {/* THAY THẾ 'Bình quân/đơn' THÀNH 'Chi phí nhập / giảm giá' */}
         <div className="bg-white p-4.5 rounded-2xl border border-coffee-light flex items-center justify-between shadow-sm">
           <div className="space-y-1">
             <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider block">Chi phí nhập / giảm giá</span>
@@ -341,112 +371,65 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
             <span className="font-black text-base text-coffee-dark">{metrics.sales.lyTrang}</span>
           </div>
           <div className="text-center space-y-0.5 border-l border-coffee-light/60">
-            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Hoa Văn</span>
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trắng H.Văn AVA</span>
             <span className="font-black text-base text-coffee-dark">{metrics.sales.lyHoaVan}</span>
           </div>
           <div className="text-center space-y-0.5 border-l border-coffee-light/60">
-            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trà Tắc</span>
+            <span className="text-[10px] text-coffee-medium uppercase font-bold block">Ly Trà Tắc AVA</span>
             <span className="font-black text-base text-coffee-dark">{metrics.sales.lyTraTac}</span>
           </div>
         </div>
 
-        {/* Danh sách món ăn đã bán */}
-        <div className="space-y-2">
-          <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider block">Món ăn bán ra (Xếp theo số lượng)</span>
-          {metrics.sales.sortedSales.length === 0 ? (
-            <p className="text-xs text-coffee-medium/70 italic text-center py-4">Chưa bán được món nào trong ca.</p>
-          ) : (
-            <div className="overflow-x-auto border border-coffee-light rounded-2xl bg-white shadow-sm">
-              <table className="w-full text-xs text-left min-w-[500px]">
-                <thead>
-                  <tr className="bg-[#FAF6F0] text-coffee-medium font-bold border-b border-coffee-light/60 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                    <th className="p-3 w-12 text-center">STT</th>
-                    <th className="p-3">Tên món</th>
-                    <th className="p-3 text-center">Số lượng</th>
-                    <th className="p-3 text-right">Đơn giá</th>
-                    <th className="p-3 text-right">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-coffee-light/50">
-                  {metrics.sales.sortedSales.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-[#FAF6F0]/20 transition whitespace-nowrap">
-                      <td className="p-3 text-center text-coffee-medium font-bold">{idx + 1}</td>
-                      <td className="p-3 font-extrabold text-coffee-dark">{item.name}</td>
-                      <td className="p-3 text-center">
-                        <span className="font-extrabold text-coffee-primary bg-coffee-accent/25 px-2 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
-                          {item.quantity} ly
-                        </span>
-                      </td>
-                      <td className="p-3 text-right font-medium text-coffee-medium">
-                        {item.price.toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="p-3 text-right font-black text-coffee-primary">
-                        {item.subtotal.toLocaleString('vi-VN')}đ
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        {/* Bảng danh sách món ăn đã bán */}
+        <div className="overflow-x-auto rounded-xl border border-coffee-light/80">
+          <table className="w-full text-left border-collapse min-w-[500px]">
+            <thead>
+              <tr className="bg-coffee-light/40 border-b border-coffee-light text-coffee-medium text-[10px] font-extrabold uppercase tracking-wider">
+                <th className="py-2.5 px-3 w-12 text-center">STT</th>
+                <th className="py-2.5 px-3">Tên món</th>
+                <th className="py-2.5 px-3 text-center">Số lượng</th>
+                <th className="py-2.5 px-3 text-right">Đơn giá</th>
+                <th className="py-2.5 px-3 text-right">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-coffee-light/35">
+              {metrics.sales.sortedSales.map((item: any, index: number) => (
+                <tr key={item.product_name} className="hover:bg-coffee-light/10 text-xs font-medium text-coffee-dark transition whitespace-nowrap">
+                  <td className="py-2.5 px-3 text-center text-coffee-medium font-mono">{index + 1}</td>
+                  <td className="py-2.5 px-3 font-semibold text-coffee-dark">{item.product_name}</td>
+                  <td className="py-2.5 px-3 text-center font-bold text-coffee-medium">{item.quantity} ly</td>
+                  <td className="py-2.5 px-3 text-right text-coffee-medium">{Number(item.price || 0).toLocaleString('vi-VN')}đ</td>
+                  <td className="py-2.5 px-3 text-right font-bold text-coffee-primary">{Number(item.subtotal || 0).toLocaleString('vi-VN')}đ</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Phân bổ thanh toán */}
-      <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-3.5">
-        <h4 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Hình thức thanh toán</h4>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] font-semibold">
-              <span className="text-coffee-dark">Tiền mặt bán hàng</span>
-              <span className="text-coffee-primary">{metrics.totalCash.toLocaleString('vi-VN')}đ ({metrics.grossRevenue > 0 ? Math.round((metrics.totalCash/metrics.grossRevenue)*100) : 0}%)</span>
-            </div>
-            <div className="w-full bg-[#FAF6F0] h-2.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-coffee-primary h-full rounded-full" 
-                style={{ width: `${metrics.grossRevenue > 0 ? (metrics.totalCash / metrics.grossRevenue) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] font-semibold">
-              <span className="text-coffee-dark">Chuyển khoản</span>
-              <span className="text-coffee-primary">{metrics.totalTransfer.toLocaleString('vi-VN')}đ ({metrics.grossRevenue > 0 ? Math.round((metrics.totalTransfer/metrics.grossRevenue)*100) : 0}%)</span>
-            </div>
-            <div className="w-full bg-[#FAF6F0] h-2.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-coffee-dark h-full rounded-full" 
-                style={{ width: `${metrics.grossRevenue > 0 ? (metrics.totalTransfer / metrics.grossRevenue) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* BẢNG DÒNG TIỀN NGAY DƯỚI HÌNH THỨC THANH TOÁN */}
-      <div className="bg-[#FAF6F0] p-5 rounded-3xl border border-coffee-light space-y-3 text-xs shadow-sm">
-        <h4 className="font-extrabold text-sm text-coffee-dark flex items-center justify-between border-b border-coffee-light/80 pb-2.5">
-          <span>💵 Bảng Tính Dòng Tiền Thực Tế Ca</span>
-          <span className="text-[10px] text-coffee-medium font-bold uppercase">Cân bằng két tiền</span>
+      {/* Bảng tính dòng tiền thực tế */}
+      <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-4">
+        <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider border-b border-coffee-light pb-2.5">
+          💵 Bảng tính dòng tiền thực tế ca
         </h4>
-
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-coffee-medium">Tiền mặt bán hàng:</span>
-            <strong className="font-extrabold text-coffee-dark">{metrics.totalCash.toLocaleString('vi-VN')}đ</strong>
+        <div className="space-y-2 text-xs text-coffee-dark font-medium">
+          <div className="flex justify-between items-center text-coffee-medium">
+            <span>+ Doanh thu Tiền mặt (cả giảm giá):</span>
+            <span className="font-bold text-coffee-dark">+{metrics.totalCash.toLocaleString('vi-VN')}đ</span>
           </div>
 
-          {/* Chi tiết từng khoản chi phí phát sinh */}
           {metrics.restockItems.length > 0 ? (
-            metrics.restockItems.map((log: any) => (
-              <div key={log.id} className="flex justify-between items-center text-red-600 pl-3 text-[11px]">
-                <span>- {log.ingredient_name} ({log.note || 'Nhập kho'}):</span>
-                <strong>-{log.cost.toLocaleString('vi-VN')}đ</strong>
-              </div>
-            ))
+            <div className="space-y-1.5 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
+              <span className="text-[10px] text-coffee-medium uppercase font-bold block">Chi tiết chi phí nhập trong ca:</span>
+              {metrics.restockItems.map((log: any) => (
+                <div key={log.id} className="flex justify-between text-[11px] text-red-700">
+                  <span>• {log.note || `Nhập ${log.custom_ingredient_name || 'Nguyên liệu'}`}</span>
+                  <span className="font-semibold">-{Number(log.cost || 0).toLocaleString('vi-VN')}đ</span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="flex justify-between items-center text-coffee-medium/70 pl-3 text-[11px] italic">
+            <div className="flex justify-between items-center text-coffee-medium/70 text-[11px]">
               <span>- Chi phí nhập/phát sinh:</span>
               <span>0đ</span>
             </div>
@@ -469,7 +452,7 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
         </div>
       </div>
 
-      {/* Lịch sử đơn hàng trong ca (ĐÃ ĐƯA XUỐNG DƯỚI CÙNG) */}
+      {/* Lịch sử đơn hàng trong ca */}
       <div className="bg-white p-5 rounded-2xl border border-coffee-light shadow-sm space-y-3">
         <h4 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Hóa đơn trong ca</h4>
         {metrics.orders.length === 0 ? (
@@ -485,7 +468,7 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
                 const mMonth = String(date.getMonth() + 1).padStart(2, '0');
                 const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
                 return (
-                  <div key={order.id} className="py-3.5 space-y-2 text-xs">
+                  <div key={order.id} className="py-3.5 space-y-2 text-xs animate-fade-in">
                     {/* Hàng 1: Mã HĐ và Giờ */}
                     <div className="flex justify-between items-center">
                       <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
@@ -501,7 +484,16 @@ function ShiftMetricsSection({ metrics }: { metrics: any }) {
                           {order.payment_method}
                         </span>
                       </div>
-                      <span className="font-extrabold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-extrabold text-coffee-primary mr-1">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+                        <button
+                          onClick={() => handleCancelOrder(order.id)}
+                          disabled={cancelingId !== null}
+                          className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold transition disabled:opacity-50 flex items-center space-x-1"
+                        >
+                          <span>Hủy</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

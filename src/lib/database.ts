@@ -14,6 +14,11 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+// Cache variables for performance optimization
+let cachedCategories: any[] | null = null;
+let cachedProducts: any[] | null = null;
+let cachedRecipes: any[] | null = null;
+
 // Helper tạo ID ngắn giống trên database khi offline (ví dụ: p_3a4b5c)
 export const generateShortId = (prefix: string): string => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -862,14 +867,19 @@ export const db = {
 
   // --- CATEGORIES (danhmuc) ---
   async getCategories() {
+    if (cachedCategories) return cachedCategories;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('danhmuc').select('*');
-      if (!error && data) return data.map(mapCategoryToClient).filter(Boolean).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
+      if (!error && data) {
+        cachedCategories = data.map(mapCategoryToClient).filter(Boolean).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
+        return cachedCategories;
+      }
     }
     return mockDb.getCategories().sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async createCategory(name: string) {
+    cachedCategories = null;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('danhmuc').insert([{ ten_danh_muc: name }]).select();
       if (!error && data) return mapCategoryToClient(data[0]);
@@ -882,6 +892,7 @@ export const db = {
   },
 
   async deleteCategory(id: string) {
+    cachedCategories = null;
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from('danhmuc').delete().eq('id', id);
       if (!error) return true;
@@ -893,14 +904,19 @@ export const db = {
 
   // --- PRODUCTS (sanpham) ---
   async getProducts() {
+    if (cachedProducts) return cachedProducts;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('sanpham').select('*');
-      if (!error && data) return data.map(mapProductToClient).filter(Boolean) as any[];
+      if (!error && data) {
+        cachedProducts = data.map(mapProductToClient).filter(Boolean) as any[];
+        return cachedProducts;
+      }
     }
     return mockDb.getProducts();
   },
 
   async createProduct(product: any) {
+    cachedProducts = null;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('sanpham').insert([{
         id: product.id || generateShortId('p_'),
@@ -923,6 +939,7 @@ export const db = {
   },
 
   async updateProduct(id: string, updates: any) {
+    cachedProducts = null;
     if (isSupabaseConfigured && supabase) {
       const dbUpdates: any = {};
       if (updates.category_id !== undefined) dbUpdates.id_danh_muc = updates.category_id;
@@ -948,6 +965,7 @@ export const db = {
   },
 
   async deleteProduct(id: string) {
+    cachedProducts = null;
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from('sanpham').delete().eq('id', id);
       if (!error) return true;
@@ -1382,6 +1400,45 @@ export const db = {
     return false;
   },
 
+  async cancelPaidOrder(orderId: string) {
+    try {
+      let items: any[] = [];
+      if (isSupabaseConfigured && supabase) {
+        // 1. Lấy chi tiết hóa đơn từ Supabase
+        const { data: dbItems } = await supabase
+          .from('hoadondetail')
+          .select('idsp, so_luong')
+          .eq('idhoadon', orderId);
+        
+        if (dbItems && dbItems.length > 0) {
+          items = dbItems.map(item => ({
+            product_id: item.idsp,
+            quantity: item.so_luong
+          }));
+        }
+      } else {
+        // Mock DB
+        const mockItems = mockDb.getOrderItems().filter(item => item.order_id === orderId);
+        items = mockItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity
+        }));
+      }
+
+      // 2. Hoàn lại tồn kho
+      if (items.length > 0) {
+        await this.restoreStockFromOrder(items);
+      }
+
+      // 3. Xóa hóa đơn và chi tiết
+      const success = await this.cancelOrder(orderId);
+      return success;
+    } catch (e) {
+      console.error('Lỗi khi hủy hóa đơn đã thanh toán:', e);
+      return false;
+    }
+  },
+
   async deleteOrderItem(orderId: string, itemId: string, quantityToRemove?: number) {
     if (isSupabaseConfigured && supabase) {
       if (quantityToRemove && quantityToRemove > 0) {
@@ -1775,16 +1832,18 @@ export const db = {
   },
 
   async getRecipes() {
+    if (cachedRecipes) return cachedRecipes;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('congthuc').select('*');
       if (!error && data) {
-        return data.map(rec => ({
+        cachedRecipes = data.map(rec => ({
           id: rec.id,
           product_id: rec.id_san_pham,
           ingredient_id: rec.id_nguyen_lieu,
           quantity_needed: Number(rec.so_luong_can),
           unit: rec.don_vi_tinh
         }));
+        return cachedRecipes;
       }
     }
     return mockDb.getRecipes();
