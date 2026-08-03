@@ -304,21 +304,17 @@ const MOCK_USERS = [
 export const MOCK_INGREDIENTS = [
   { id: 'ing_caphe', name: 'Cà phê hạt AVA', unit: 'g', stock_quantity: 5000, opening_stock: 5000, min_stock: 1000, quy_cach: '1kg' },
   { id: 'ing_cacao', name: 'Cacao AVA', unit: 'g', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: '1kg' },
-  { id: 'ing_matcha', name: 'Bột Matcha', unit: 'g', stock_quantity: 500, opening_stock: 500, min_stock: 50, quy_cach: '500g' },
-  { id: 'ing_trasanmay', name: 'Trà săn mây', unit: 'g', stock_quantity: 600, opening_stock: 600, min_stock: 300, quy_cach: '300g' },
-  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'g', stock_quantity: 1500, opening_stock: 1500, min_stock: 300, quy_cach: '150g' },
+  { id: 'ing_matcha', name: 'Bột Matcha', unit: 'g', stock_quantity: 500, opening_stock: 500, min_stock: 50, quy_cach: '200g' },
+  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'g', stock_quantity: 1500, opening_stock: 1500, min_stock: 300, quy_cach: '30g' },
   { id: 'ing_suadac', name: 'Sữa đặc', unit: 'g', stock_quantity: 6420, opening_stock: 6420, min_stock: 1284, quy_cach: '1284g' },
   { id: 'ing_suatuoi', name: 'Sữa tươi', unit: 'ml', stock_quantity: 5000, opening_stock: 5000, min_stock: 2000, quy_cach: '1000ml' },
   { id: 'ing_lyden', name: 'Ly đen AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
   { id: 'ing_lytrang', name: 'Ly trắng AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
   { id: 'ing_lyhoavan', name: 'Ly trắng hoa văn AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
-  { id: 'ing_onghutthuong', name: 'Ống hút đen', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch' },
-  { id: 'ing_onghuttraicay', name: 'Ống hút trắng (nhỏ)', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch' },
   { id: 'ing_muong', name: 'Muỗng', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch' },
   { id: 'ing_tuimangdi', name: 'Túi mang đi', unit: 'kg', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: '1kg' },
   { id: 'ing_duong', name: 'Đường', unit: 'g', stock_quantity: 5000, opening_stock: 5000, min_stock: 1000, quy_cach: '1000g' },
   { id: 'ing_kembeo', name: 'Kem béo', unit: 'hộp', stock_quantity: 5, opening_stock: 5, min_stock: 1, quy_cach: 'hộp' },
-  { id: 'ing_muoihong', name: 'Muối Iot', unit: 'g', stock_quantity: 500, opening_stock: 500, min_stock: 10, quy_cach: '500g' },
   { id: 'ing_suachua', name: 'Sữa chua', unit: 'hộp', stock_quantity: 20, opening_stock: 20, min_stock: 4, quy_cach: 'hộp' },
   { id: 'ing_mutdau', name: 'Mứt dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_mutvietquat', name: 'Mứt việt quất', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
@@ -336,8 +332,7 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_n007', name: 'Revive (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
   { id: 'ing_n008', name: 'Sting (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
   { id: 'ing_lytratac', name: 'Ly trà tắc', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 2, quy_cach: 'cái' },
-  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: '500g' },
-  { id: 'ing_onghuttrangto', name: 'Ống hút trắng (to)', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: 'bịch' }
+  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: '500g' }
 ];
 
 export const MOCK_RECIPES = [
@@ -363,7 +358,6 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp4_kembeo', product_id: 'CP004', ingredient_id: 'ing_kembeo', quantity_needed: 0.0667, unit: 'hộp' },
   { id: 'rec_cp4_suadac_km', product_id: 'CP004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_cp4_suatuoi_km', product_id: 'CP004', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
-  { id: 'rec_cp4_muoi', product_id: 'CP004', ingredient_id: 'ing_muoihong', quantity_needed: 0.33, unit: 'g' },
   { id: 'rec_cp4_4', product_id: 'CP004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 5. Bạc xỉu
@@ -385,7 +379,6 @@ export const MOCK_RECIPES = [
   { id: 'rec_tuk2_kembeo', product_id: 'TUK002', ingredient_id: 'ing_kembeo', quantity_needed: 0.0667, unit: 'hộp' },
   { id: 'rec_tuk2_suadac_km', product_id: 'TUK002', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_tuk2_suatuoi_km', product_id: 'TUK002', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
-  { id: 'rec_tuk2_muoi', product_id: 'TUK002', ingredient_id: 'ing_muoihong', quantity_needed: 0.33, unit: 'g' },
   { id: 'rec_tuk2_5', product_id: 'TUK002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 8. Matcha Latte
@@ -401,7 +394,6 @@ export const MOCK_RECIPES = [
   { id: 'rec_tuk4_kembeo', product_id: 'TUK004', ingredient_id: 'ing_kembeo', quantity_needed: 0.0667, unit: 'hộp' },
   { id: 'rec_tuk4_suadac_km', product_id: 'TUK004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_tuk4_suatuoi_km', product_id: 'TUK004', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
-  { id: 'rec_tuk4_muoi', product_id: 'TUK004', ingredient_id: 'ing_muoihong', quantity_needed: 0.33, unit: 'g' },
   { id: 'rec_tuk4_5', product_id: 'TUK004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 10. Trà tắc
@@ -500,6 +492,14 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
       }
       return `${g}g`;
     }
+    if (quyCach === '200g') {
+      const bich = Math.floor(qty / 200);
+      const g = Math.round(qty % 200);
+      if (bich > 0) {
+        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
+      }
+      return `${g}g`;
+    }
     if (quyCach === '100g') {
       const bich = Math.floor(qty / 100);
       const g = Math.round(qty % 100);
@@ -519,6 +519,14 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
     if (quyCach === '150g') {
       const bich = Math.floor(qty / 150);
       const g = Math.round(qty % 150);
+      if (bich > 0) {
+        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
+      }
+      return `${g}g`;
+    }
+    if (quyCach === '30g') {
+      const bich = Math.floor(qty / 30);
+      const g = Math.round(qty % 30);
       if (bich > 0) {
         return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       }

@@ -451,15 +451,33 @@ export default function AdminPage() {
   const totalCash = paidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
   const totalTransfer = paidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
 
-  // Tính tổng giá vốn các món đã bán trong giai đoạn (sử dụng snapshot gia_von từ hoadondetail)
-  const totalCOGS = paidOrders.reduce((sum, order) => {
+  // Tính tổng giá vốn các món đã bán trong giai đoạn (tính động dựa trên công thức và giá vốn trung bình hiện tại của nguyên liệu)
+  let calculatedCOGS = 0;
+  const ingredientUsage: { [id: string]: number } = {};
+
+  paidOrders.forEach(order => {
     const items = allOrderItems.filter(item => item.order_id === order.id);
-    const orderCost = items.reduce((itemSum, item) => {
-      const costPrice = Number(item.cost_price || 0);
-      return itemSum + (item.quantity * costPrice);
-    }, 0);
-    return sum + orderCost;
-  }, 0);
+    items.forEach(item => {
+      const prodRecipes = recipes.filter(r => r.product_id === item.product_id);
+      if (prodRecipes.length > 0) {
+        prodRecipes.forEach(r => {
+          const qtyUsed = Number(r.quantity_needed || 0) * Number(item.quantity || 0);
+          ingredientUsage[r.ingredient_id] = (ingredientUsage[r.ingredient_id] || 0) + qtyUsed;
+        });
+      } else {
+        // Fallback nếu không có công thức: dùng giá vốn snapshot từ hoadondetail
+        calculatedCOGS += Number(item.quantity || 0) * Number(item.cost_price || 0);
+      }
+    });
+  });
+
+  Object.entries(ingredientUsage).forEach(([ingId, qtyUsed]) => {
+    const ing = ingredients.find(i => i.id === ingId);
+    const costPrice = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+    calculatedCOGS += qtyUsed * costPrice;
+  });
+
+  const totalCOGS = Math.round(calculatedCOGS);
 
   // Chi phí vận hành trong khoảng thời gian được chọn
   const rangeExpenses = expenses.filter(e => {

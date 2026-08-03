@@ -286,21 +286,17 @@ SET ten_san_pham = EXCLUDED.ten_san_pham,
 INSERT INTO public.nguyenlieu (id, ten_nguyen_lieu, don_vi_tinh, so_luong_ton, ton_dau_ngay, muc_canh_bao, quy_cach) VALUES
 ('ing_caphe', 'Cà phê hạt AVA', 'g', 5000, 5000, 1000, '1kg'),
 ('ing_cacao', 'Cacao AVA', 'g', 1000, 1000, 200, '1kg'),
-('ing_matcha', 'Bột Matcha', 'g', 500, 500, 50, '500g'),
-('ing_trasanmay', 'Trà săn mây', 'g', 600, 600, 300, '300g'),
-('ing_hongtra', 'Hồng trà', 'bịch', 10, 10, 2, '150g'),
-('ing_suadac', 'Sữa đặc', 'hộp', 5, 5, 1, '1284g'),
+('ing_matcha', 'Bột Matcha', 'g', 500, 500, 50, '200g'),
+('ing_hongtra', 'Hồng trà', 'g', 1500, 1500, 300, '30g'),
+('ing_suadac', 'Sữa đặc', 'g', 6420, 6420, 1284, '1284g'),
 ('ing_suatuoi', 'Sữa tươi', 'ml', 5000, 5000, 2000, '1000ml'),
 ('ing_lyden', 'Ly đen AVA', 'cái', 200, 200, 50, 'cái'),
 ('ing_lytrang', 'Ly trắng AVA', 'cái', 200, 200, 50, 'cái'),
 ('ing_lyhoavan', 'Ly trắng hoa văn AVA', 'cái', 200, 200, 50, 'cái'),
-('ing_onghutthuong', 'Ống hút đen', 'bịch', 5, 5, NULL, 'bịch'),
-('ing_onghuttraicay', 'Ống hút trắng (nhỏ)', 'bịch', 5, 5, NULL, 'bịch'),
 ('ing_muong', 'Muỗng', 'bịch', 5, 5, NULL, 'bịch'),
 ('ing_tuimangdi', 'Túi mang đi', 'kg', 5, 5, NULL, '1kg'),
 ('ing_duong', 'Đường', 'g', 5000, 5000, 1000, '1000g'),
 ('ing_kembeo', 'Kem béo', 'hộp', 5, 5, 1, 'hộp'),
-('ing_muoihong', 'Muối Iot', 'g', 500, 500, 10, '500g'),
 ('ing_suachua', 'Sữa chua', 'hộp', 20, 20, 4, 'hộp'),
 ('ing_mutdau', 'Mứt dâu', 'ml', 1000, 1000, 200, 'ml'),
 ('ing_mutvietquat', 'Mứt việt quất', 'ml', 1000, 1000, 200, 'ml'),
@@ -318,8 +314,7 @@ INSERT INTO public.nguyenlieu (id, ten_nguyen_lieu, don_vi_tinh, so_luong_ton, t
 ('ing_n007', 'Revive (chai)', 'chai', 24, 24, 2, 'chai'),
 ('ing_n008', 'Sting (lon)', 'lon', 24, 24, 2, 'lon'),
 ('ing_lytratac', 'Ly trà tắc', 'cái', 200, 200, 2, 'cái'),
-('ing_muoibien', 'Topping Muối biển', 'bịch', 5, 5, 2, '500g'),
-('ing_onghuttrangto', 'Ống hút trắng (to)', 'bịch', 5, 5, 2, 'bịch')
+('ing_muoibien', 'Topping Muối biển', 'bịch', 5, 5, 2, '500g')
 ON CONFLICT (id) DO UPDATE
 SET ten_nguyen_lieu = EXCLUDED.ten_nguyen_lieu,
     don_vi_tinh = EXCLUDED.don_vi_tinh,
@@ -350,7 +345,6 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_cp4_kembeo', 'CP004', 'ing_kembeo', 0.0667, 'hộp'),
 ('rec_cp4_suadac_km', 'CP004', 'ing_suadac', 1.33, 'g'),
 ('rec_cp4_suatuoi_km', 'CP004', 'ing_suatuoi', 2, 'ml'),
-('rec_cp4_muoi', 'CP004', 'ing_muoihong', 0.33, 'g'),
 ('rec_cp4_4', 'CP004', 'ing_lytrang', 1, 'cái'),
 
 -- 5. Bạc xỉu
@@ -372,7 +366,6 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_tuk2_kembeo', 'TUK002', 'ing_kembeo', 0.0667, 'hộp'),
 ('rec_tuk2_suadac_km', 'TUK002', 'ing_suadac', 1.33, 'g'),
 ('rec_tuk2_suatuoi_km', 'TUK002', 'ing_suatuoi', 2, 'ml'),
-('rec_tuk2_muoi', 'TUK002', 'ing_muoihong', 0.33, 'g'),
 ('rec_tuk2_5', 'TUK002', 'ing_lytrang', 1, 'cái'),
 
 -- 8. Matcha Latte
@@ -388,7 +381,6 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 ('rec_tuk4_kembeo', 'TUK004', 'ing_kembeo', 0.0667, 'hộp'),
 ('rec_tuk4_suadac_km', 'TUK004', 'ing_suadac', 1.33, 'g'),
 ('rec_tuk4_suatuoi_km', 'TUK004', 'ing_suatuoi', 2, 'ml'),
-('rec_tuk4_muoi', 'TUK004', 'ing_muoihong', 0.33, 'g'),
 ('rec_tuk4_5', 'TUK004', 'ing_lytrang', 1, 'cái'),
 
 -- 10. Trà tắc (300ml cốt trà → 1.875 bịch hồng trà)
