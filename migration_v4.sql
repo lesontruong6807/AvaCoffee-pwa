@@ -61,5 +61,5 @@ WHERE id_nguyen_lieu IN ('ing_muoihong', 'ing_onghutthuong', 'ing_onghuttraicay'
 DELETE FROM public.nguyenlieu 
 WHERE id IN ('ing_onghutthuong', 'ing_onghuttraicay', 'ing_onghuttrangto', 'ing_muoihong', 'ing_trasanmay');
 
--- 12. Dọn dẹp cột dư thừa ton_dau_ngay khỏi bảng nguyenlieu (nếu muốn xóa triệt để)
--- ALTER TABLE public.nguyenlieu DROP COLUMN IF EXISTS ton_dau_ngay;
+-- 12. Dọn dẹp cột dư thừa ton_dau_ngay khỏi bảng nguyenlieu
+ALTER TABLE public.nguyenlieu DROP COLUMN IF EXISTS ton_dau_ngay;
