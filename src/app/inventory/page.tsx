@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { db, getCurrentUser, formatIngredientStock } from '@/lib/database';
+import { db, getCurrentUser, formatIngredientStock, formatIngredientRefill, getIngredientPackageInfo } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
   Package, 
@@ -154,10 +154,14 @@ export default function InventoryPage() {
 
     setSubmittingRestock(true);
     try {
+      const selectedIng = ingredients.find(i => i.id === selectedIngId);
+      const pkgInfo = selectedIng ? getIngredientPackageInfo(selectedIng.unit, selectedIng.quy_cach) : { multiplier: 1 };
+      const finalChangeAmount = isCustom ? 1 : (Number(restockQty) * pkgInfo.multiplier);
+
       await db.restockIngredient({
         ingredient_id: selectedIngId,
         custom_ingredient_name: isCustom ? customIngName.trim() : undefined,
-        change_amount: isCustom ? 1 : Number(restockQty),
+        change_amount: finalChangeAmount,
         cost: Number(restockCost || 0),
         note: restockNote.trim(),
         staff_id: currentUser.id
@@ -479,7 +483,7 @@ export default function InventoryPage() {
                     const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
 
                     // Formatter for Refill and Sales values
-                    const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                    const formatRefill = refilled > 0 ? formatIngredientRefill(refilled, ing.unit, ing.quy_cach) : '-';
                     const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
 
                     return (
@@ -690,22 +694,33 @@ export default function InventoryPage() {
               )}
 
               {/* Số lượng nhập (nếu món trong danh mục) */}
-              {selectedIngId !== 'other' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-coffee-medium uppercase">
-                    Số lượng nhập thêm ({selectedRestockIngredient?.unit})
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder={`Ví dụ: ${selectedRestockIngredient?.unit === 'g' ? '1000 (cho 1kg)' : '5'}`}
-                    value={restockQty}
-                    onChange={(e) => setRestockQty(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
-                    required
-                  />
-                </div>
-              )}
+              {selectedIngId !== 'other' && (() => {
+                const pkg = getIngredientPackageInfo(selectedRestockIngredient?.unit || '', selectedRestockIngredient?.quy_cach);
+                return (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-coffee-medium uppercase flex justify-between items-center">
+                      <span>Số lượng nhập thêm</span>
+                      <span className="text-coffee-primary font-black bg-coffee-accent/25 px-2 py-0.5 rounded-lg text-[11px]">
+                        Đơn vị nhập: {pkg.inputUnit}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={`Ví dụ: 5 (${pkg.inputUnit})`}
+                      value={restockQty}
+                      onChange={(e) => setRestockQty(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs font-bold border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
+                      required
+                    />
+                    {pkg.multiplier > 1 && (
+                      <p className="text-[11px] text-amber-900 font-extrabold bg-amber-50 p-2.5 rounded-xl border border-amber-200/60">
+                        💡 Bạn nhập {restockQty || 1} {pkg.inputUnit} → Hệ thống tự động quy đổi +{((Number(restockQty) || 1) * pkg.multiplier)}g vào kho.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
 
 

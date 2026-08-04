@@ -469,11 +469,45 @@ export const MOCK_RECIPES = [
   { id: 'rec_n8', product_id: 'N008', ingredient_id: 'ing_n008', quantity_needed: 1, unit: 'lon' }
 ];
 
+export function getIngredientPackageInfo(unit: string, quyCach?: string): { inputUnit: string; multiplier: number } {
+  const u = (unit || '').toLowerCase();
+  const qc = (quyCach || '').toLowerCase();
+
+  if (qc.includes('454')) {
+    return { inputUnit: 'hộp', multiplier: 454 };
+  }
+  if (qc.includes('1284')) {
+    return { inputUnit: 'hộp', multiplier: 1284 };
+  }
+  if (qc === '1kg' || qc === '1000g') {
+    return { inputUnit: 'kg', multiplier: 1000 };
+  }
+  if (qc === '500g') {
+    return { inputUnit: 'bịch', multiplier: 500 };
+  }
+  if (qc === '300g') {
+    return { inputUnit: 'bịch', multiplier: 300 };
+  }
+  if (qc === '200g') {
+    return { inputUnit: 'bịch', multiplier: 200 };
+  }
+  if (qc === '150g') {
+    return { inputUnit: 'bịch', multiplier: 150 };
+  }
+  if (qc === '30g' || u === 'bịch') {
+    return { inputUnit: 'bịch', multiplier: 30 };
+  }
+  if (qc === '1000ml' || qc === '1l') {
+    return { inputUnit: 'hộp', multiplier: 1000 };
+  }
+  return { inputUnit: unit, multiplier: 1 };
+}
+
 // Helper hiển thị tồn kho dạng ghép đơn vị (VD: 1kg + 982g, 1 bịch + 50g)
 export function formatIngredientStock(quantity: number, unit: string, quyCach?: string): string {
   const qty = Math.max(0, quantity);
 
-  if (unit === 'g') {
+  if (unit === 'g' || unit === 'bịch' || unit === 'hộp') {
     if (quyCach === '1kg' || quyCach === '1000g') {
       const kg = Math.floor(qty / 1000);
       const g = Math.round(qty % 1000);
@@ -522,7 +556,7 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
       if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
-    if (quyCach === '30g') {
+    if (quyCach === '30g' || unit === 'bịch') {
       const bich = Math.floor(qty / 30);
       const g = Math.round(qty % 30);
       if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
@@ -535,7 +569,7 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
       return `${g}g`;
     }
     const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
-    return `${rounded}g`;
+    return `${rounded}${unit === 'g' ? 'g' : ` ${unit}`}`;
   }
 
   if (unit === 'ml') {
@@ -549,23 +583,27 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
     return `${rounded}ml`;
   }
 
-  if (unit === 'hộp' || unit === 'bịch') {
-    const intQty = Math.floor(qty);
-    const rem = qty - intQty;
-    if (quyCach === '454g' || quyCach?.includes('454')) {
-      const grams = Math.round(rem * 454);
-      if (intQty > 0) return grams > 0 ? `${intQty} ${unit} + ${grams}g` : `${intQty} ${unit}`;
-      return `${grams}g`;
-    }
-    if (rem > 0) {
-      const remPercentage = Math.round(rem * 100);
-      return `${intQty} ${unit} + ${remPercentage}%`;
-    }
-    return `${intQty} ${unit}`;
-  }
-
   const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
   return `${rounded} ${unit}`;
+}
+
+export function formatIngredientRefill(quantity: number, unit: string, quyCach?: string): string {
+  const qty = Math.max(0, quantity);
+  const pkg = getIngredientPackageInfo(unit, quyCach);
+
+  if (pkg.multiplier > 1) {
+    const pkgs = qty / pkg.multiplier;
+    if (Number.isInteger(pkgs)) {
+      return `+${pkgs} ${pkg.inputUnit}`;
+    }
+    const intPkgs = Math.floor(pkgs);
+    const rem = Math.round(qty % pkg.multiplier);
+    if (intPkgs > 0) {
+      return `+${intPkgs} ${pkg.inputUnit} + ${rem}g`;
+    }
+    return `+${rem}g`;
+  }
+  return `+${formatIngredientStock(qty, unit, quyCach)}`;
 }
 
 // Helper lấy/ghi LocalStorage

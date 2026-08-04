@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { db, getCurrentUser, formatIngredientStock } from '@/lib/database';
+import { db, getCurrentUser, formatIngredientStock, formatIngredientRefill } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
   ShieldCheck, 
@@ -1393,7 +1393,7 @@ export default function AdminPage() {
                         unit: ing.unit,
                         quy_cach: ing.quy_cach,
                         openingStock: formatIngredientStock(openingStock, ing.unit, ing.quy_cach),
-                        refilled: refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-',
+                        refilled: refilled > 0 ? formatIngredientRefill(refilled, ing.unit, ing.quy_cach) : '-',
                         sold: sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-',
                         endingStock: formatIngredientStock(endingStock, ing.unit, ing.quy_cach)
                       };
@@ -1415,7 +1415,7 @@ export default function AdminPage() {
                         unit: ing.unit,
                         quy_cach: ing.quy_cach,
                         openingStock: formatIngredientStock(openingStock, ing.unit, ing.quy_cach),
-                        refilled: refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-',
+                        refilled: refilled > 0 ? formatIngredientRefill(refilled, ing.unit, ing.quy_cach) : '-',
                         sold: sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-',
                         endingStock: formatIngredientStock(endingStock, ing.unit, ing.quy_cach)
                       };
