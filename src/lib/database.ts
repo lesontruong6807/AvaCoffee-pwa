@@ -589,7 +589,7 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
       return `${ml}ml`;
     }
     const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
-    return `${rounded}ml`;
+    return `${rounded}${unit === 'ml' ? 'ml' : ` ${unit}`}`;
   }
 
   const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
@@ -608,9 +608,9 @@ export function formatIngredientRefill(quantity: number, unit: string, quyCach?:
     const intPkgs = Math.floor(pkgs);
     const rem = Math.round(qty % pkg.multiplier);
     if (intPkgs > 0) {
-      return `+${intPkgs} ${pkg.inputUnit} + ${rem}g`;
+      return `+${intPkgs} ${pkg.inputUnit} + ${rem}${unit}`;
     }
-    return `+${rem}g`;
+    return `+${rem}${unit}`;
   }
   return `+${formatIngredientStock(qty, unit, quyCach)}`;
 }
