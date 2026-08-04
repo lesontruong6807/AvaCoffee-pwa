@@ -23,7 +23,6 @@ import {
   ArrowLeft,
   Loader2
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 interface CartItem {
   product_id: string;
@@ -184,29 +183,22 @@ export default function PosPage() {
     const oldTables = [...tables];
     
     // Optimistic Update: Cập nhật trạng thái bàn sang Đang phục vụ ngay lập tức trên UI
-    if (selectedTable.id !== 'tb7') { // Khách mang về không đổi trạng thái
+    if (selectedTable?.id !== 'tb7') { // Khách mang về không đổi trạng thái
       setTables(prev => prev.map(tb => 
-        tb.id === selectedTable.id ? { ...tb, status: 'Đang phục vụ' } : tb
+        tb.id === selectedTable?.id ? { ...tb, status: 'Đang phục vụ' } : tb
       ));
     }
 
     try {
       const newOrder = await db.createOrder({
-        table_id: selectedTable.id,
+        table_id: selectedTable?.id || 'tb7',
         staff_id: currentUser?.id || 'u1',
         total_amount: finalTotalAmount,
         discount: discountAmount,
         items: cart
       });
 
-      // Tạo hiệu ứng confetti ăn mừng
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-
-      toast.success(`Đặt món thành công cho ${selectedTable.table_name}!`);
+      toast.success(`Đặt món thành công cho ${selectedTable?.table_name || 'bàn'}!`);
       clearCart();
       
       // Reload bàn chính thức
@@ -282,8 +274,8 @@ export default function PosPage() {
             <button 
               onClick={() => {
                 if (posStep === 'menu') {
-                  setSelectedTable(null);
                   setPosStep('table');
+                  setSelectedTable(null);
                 } else if (posStep === 'summary') {
                   setPosStep('menu');
                 }
@@ -294,7 +286,7 @@ export default function PosPage() {
             </button>
             <div>
               <span className="text-xs font-semibold text-coffee-medium uppercase tracking-wider">Đang phục vụ</span>
-              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable.table_name}</h2>
+              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable?.table_name || ''}</h2>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -386,7 +378,7 @@ export default function PosPage() {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           {/* Menu bên trái (2/3 chiều rộng) */}
-          <div className="lg:col-span-2 space-y-6 pb-28 lg:pb-0">
+          <div className="lg:col-span-2 space-y-6 pb-36 lg:pb-0">
             {/* Thanh Tìm Kiếm & Danh Mục */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
               <div className="relative">
@@ -534,7 +526,7 @@ export default function PosPage() {
           <div className="hidden lg:flex bg-white rounded-3xl p-6 shadow-sm border border-coffee-light flex flex-col min-h-[500px]">
             <h3 className="font-bold text-lg text-coffee-dark border-b border-coffee-light pb-4 flex items-center space-x-2">
               <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-              <span>Đơn món - {selectedTable.table_name}</span>
+              <span>Đơn món - {selectedTable?.table_name || ''}</span>
             </h3>
 
             {/* Danh sách giỏ hàng */}
@@ -678,9 +670,9 @@ export default function PosPage() {
         </div>
 
         {cart.length > 0 && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-between z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-between z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
             <div>
-              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable.table_name}</span>
+              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable?.table_name || ''}</span>
               <span className="font-extrabold text-sm text-coffee-primary">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)} món | {totalCartAmount.toLocaleString('vi-VN')}đ
               </span>
@@ -707,7 +699,7 @@ export default function PosPage() {
               <h3 className="font-bold text-base text-coffee-dark border-b border-coffee-light pb-3 flex items-center justify-between shrink-0">
                 <span className="flex items-center space-x-2">
                   <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-                  <span>Đơn món - {selectedTable.table_name}</span>
+                  <span>Đơn món - {selectedTable?.table_name || ''}</span>
                 </span>
                 <button 
                   onClick={() => setIsMobileCartOpen(false)} 
@@ -863,7 +855,7 @@ export default function PosPage() {
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Bàn phục vụ:</span>
-              <strong className="text-coffee-dark font-extrabold">{selectedTable.table_name}</strong>
+              <strong className="text-coffee-dark font-extrabold">{selectedTable?.table_name || ''}</strong>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Nhân viên ghi đơn:</span>
