@@ -1026,8 +1026,21 @@ export const db = {
       }));
   },  async getAllOrderItems() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('hoadondetail').select('*');
-      if (!error && data) return data.map(mapOrderItemToClient).filter(Boolean) as any[];
+      const { data, error } = await supabase
+        .from('hoadondetail')
+        .select(`
+          *,
+          sanpham (ten_san_pham, hinh_anh)
+        `);
+      if (!error && data) {
+        return data.map(oi => ({
+          ...mapOrderItemToClient(oi),
+          products: {
+            name: oi.sanpham?.ten_san_pham || oi.ten_san_pham || '',
+            image_url: oi.sanpham?.hinh_anh || ''
+          }
+        })).filter(Boolean) as any[];
+      }
     }
     return mockDb.getOrderItems();
   },

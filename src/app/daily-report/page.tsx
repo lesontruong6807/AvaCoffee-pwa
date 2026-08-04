@@ -394,9 +394,9 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
             </thead>
             <tbody className="divide-y divide-coffee-light/35">
               {metrics.sales.sortedSales.map((item: any, index: number) => (
-                <tr key={item.product_name} className="hover:bg-coffee-light/10 text-xs font-medium text-coffee-dark transition whitespace-nowrap">
+                <tr key={index} className="hover:bg-coffee-light/10 text-xs font-medium text-coffee-dark transition whitespace-nowrap">
                   <td className="py-2.5 px-3 text-center text-coffee-medium font-mono">{index + 1}</td>
-                  <td className="py-2.5 px-3 font-semibold text-coffee-dark">{item.product_name}</td>
+                  <td className="py-2.5 px-3 font-extrabold text-coffee-dark">{item.name || item.product_name || 'Món ăn'}</td>
                   <td className="py-2.5 px-3 text-center font-bold text-coffee-medium">{item.quantity} ly</td>
                   <td className="py-2.5 px-3 text-right text-coffee-medium">{Number(item.price || 0).toLocaleString('vi-VN')}đ</td>
                   <td className="py-2.5 px-3 text-right font-bold text-coffee-primary">{Number(item.subtotal || 0).toLocaleString('vi-VN')}đ</td>
@@ -412,42 +412,44 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
         <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider border-b border-coffee-light pb-2.5">
           💵 Bảng tính dòng tiền thực tế ca
         </h4>
-        <div className="space-y-2 text-xs text-coffee-dark font-medium">
-          <div className="flex justify-between items-center text-coffee-medium">
-            <span>+ Doanh thu Tiền mặt (cả giảm giá):</span>
-            <span className="font-bold text-coffee-dark">+{metrics.totalCash.toLocaleString('vi-VN')}đ</span>
+        <div className="space-y-3 text-xs text-coffee-dark font-medium">
+          {/* Thanh Tiền mặt */}
+          <div className="flex justify-between items-center bg-amber-50/70 p-3 rounded-xl border border-amber-200/60 font-bold">
+            <span className="text-amber-900">+ Doanh thu Tiền mặt (cả giảm giá):</span>
+            <span className="font-extrabold text-amber-900 text-sm">+{metrics.totalCash.toLocaleString('vi-VN')}đ</span>
+          </div>
+
+          {/* Thanh Chuyển khoản */}
+          <div className="flex justify-between items-center bg-blue-50/70 p-3 rounded-xl border border-blue-200/60 font-bold">
+            <span className="text-blue-900">+ Doanh thu Chuyển khoản (Ngân hàng):</span>
+            <span className="font-extrabold text-blue-900 text-sm">+{metrics.totalTransfer.toLocaleString('vi-VN')}đ</span>
           </div>
 
           {metrics.restockItems.length > 0 ? (
             <div className="space-y-1.5 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
               <span className="text-[10px] text-coffee-medium uppercase font-bold block">Chi tiết chi phí nhập trong ca:</span>
               {metrics.restockItems.map((log: any) => (
-                <div key={log.id} className="flex justify-between text-[11px] text-red-700">
+                <div key={log.id} className="flex justify-between text-[11px] text-red-700 font-semibold">
                   <span>• {log.note || `Nhập ${log.custom_ingredient_name || 'Nguyên liệu'}`}</span>
-                  <span className="font-semibold">-{Number(log.cost || 0).toLocaleString('vi-VN')}đ</span>
+                  <span>-{Number(log.cost || 0).toLocaleString('vi-VN')}đ</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex justify-between items-center text-coffee-medium/70 text-[11px]">
+            <div className="flex justify-between items-center text-coffee-medium/70 text-[11px] px-1">
               <span>- Chi phí nhập/phát sinh:</span>
               <span>0đ</span>
             </div>
           )}
 
-          <div className="flex justify-between items-center pt-2 border-t border-dashed border-coffee-light font-extrabold text-coffee-dark text-sm">
-            <span>👉 Tiền mặt hiện tại trong két:</span>
-            <span className="text-amber-800">{metrics.currentCash.toLocaleString('vi-VN')}đ</span>
+          <div className="flex justify-between items-center p-3 bg-amber-100/40 rounded-xl border border-amber-200 font-extrabold text-coffee-dark text-sm">
+            <span>👉 Tiền mặt thực tế trong két:</span>
+            <span className="text-amber-900 text-base">{metrics.currentCash.toLocaleString('vi-VN')}đ</span>
           </div>
 
-          <div className="flex justify-between items-center text-coffee-medium pt-1">
-            <span>+ Chuyển khoản (Ngân hàng):</span>
-            <strong className="font-bold text-blue-700">+{metrics.totalTransfer.toLocaleString('vi-VN')}đ</strong>
-          </div>
-
-          <div className="flex justify-between items-center pt-2.5 border-t border-coffee-light font-black text-base text-emerald-800">
+          <div className="flex justify-between items-center p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 font-black text-base text-emerald-900">
             <span>= Doanh thu thực tế ca:</span>
-            <span>{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
+            <span className="text-lg">{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
           </div>
         </div>
       </div>
