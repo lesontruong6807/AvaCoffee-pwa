@@ -269,17 +269,22 @@ export default function InventoryPage() {
     // 1. Nhật ký TRƯỚC thời điểm bắt đầu đã chọn (t < startT)
     const logsBeforeStart = ingLogs.filter(l => new Date(l.created_at).getTime() < startT);
     const refilledBefore = logsBeforeStart
-      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .filter(l => 
+        (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
+      )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
     const soldBefore = logsBeforeStart
-      .filter(l => l.type === 'Bán hàng')
+      .filter(l => 
+        (l.type === 'Bán hàng') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
+      )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
-    const otherBefore = logsBeforeStart
-      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
-      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
 
-    // Tồn đầu kỳ tại thời điểm startT (Bắt đầu từ 0 vào ngày 03/08)
-    const openingStock = Math.max(0, refilledBefore - soldBefore + otherBefore);
+    // Tồn đầu kỳ tại thời điểm startT
+    const openingStock = Math.max(0, refilledBefore - soldBefore);
 
     // 2. Nhật ký TRONG khoảng thời gian được chọn [startT, endT]
     const logsInRange = ingLogs.filter(l => {
@@ -288,17 +293,22 @@ export default function InventoryPage() {
     });
 
     const refilled = logsInRange
-      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .filter(l => 
+        (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
+      )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
     const sold = logsInRange
-      .filter(l => l.type === 'Bán hàng')
+      .filter(l => 
+        (l.type === 'Bán hàng') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
+      )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
-    const otherInRange = logsInRange
-      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
-      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
 
-    // Tồn thực tế cuối kỳ tại thời điểm endT (Đảm bảo toán học: Tồn cuối = Tồn đầu + Nhập - Bán + Khác)
-    const closingStock = openingStock + refilled - sold + otherInRange;
+    // Tồn thực tế cuối kỳ tại thời điểm endT (Tồn cuối = Tồn đầu + Nhập - Bán)
+    const closingStock = openingStock + refilled - sold;
 
     return {
       openingStock: Math.max(0, openingStock),

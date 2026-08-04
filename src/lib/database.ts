@@ -2146,10 +2146,11 @@ export const db = {
       note: `Kiểm kho thực tế: ${payload.actual_stock} (Hệ thống: ${payload.system_stock}). ${payload.note || ''}`,
       staff_id: payload.staff_id,
       created_at: new Date().toISOString(),
-      status: 'Chờ duyệt' as const
+      status: 'Đã duyệt' as const
     };
 
     if (isSupabaseConfigured && supabase) {
+      // 1. Ghi nhận lịch sử kho trạng thái Đã duyệt lập tức
       await supabase.from('lichsukho').insert([{
         id: logId,
         id_nguyen_lieu: payload.ingredient_id,
@@ -2158,12 +2159,24 @@ export const db = {
         chi_phi: 0,
         ghi_chu: newLog.note,
         id_nhan_vien: payload.staff_id,
-        trang_thai: 'Chờ duyệt'
+        trang_thai: 'Đã duyệt'
       }]);
+
+      // 2. Cập nhật trực tiếp số lượng tồn kho thực tế trong nguyenlieu
+      await supabase.from('nguyenlieu')
+        .update({ so_luong_ton: payload.actual_stock })
+        .eq('id', payload.ingredient_id);
     } else {
       const logs = mockDb.getInventoryLogs();
       logs.push(newLog);
       mockDb.setInventoryLogs(logs);
+
+      const ingredients = mockDb.getIngredients();
+      const ingIdx = ingredients.findIndex(i => i.id === payload.ingredient_id);
+      if (ingIdx !== -1) {
+        ingredients[ingIdx].stock_quantity = payload.actual_stock;
+        mockDb.setIngredients(ingredients);
+      }
     }
 
     return newLog;
