@@ -319,7 +319,7 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_muong', name: 'Muỗng', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch' },
   { id: 'ing_tuimangdi', name: 'Túi mang đi', unit: 'kg', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: '1kg' },
   { id: 'ing_duong', name: 'Đường', unit: 'g', stock_quantity: 5000, opening_stock: 5000, min_stock: 1000, quy_cach: '1000g' },
-  { id: 'ing_kembeo', name: 'Kem béo', unit: 'hộp', stock_quantity: 5, opening_stock: 5, min_stock: 1, quy_cach: 'hộp' },
+  { id: 'ing_kembeo', name: "Kem RICH'S", unit: 'g', stock_quantity: 2270, opening_stock: 2270, min_stock: 454, quy_cach: '454g' },
   { id: 'ing_suachua', name: 'Sữa chua', unit: 'hộp', stock_quantity: 20, opening_stock: 20, min_stock: 4, quy_cach: 'hộp' },
   { id: 'ing_mutdau', name: 'Mứt dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_mutvietquat', name: 'Mứt việt quất', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
@@ -472,93 +472,100 @@ export const MOCK_RECIPES = [
 // Helper hiển thị tồn kho dạng ghép đơn vị (VD: 1kg + 982g, 1 bịch + 50g)
 export function formatIngredientStock(quantity: number, unit: string, quyCach?: string): string {
   const qty = Math.max(0, quantity);
+
   if (unit === 'g') {
     if (quyCach === '1kg' || quyCach === '1000g') {
       const kg = Math.floor(qty / 1000);
       const g = Math.round(qty % 1000);
-      if (kg > 0) {
-        return g > 0 ? `${kg}kg + ${g}g` : `${kg}kg`;
-      }
+      if (kg > 0) return g > 0 ? `${kg}kg + ${g}g` : `${kg}kg`;
       return `${g}g`;
     }
     if (quyCach === '500g') {
       const bich = Math.floor(qty / 500);
       const g = Math.round(qty % 500);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
+      return `${g}g`;
+    }
+    if (quyCach === '454g' || quyCach?.includes('454')) {
+      const hop = Math.floor(qty / 454);
+      const g = Math.round(qty % 454);
+      if (hop > 0) return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
       return `${g}g`;
     }
     if (quyCach === '300g') {
       const bich = Math.floor(qty / 300);
       const g = Math.round(qty % 300);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
     if (quyCach === '200g') {
       const bich = Math.floor(qty / 200);
       const g = Math.round(qty % 200);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
     if (quyCach === '100g') {
       const bich = Math.floor(qty / 100);
       const g = Math.round(qty % 100);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
     if (quyCach === '1284g') {
       const hop = Math.floor(qty / 1284);
       const g = Math.round(qty % 1284);
-      if (hop > 0) {
-        return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
-      }
+      if (hop > 0) return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
       return `${g}g`;
     }
     if (quyCach === '150g') {
       const bich = Math.floor(qty / 150);
       const g = Math.round(qty % 150);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
     if (quyCach === '30g') {
       const bich = Math.floor(qty / 30);
       const g = Math.round(qty % 30);
-      if (bich > 0) {
-        return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
-      }
+      if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
     if (quyCach === '1200g') {
       const hop = Math.floor(qty / 1200);
       const g = Math.round(qty % 1200);
-      if (hop > 0) {
-        return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
-      }
+      if (hop > 0) return g > 0 ? `${hop} hộp + ${g}g` : `${hop} hộp`;
       return `${g}g`;
     }
-    return `${qty}g`;
+    const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
+    return `${rounded}g`;
   }
+
   if (unit === 'ml') {
-    if (quyCach === '1000ml') {
-      const hop = Math.floor(qty / 1000);
+    if (quyCach === '1000ml' || quyCach === '1L' || quyCach === '1l') {
+      const l = Math.floor(qty / 1000);
       const ml = Math.round(qty % 1000);
-      if (hop > 0) {
-        return ml > 0 ? `${hop} hộp + ${ml}ml` : `${hop} hộp`;
-      }
+      if (l > 0) return ml > 0 ? `${l}L + ${ml}ml` : `${l}L`;
       return `${ml}ml`;
     }
-    return `${qty}ml`;
+    const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
+    return `${rounded}ml`;
   }
-  return `${qty} ${unit}`;
+
+  if (unit === 'hộp' || unit === 'bịch') {
+    const intQty = Math.floor(qty);
+    const rem = qty - intQty;
+    if (quyCach === '454g' || quyCach?.includes('454')) {
+      const grams = Math.round(rem * 454);
+      if (intQty > 0) return grams > 0 ? `${intQty} ${unit} + ${grams}g` : `${intQty} ${unit}`;
+      return `${grams}g`;
+    }
+    if (rem > 0) {
+      const remPercentage = Math.round(rem * 100);
+      return `${intQty} ${unit} + ${remPercentage}%`;
+    }
+    return `${intQty} ${unit}`;
+  }
+
+  const rounded = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
+  return `${rounded} ${unit}`;
 }
 
 // Helper lấy/ghi LocalStorage

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { db, getCurrentUser } from '@/lib/database';
+import { db, getCurrentUser, formatIngredientStock } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { 
   ShieldCheck, 
@@ -605,12 +605,7 @@ export default function AdminPage() {
     };
   };
 
-  const formatIngredientStock = (qty: number, unit: string, quyCach: string | null) => {
-    if (quyCach && quyCach.toLowerCase().includes('lít') && unit.toLowerCase() === 'ml') {
-      return `${qty / 1000}L`;
-    }
-    return `${qty} ${unit}`;
-  };
+
 
   return (
     <div className="space-y-6">
