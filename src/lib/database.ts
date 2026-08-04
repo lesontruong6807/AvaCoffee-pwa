@@ -1921,6 +1921,7 @@ export const db = {
   },
 
   async getInventoryLogs() {
+    this.consolidateDuplicateSalesLogs().catch(err => console.error(err));
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from('lichsukho')
@@ -2338,9 +2339,9 @@ export const db = {
         }
       }
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      const startOfDay = `${todayStr}T00:00:00+07:00`;
-      const endOfDay = `${todayStr}T23:59:59+07:00`;
+      // Xác định ngày địa phương Việt Nam (YYYY-MM-DD)
+      const now = new Date();
+      const vnDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
       let existingTodayLogs: any[] = [];
       if (isSupabaseConfigured && supabase) {
@@ -2348,9 +2349,15 @@ export const db = {
           .from('lichsukho')
           .select('*')
           .eq('loai_giao_dich', 'Bán hàng')
-          .gte('thoi_gian_tao', startOfDay)
-          .lte('thoi_gian_tao', endOfDay);
-        if (data) existingTodayLogs = data;
+          .order('thoi_gian_tao', { ascending: false })
+          .limit(100);
+
+        if (data) {
+          existingTodayLogs = data.filter(l => {
+            const logVnDate = new Date(l.thoi_gian_tao).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+            return logVnDate === vnDateStr;
+          });
+        }
       }
 
       const dbUpdates: any[] = [];
@@ -2359,7 +2366,7 @@ export const db = {
       for (const ingId in ingChanges) {
         const ing = ingredients.find(i => i.id === ingId);
         if (ing) {
-          const { deductQty, productIds } = ingChanges[ingId];
+          const { deductQty } = ingChanges[ingId];
           ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) - deductQty);
           updated = true;
 
@@ -2372,7 +2379,10 @@ export const db = {
             if (existingLog) {
               const newQty = Number(existingLog.so_luong_thay_doi) - deductQty;
               dbUpdates.push(
-                supabase.from('lichsukho').update({ so_luong_thay_doi: newQty }).eq('id', existingLog.id)
+                supabase.from('lichsukho').update({ 
+                  so_luong_thay_doi: newQty,
+                  thoi_gian_tao: now.toISOString()
+                }).eq('id', existingLog.id)
               );
             } else {
               historyLogsToInsert.push({
@@ -2381,7 +2391,7 @@ export const db = {
                 so_luong_thay_doi: -deductQty,
                 loai_giao_dich: 'Bán hàng',
                 chi_phi: 0,
-                ghi_chu: `Khấu trừ tổng hợp bán hàng POS ngày ${new Date().toLocaleDateString('vi-VN')}`,
+                ghi_chu: `Khấu trừ tổng hợp bán hàng POS ngày ${now.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`,
                 trang_thai: 'Đã duyệt'
               });
             }
@@ -2390,7 +2400,7 @@ export const db = {
             const existingMockLog = logs.find(l => 
               l.ingredient_id === ing.id && 
               l.type === 'Bán hàng' && 
-              l.created_at.startsWith(todayStr)
+              new Date(l.created_at).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) === vnDateStr
             );
             if (existingMockLog) {
               existingMockLog.change_amount = Number(existingMockLog.change_amount) - deductQty;
@@ -2402,9 +2412,9 @@ export const db = {
                 change_amount: -deductQty,
                 type: 'Bán hàng' as const,
                 cost: 0,
-                note: `Khấu trừ tổng hợp bán hàng POS ngày ${new Date().toLocaleDateString('vi-VN')}`,
+                note: `Khấu trừ tổng hợp bán hàng POS ngày ${now.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`,
                 staff_id: 'system',
-                created_at: new Date().toISOString(),
+                created_at: now.toISOString(),
                 status: 'Đã duyệt' as const
               });
             }
@@ -2425,6 +2435,59 @@ export const db = {
       }
     } catch (e) {
       console.error('Lỗi khi khấu trừ tồn kho bán hàng:', e);
+    }
+  },
+
+  // Gộp các log bán hàng trùng lặp trong cùng một ngày cho từng nguyên liệu
+  async consolidateDuplicateSalesLogs() {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const { data: salesLogs, error } = await supabase
+        .from('lichsukho')
+        .select('*')
+        .eq('loai_giao_dich', 'Bán hàng');
+
+      if (error || !salesLogs || salesLogs.length === 0) return;
+
+      const groups: { [key: string]: any[] } = {};
+      salesLogs.forEach(log => {
+        const vnDateStr = new Date(log.thoi_gian_tao).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const key = `${log.id_nguyen_lieu}_${vnDateStr}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(log);
+      });
+
+      const updates: any[] = [];
+      const idsToDelete: string[] = [];
+
+      Object.values(groups).forEach(group => {
+        if (group.length > 1) {
+          group.sort((a, b) => new Date(b.thoi_gian_tao).getTime() - new Date(a.thoi_gian_tao).getTime());
+          const keepLog = group[0];
+          const totalQty = group.reduce((sum, l) => sum + Number(l.so_luong_thay_doi || 0), 0);
+
+          updates.push(
+            supabase.from('lichsukho').update({ so_luong_thay_doi: totalQty }).eq('id', keepLog.id)
+          );
+
+          for (let i = 1; i < group.length; i++) {
+            idsToDelete.push(group[i].id);
+          }
+        }
+      });
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+      }
+
+      if (idsToDelete.length > 0) {
+        for (let i = 0; i < idsToDelete.length; i += 50) {
+          const batch = idsToDelete.slice(i, i + 50);
+          await supabase.from('lichsukho').delete().in('id', batch);
+        }
+      }
+    } catch (e) {
+      console.error('Lỗi khi gộp nhật ký bán hàng trùng lặp:', e);
     }
   },
 

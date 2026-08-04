@@ -561,18 +561,24 @@ export default function AdminPage() {
     const startT = new Date(invStartDate + 'T00:00:00').getTime();
     const endT = new Date(invEndDate + 'T23:59:59').getTime();
 
-    const ingLogs = inventoryLogs
-      .filter(l => l.ingredient_id === ing.id)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const ingLogs = inventoryLogs.filter(l => l.ingredient_id === ing.id);
 
-    const logsAfterStart = ingLogs.filter(l => new Date(l.created_at).getTime() >= startT);
-    const totalAppliedAfterStart = logsAfterStart.reduce((sum, l) => sum + getLogAppliedAmount(l), 0);
-    const openingStock = Number(ing.stock_quantity) - totalAppliedAfterStart;
+    // 1. Nhật ký SAU thời điểm kết thúc đã chọn (t > endT)
+    const logsAfter = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
+    const refilledAfter = logsAfter
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+    const soldAfter = logsAfter
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    const otherAfter = logsAfter
+      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
 
-    const logsAfterEnd = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
-    const totalAppliedAfterEnd = logsAfterEnd.reduce((sum, l) => sum + getLogAppliedAmount(l), 0);
-    const endingStock = Number(ing.stock_quantity) - totalAppliedAfterEnd;
+    // Tồn thực tế tại thời điểm Cuối Kỳ (endT)
+    const endingStock = Number(ing.stock_quantity || 0) - refilledAfter + soldAfter - otherAfter;
 
+    // 2. Nhật ký TRONG khoảng thời gian đã chọn [startT, endT]
     const logsInRange = ingLogs.filter(l => {
       const t = new Date(l.created_at).getTime();
       return t >= startT && t <= endT;
@@ -581,14 +587,19 @@ export default function AdminPage() {
     const refilled = logsInRange
       .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-
     const sold = logsInRange
       .filter(l => l.type === 'Bán hàng')
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    const otherInRange = logsInRange
+      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
+    // Tồn đầu kỳ tại thời điểm Đầu Kỳ (startT)
+    const openingStock = endingStock - refilled + sold - otherInRange;
 
     return {
-      openingStock,
-      endingStock,
+      openingStock: Math.max(0, openingStock),
+      endingStock: Math.max(0, endingStock),
       refilled,
       sold
     };

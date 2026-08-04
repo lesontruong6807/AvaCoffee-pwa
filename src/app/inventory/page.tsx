@@ -114,27 +114,9 @@ export default function InventoryPage() {
   // Tính tổng chi phí nhập kho trong ngày
   const todayStr = new Date().toLocaleDateString('en-CA');
 
-  const getIngStats = (ingId: string) => {
-    const todayLogs = logs.filter(l => new Date(l.created_at).toLocaleDateString('en-CA') === todayStr && l.ingredient_id === ingId);
-    const refilled = todayLogs
-      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
-      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-    const sold = todayLogs
-      .filter(l => l.type === 'Bán hàng')
-      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
-    return { refilled, sold };
-  };
-
   const todayRestockCost = logs
     .filter(l => l.type === 'Nhập kho' && new Date(l.created_at).toLocaleDateString('en-CA') === todayStr)
     .reduce((sum, l) => sum + Number(l.cost || 0), 0);
-
-  const lowStockCount = ingredients.filter(i => {
-    if (i.min_stock === null) return false;
-    const { refilled, sold } = getIngStats(i.id);
-    const calculatedStock = Number(i.opening_stock) + refilled - sold;
-    return calculatedStock <= Number(i.min_stock);
-  }).length;
 
   // --- XỬ LÝ NHẬP THÊM (RESTOCK) ---
   const handleOpenRestock = (ingId?: string) => {
@@ -276,6 +258,57 @@ export default function InventoryPage() {
 
   const startT = new Date(logStartDate + 'T00:00:00').getTime();
   const endT = new Date(logEndDate + 'T23:59:59').getTime();
+
+  const getIngStats = (ingId: string, currentStockQty: number) => {
+    const ingLogs = logs.filter(l => l.ingredient_id === ingId);
+
+    // 1. Nhật ký SAU khoảng thời gian được chọn (t > endT)
+    const logsAfter = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
+    const refilledAfter = logsAfter
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+    const soldAfter = logsAfter
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    const otherAfter = logsAfter
+      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
+    // Tồn thực tế tại thời điểm Cuối Kỳ (endT)
+    const closingStock = Number(currentStockQty || 0) - refilledAfter + soldAfter - otherAfter;
+
+    // 2. Nhật ký TRONG khoảng thời gian được chọn [startT, endT]
+    const logsInRange = ingLogs.filter(l => {
+      const t = new Date(l.created_at).getTime();
+      return t >= startT && t <= endT;
+    });
+
+    const refilled = logsInRange
+      .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+    const sold = logsInRange
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+    const otherInRange = logsInRange
+      .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
+      .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
+    // Tồn đầu kỳ tại thời điểm Đầu Kỳ (startT)
+    const openingStock = closingStock - refilled + sold - otherInRange;
+
+    return {
+      openingStock: Math.max(0, openingStock),
+      refilled,
+      sold,
+      closingStock: Math.max(0, closingStock)
+    };
+  };
+
+  const lowStockCount = ingredients.filter(i => {
+    if (i.min_stock === null) return false;
+    const { closingStock } = getIngStats(i.id, i.stock_quantity);
+    return closingStock <= Number(i.min_stock);
+  }).length;
 
   const filteredLogs = logs.filter(log => {
     const t = new Date(log.created_at).getTime();
@@ -440,11 +473,10 @@ export default function InventoryPage() {
                 </thead>
                 <tbody className="divide-y divide-coffee-light/50">
                   {filteredIngredients.map((ing) => {
-                    const { refilled, sold } = getIngStats(ing.id);
-                    const calculatedStock = Number(ing.opening_stock) + refilled - sold;
-                    const isLowStock = ing.min_stock !== null && calculatedStock <= Number(ing.min_stock);
-                    const formattedStock = formatIngredientStock(calculatedStock, ing.unit, ing.quy_cach);
-                    const formattedOpening = formatIngredientStock(ing.opening_stock, ing.unit, ing.quy_cach);
+                    const { openingStock, refilled, sold, closingStock } = getIngStats(ing.id, ing.stock_quantity);
+                    const isLowStock = ing.min_stock !== null && closingStock <= Number(ing.min_stock);
+                    const formattedStock = formatIngredientStock(closingStock, ing.unit, ing.quy_cach);
+                    const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
 
                     // Formatter for Refill and Sales values
                     const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
