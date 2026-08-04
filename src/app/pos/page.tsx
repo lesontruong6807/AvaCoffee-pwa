@@ -21,11 +21,7 @@ import {
   Tag, 
   CheckCircle, 
   ArrowLeft,
-  Loader2,
-  DollarSign,
-  Printer,
-  X,
-  ArrowRightLeft
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -55,20 +51,11 @@ export default function PosPage() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
-  // Trạng thái đơn hàng đang hoạt động của bàn
-  const [activeOrder, setActiveOrder] = useState<any | null>(null);
-  const [existingItems, setExistingItems] = useState<any[]>([]);
-  const [loadingActiveOrder, setLoadingActiveOrder] = useState(false);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [submittingPayment, setSubmittingPayment] = useState(false);
-  const [isNative, setIsNative] = useState(false);
-
   // Trạng thái giảm giá
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountValue, setDiscountValue] = useState<number>(0);
 
   useEffect(() => {
-    setIsNative(Capacitor.isNativePlatform());
     async function loadData() {
       // 1. Đọc dữ liệu từ cache trước để hiển thị ngay lập tức (Offline-first / Fast Load)
       let cachedTables = null;
@@ -182,14 +169,12 @@ export default function PosPage() {
   };
 
   const totalCartAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  const totalExistingAmount = existingItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const overallTotalAmount = totalCartAmount + totalExistingAmount;
 
   const discountAmount = discountType === 'amount'
-    ? Math.min(overallTotalAmount, discountValue)
-    : Math.min(overallTotalAmount, Math.round((overallTotalAmount * discountValue) / 100));
+    ? Math.min(totalCartAmount, discountValue)
+    : Math.min(totalCartAmount, Math.round((totalCartAmount * discountValue) / 100));
 
-  const finalTotalAmount = Math.max(0, overallTotalAmount - discountAmount);
+  const finalTotalAmount = Math.max(0, totalCartAmount - discountAmount);
 
   // --- LÓGIC CONFIRM & SUBMIT ORDER ---
   const handleConfirmOrder = async () => {
@@ -238,189 +223,6 @@ export default function PosPage() {
     } finally {
       setSavingOrder(false);
     }
-  };
-
-  // --- LÓGIC CHỌN BÀN & TẢI ĐƠN HÀNG ĐANG HOẠT ĐỘNG ---
-  const handleSelectTable = async (table: any) => {
-    setSelectedTable(table);
-    setPosStep('menu');
-    setCart([]);
-    setActiveOrder(null);
-    setExistingItems([]);
-    setDiscountValue(0);
-    setDiscountType('amount');
-
-    if (table.status === 'Đang phục vụ') {
-      setLoadingActiveOrder(true);
-      try {
-        const allOrders = await db.getOrders();
-        const unpaidOrder = allOrders.find(o => o.table_id === table.id && o.payment_status === 'Chưa thanh toán');
-        if (unpaidOrder) {
-          setActiveOrder(unpaidOrder);
-          const items = await db.getOrderItems(unpaidOrder.id);
-          setExistingItems(items.map(item => ({
-            id: item.id,
-            product_id: item.idsp,
-            name: item.ten_san_pham || item.products?.name || 'Sản phẩm',
-            price: item.unit_price || item.don_gia || item.products?.price || 0,
-            quantity: item.so_luong,
-            subtotal: item.thanh_tien
-          })));
-          setDiscountValue(Number(unpaidOrder.discount || 0));
-          setDiscountType('amount');
-        }
-      } catch (err) {
-        console.error('Lỗi tải hóa đơn hiện tại của bàn:', err);
-        toast.error('Không thể tải hóa đơn hiện tại.');
-      } finally {
-        setLoadingActiveOrder(false);
-      }
-    }
-  };
-
-  // --- LÓGIC THANH TOÁN TRỰC TIẾP TỪ POS ---
-  const handlePayDirect = async (method: 'Tiền mặt' | 'Chuyển khoản') => {
-    if (!activeOrder) return;
-    setSubmittingPayment(true);
-    try {
-      await db.payOrder(activeOrder.id, method);
-      
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        colors: ['#4A3525', '#FFE4C4', '#FFFDD0', '#8C6A5C']
-      });
-
-      setIsPayModalOpen(false);
-      toast.success(`Thanh toán thành công qua phương thức: ${method}`);
-      
-      clearCart();
-      setActiveOrder(null);
-      setExistingItems([]);
-      
-      const updatedTables = await db.getTables();
-      setTables(updatedTables);
-      
-      setSelectedTable(null);
-      setPosStep('table');
-    } catch (e) {
-      console.error('Lỗi thanh toán:', e);
-      toast.error('Gặp lỗi khi xử lý thanh toán.');
-    } finally {
-      setSubmittingPayment(false);
-    }
-  };
-
-  // --- LÓGIC HỦY ĐƠN TRỰC TIẾP TỪ POS ---
-  const handleCancelDirect = async () => {
-    if (!activeOrder) return;
-    const confirmCancel = window.confirm("Bạn có chắc chắn muốn hủy và xóa hoàn toàn hóa đơn này không?");
-    if (!confirmCancel) return;
-
-    setSavingOrder(true);
-    try {
-      const success = await db.cancelOrder(activeOrder.id);
-      if (success) {
-        toast.success("Đã hủy và xóa hóa đơn thành công!");
-        clearCart();
-        setActiveOrder(null);
-        setExistingItems([]);
-        
-        const updatedTables = await db.getTables();
-        setTables(updatedTables);
-        
-        setSelectedTable(null);
-        setPosStep('table');
-      } else {
-        toast.error("Không thể hủy hóa đơn này.");
-      }
-    } catch (e) {
-      console.error("Lỗi khi hủy hóa đơn:", e);
-      toast.error("Gặp lỗi khi hủy hóa đơn.");
-    } finally {
-      setSavingOrder(false);
-    }
-  };
-
-  // --- LÓGIC IN HÓA ĐƠN TRỰC TIẾP TỪ POS ---
-  const handlePrintDirect = async () => {
-    if (!activeOrder) return;
-    try {
-      const { printOrderDirect } = await import('@/lib/printerService');
-      
-      const itemsForPrint = existingItems.map(item => ({
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        subtotal: item.subtotal
-      }));
-
-      await printOrderDirect({
-        tableName: selectedTable?.table_name || 'Bàn không xác định',
-        staffName: activeOrder.users?.full_name || currentUser?.full_name || 'Nhân viên',
-        items: itemsForPrint,
-        discount: activeOrder.discount || 0,
-        totalAmount: activeOrder.total_amount,
-        orderId: activeOrder.id
-      });
-      toast.success('Đã gửi lệnh in tới máy in!');
-    } catch (e) {
-      console.error('Lỗi khi in hóa đơn:', e);
-      toast.error('Lỗi in bill: Không thể kết nối tới máy in (192.168.1.232:9100)');
-    }
-  };
-
-  // --- LÓGIC XÁC NHẬN VÀ MỞ modal THANH TOÁN ---
-  const handleConfirmAndPay = async () => {
-    if (!selectedTable) return;
-    
-    // Nếu có món mới trong giỏ hàng, lưu vào đơn hàng trước
-    if (cart.length > 0) {
-      setSavingOrder(true);
-      try {
-        const diffAmount = finalTotalAmount - totalExistingAmount;
-        const diffDiscount = discountAmount - (activeOrder?.discount || 0);
-
-        await db.createOrder({
-          table_id: selectedTable.id,
-          staff_id: currentUser?.id || 'u1',
-          total_amount: diffAmount,
-          discount: diffDiscount,
-          items: cart
-        });
-        
-        // Tải lại thông tin đơn hàng mới cập nhật
-        const allOrders = await db.getOrders();
-        const unpaidOrder = allOrders.find(o => o.table_id === selectedTable.id && o.payment_status === 'Chưa thanh toán');
-        if (unpaidOrder) {
-          setActiveOrder(unpaidOrder);
-          const items = await db.getOrderItems(unpaidOrder.id);
-          setExistingItems(items.map(item => ({
-            id: item.id,
-            product_id: item.idsp,
-            name: item.ten_san_pham || item.products?.name || 'Sản phẩm',
-            price: item.unit_price || item.don_gia || item.products?.price || 0,
-            quantity: item.so_luong,
-            subtotal: item.thanh_tien
-          })));
-          setDiscountValue(Number(unpaidOrder.discount || 0));
-          setDiscountType('amount');
-        }
-        
-        clearCart();
-        toast.success("Đã cập nhật món vào đơn hàng thành công!");
-      } catch (err) {
-        console.error("Lỗi cập nhật trước khi thanh toán:", err);
-        toast.error("Không thể cập nhật đơn hàng.");
-        setSavingOrder(false);
-        return;
-      } finally {
-        setSavingOrder(false);
-      }
-    }
-    
-    // Mở modal thanh toán nhanh
-    setIsPayModalOpen(true);
   };
 
   // --- RENDERS ---
@@ -480,8 +282,8 @@ export default function PosPage() {
             <button 
               onClick={() => {
                 if (posStep === 'menu') {
-                  setPosStep('table');
                   setSelectedTable(null);
+                  setPosStep('table');
                 } else if (posStep === 'summary') {
                   setPosStep('menu');
                 }
@@ -492,7 +294,7 @@ export default function PosPage() {
             </button>
             <div>
               <span className="text-xs font-semibold text-coffee-medium uppercase tracking-wider">Đang phục vụ</span>
-              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable?.table_name || ''}</h2>
+              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable.table_name}</h2>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -537,7 +339,11 @@ export default function PosPage() {
               return (
                 <button
                   key={table.id}
-                  onClick={() => handleSelectTable(table)}
+                  onClick={() => {
+                    setSelectedTable(table);
+                    setPosStep('menu');
+                    setCart([]); // Xóa giỏ tạm khi chọn bàn mới
+                  }}
                   className={`relative p-5 rounded-3xl border text-left flex flex-col justify-between h-40 transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
                     isOccupied
                       ? 'bg-amber-50/50 border-amber-300 shadow-inner'
@@ -726,94 +532,54 @@ export default function PosPage() {
 
           {/* Hóa đơn nháp / Cart xem trước bên phải (1/3 chiều rộng) */}
           <div className="hidden lg:flex bg-white rounded-3xl p-6 shadow-sm border border-coffee-light flex flex-col min-h-[500px]">
-            <h3 className="font-bold text-lg text-coffee-dark border-b border-coffee-light pb-4 flex items-center justify-between">
-              <span className="flex items-center space-x-2">
-                <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-                <span>Đơn món - {selectedTable?.table_name || ''}</span>
-              </span>
-              {activeOrder && (
-                <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold uppercase tracking-wider">
-                  Đang phục vụ
-                </span>
-              )}
+            <h3 className="font-bold text-lg text-coffee-dark border-b border-coffee-light pb-4 flex items-center space-x-2">
+              <ShoppingCart className="w-5 h-5 text-coffee-medium" />
+              <span>Đơn món - {selectedTable.table_name}</span>
             </h3>
 
             {/* Danh sách giỏ hàng */}
             <div className="flex-1 overflow-y-auto max-h-[350px] py-4 space-y-4">
-              {/* PHẦN 1: MÓN ĐÃ GỌI (Đang phục vụ) */}
-              {existingItems.length > 0 && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 uppercase tracking-wider">
-                    <span>Món đã phục vụ</span>
-                    <span>{existingItems.reduce((sum, item) => sum + item.quantity, 0)} ly</span>
+              {cart.map((item) => (
+                <div key={item.product_id} className="flex items-center justify-between text-xs pb-3 border-b border-dashed border-coffee-light/60">
+                  <div className="space-y-1 flex-1 pr-3">
+                    <p className="font-bold text-coffee-dark">{item.name}</p>
+                    <p className="text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ / món</p>
                   </div>
-                  <div className="space-y-2 border-l-2 border-amber-200 pl-3">
-                    {existingItems.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center text-xs pb-1">
-                        <div className="space-y-0.5 flex-1 pr-3">
-                          <p className="font-bold text-coffee-dark/80">{item.name}</p>
-                          <p className="text-[10px] text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ x {item.quantity}</p>
-                        </div>
-                        <span className="font-extrabold text-coffee-dark">
-                          {item.subtotal.toLocaleString('vi-VN')}đ
-                        </span>
-                      </div>
-                    ))}
+                  <div className="flex items-center space-x-3">
+                    {/* Bộ đếm nhanh */}
+                    <div className="flex items-center bg-[#FAF6F0] rounded-lg border border-coffee-light overflow-hidden">
+                      <button
+                        onClick={() => updateQuantity(item.product_id, -1)}
+                        className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="px-2 font-bold text-coffee-dark min-w-[15px] text-center">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => updateQuantity(item.product_id, 1)}
+                        className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <span className="font-extrabold text-coffee-dark w-16 text-right">
+                      {item.subtotal.toLocaleString('vi-VN')}đ
+                    </span>
+                    
+                    <button 
+                      onClick={() => removeFromCart(item.product_id)}
+                      className="text-red-500 hover:text-red-700 p-1 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-              )}
+              ))}
 
-              {/* PHẦN 2: MÓN MỚI CHỌN */}
-              {cart.length > 0 && (
-                <div className="space-y-2.5">
-                  {existingItems.length > 0 && (
-                    <div className="text-[10px] font-black text-coffee-primary bg-coffee-accent/20 px-2.5 py-1 rounded-lg border border-coffee-primary/10 uppercase tracking-wider">
-                      Món mới chọn thêm
-                    </div>
-                  )}
-                  {cart.map((item) => (
-                    <div key={item.product_id} className="flex items-center justify-between text-xs pb-3 border-b border-dashed border-coffee-light/60">
-                      <div className="space-y-1 flex-1 pr-3">
-                        <p className="font-bold text-coffee-dark">{item.name}</p>
-                        <p className="text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ / món</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        {/* Bộ đếm nhanh */}
-                        <div className="flex items-center bg-[#FAF6F0] rounded-lg border border-coffee-light overflow-hidden">
-                          <button
-                            onClick={() => updateQuantity(item.product_id, -1)}
-                            className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="px-2 font-bold text-coffee-dark min-w-[15px] text-center">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.product_id, 1)}
-                            className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        <span className="font-extrabold text-coffee-dark w-16 text-right">
-                          {item.subtotal.toLocaleString('vi-VN')}đ
-                        </span>
-                        
-                        <button 
-                          onClick={() => removeFromCart(item.product_id)}
-                          className="text-red-500 hover:text-red-700 p-1 transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {cart.length === 0 && existingItems.length === 0 && (
+              {cart.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center py-16 text-center text-coffee-medium/60 space-y-3">
                   <ShoppingCart className="w-12 h-12 opacity-35" />
                   <p className="font-semibold text-sm">Chưa chọn món nào</p>
@@ -823,7 +589,7 @@ export default function PosPage() {
             </div>
 
             {/* Phần dưới hóa đơn nháp */}
-            {(cart.length > 0 || existingItems.length > 0) && (
+            {cart.length > 0 && (
               <div className="border-t border-coffee-light pt-4 space-y-4">
                 {/* Phần giảm giá */}
                 <div className="bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light space-y-3">
@@ -875,7 +641,7 @@ export default function PosPage() {
 
                 <div className="flex justify-between items-center text-xs text-coffee-medium">
                   <span>Tổng tiền món:</span>
-                  <span>{overallTotalAmount.toLocaleString('vi-VN')}đ</span>
+                  <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
 
                 {discountAmount > 0 && (
@@ -892,83 +658,20 @@ export default function PosPage() {
                   </span>
                 </div>
 
-                {activeOrder ? (
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <button
-                        onClick={handleCancelDirect}
-                        className="py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs rounded-xl transition flex items-center justify-center space-x-1 border border-red-200"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hủy đơn</span>
-                      </button>
-                      
-                      {isNative ? (
-                        <button
-                          onClick={handlePrintDirect}
-                          className="py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs rounded-xl transition flex items-center justify-center space-x-1"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>In hóa đơn</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={clearCart}
-                          disabled={cart.length === 0}
-                          className={`py-2.5 font-extrabold text-xs rounded-xl transition border ${
-                            cart.length === 0 
-                              ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                              : 'bg-coffee-light/50 text-coffee-primary border-coffee-light hover:bg-coffee-light'
-                          }`}
-                        >
-                          Hủy món mới
-                        </button>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <button
-                        onClick={handleConfirmOrder}
-                        disabled={cart.length === 0 || savingOrder}
-                        className={`py-3 font-extrabold text-xs rounded-xl transition shadow-sm ${
-                          cart.length === 0
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-amber-700 hover:bg-amber-800 text-white shadow shadow-amber-800/10'
-                        }`}
-                      >
-                        {savingOrder ? 'Đang lưu...' : 'Cập nhật đơn'}
-                      </button>
-                      
-                      <button
-                        onClick={handleConfirmAndPay}
-                        className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-extrabold text-xs rounded-xl transition shadow shadow-coffee-primary/20 flex items-center justify-center space-x-1.5"
-                      >
-                        <DollarSign className="w-4 h-4 text-coffee-accent animate-pulse" />
-                        <span>{cart.length > 0 ? 'Lưu & Thanh toán' : 'Thanh toán'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={clearCart}
-                      className="py-3 bg-[#FAF6F0] hover:bg-coffee-accent/30 text-coffee-medium font-bold text-xs rounded-2xl transition shadow-sm"
-                    >
-                      Hủy tất cả
-                    </button>
-                    <button
-                      onClick={handleConfirmOrder}
-                      disabled={cart.length === 0 || savingOrder}
-                      className={`py-3 font-bold text-xs rounded-2xl transition shadow ${
-                        cart.length === 0
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-coffee-primary hover:bg-coffee-dark text-white shadow-coffee-primary/20'
-                      }`}
-                    >
-                      {savingOrder ? 'Đang lưu...' : 'Xác nhận đơn'}
-                    </button>
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={clearCart}
+                    className="py-3 bg-[#FAF6F0] hover:bg-coffee-accent/30 text-coffee-medium font-bold text-xs rounded-2xl transition shadow-sm"
+                  >
+                    Hủy tất cả
+                  </button>
+                  <button
+                    onClick={handleConfirmOrder}
+                    className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition shadow shadow-coffee-primary/20"
+                  >
+                    Xác nhận đơn
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -977,7 +680,7 @@ export default function PosPage() {
         {cart.length > 0 && (
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-between z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
             <div>
-              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable?.table_name || ''}</span>
+              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable.table_name}</span>
               <span className="font-extrabold text-sm text-coffee-primary">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)} món | {totalCartAmount.toLocaleString('vi-VN')}đ
               </span>
@@ -1004,7 +707,7 @@ export default function PosPage() {
               <h3 className="font-bold text-base text-coffee-dark border-b border-coffee-light pb-3 flex items-center justify-between shrink-0">
                 <span className="flex items-center space-x-2">
                   <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-                  <span>Đơn món - {selectedTable?.table_name || ''}</span>
+                  <span>Đơn món - {selectedTable.table_name}</span>
                 </span>
                 <button 
                   onClick={() => setIsMobileCartOpen(false)} 
@@ -1104,7 +807,7 @@ export default function PosPage() {
 
                 <div className="flex justify-between items-center text-xs text-coffee-medium">
                   <span>Tiền món:</span>
-                  <span>{overallTotalAmount.toLocaleString('vi-VN')}đ</span>
+                  <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
 
                 {discountAmount > 0 && (
@@ -1121,72 +824,26 @@ export default function PosPage() {
                   </span>
                 </div>
 
-                {activeOrder ? (
-                  <div className="space-y-2 pb-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={async () => {
-                          setIsMobileCartOpen(false);
-                          await handleCancelDirect();
-                        }}
-                        className="py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition border border-red-200"
-                      >
-                        Hủy đơn
-                      </button>
-                      <button
-                        onClick={async () => {
-                          setIsMobileCartOpen(false);
-                          await handleConfirmAndPay();
-                        }}
-                        className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow flex items-center justify-center space-x-1"
-                      >
-                        <DollarSign className="w-3.5 h-3.5 text-coffee-accent animate-pulse" />
-                        <span>Thanh toán</span>
-                      </button>
-                    </div>
-                    
-                    <button
-                      onClick={async () => {
-                        setIsMobileCartOpen(false);
-                        await handleConfirmOrder();
-                      }}
-                      disabled={cart.length === 0 || savingOrder}
-                      className={`w-full py-2.5 font-bold text-xs rounded-xl transition ${
-                        cart.length === 0
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-amber-700 hover:bg-amber-800 text-white'
-                      }`}
-                    >
-                      {savingOrder ? 'Đang lưu...' : 'Cập nhật đơn'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3 pb-2">
-                    <button
-                      onClick={() => {
-                        clearCart();
-                        setIsMobileCartOpen(false);
-                      }}
-                      className="py-2.5 bg-[#FAF6F0] hover:bg-coffee-accent/30 text-coffee-medium font-bold text-xs rounded-xl transition"
-                    >
-                      Hủy tất cả
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setIsMobileCartOpen(false);
-                        await handleConfirmOrder();
-                      }}
-                      disabled={cart.length === 0 || savingOrder}
-                      className={`py-2.5 font-bold text-xs rounded-xl transition shadow ${
-                        cart.length === 0
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-coffee-primary hover:bg-coffee-dark text-white'
-                      }`}
-                    >
-                      Xác nhận đơn
-                    </button>
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-3 pb-2">
+                  <button
+                    onClick={() => {
+                      clearCart();
+                      setIsMobileCartOpen(false);
+                    }}
+                    className="py-2.5 bg-[#FAF6F0] hover:bg-coffee-accent/30 text-coffee-medium font-bold text-xs rounded-xl transition"
+                  >
+                    Hủy tất cả
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsMobileCartOpen(false);
+                      await handleConfirmOrder();
+                    }}
+                    className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow"
+                  >
+                    Xác nhận đơn
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1206,7 +863,7 @@ export default function PosPage() {
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Bàn phục vụ:</span>
-              <strong className="text-coffee-dark font-extrabold">{selectedTable?.table_name || ''}</strong>
+              <strong className="text-coffee-dark font-extrabold">{selectedTable.table_name}</strong>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Nhân viên ghi đơn:</span>
@@ -1261,61 +918,6 @@ export default function PosPage() {
                 <span>Gửi Nhà Bếp / Xác Nhận</span>
               )}
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP CHỌN PHƯƠNG THỨC THANH TOÁN TRỰC TIẾP */}
-      {isPayModalOpen && activeOrder && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">Xác nhận thanh toán</h3>
-              <button 
-                onClick={() => setIsPayModalOpen(false)}
-                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm text-coffee-medium">
-                Bạn đang thực hiện thanh toán cho bàn: <strong>{selectedTable?.table_name}</strong>
-              </p>
-              <div className="flex justify-between items-center bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light">
-                <span className="text-sm font-semibold text-coffee-dark">Tổng tiền cần thu:</span>
-                <span className="text-xl font-black text-coffee-primary">
-                  {activeOrder.total_amount.toLocaleString('vi-VN')}đ
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider">Chọn phương thức thanh toán</p>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => handlePayDirect('Tiền mặt')}
-                  disabled={submittingPayment}
-                  className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm"
-                >
-                  <DollarSign className="w-8 h-8 text-coffee-primary" />
-                  <span>Tiền mặt</span>
-                </button>
-                <button
-                  onClick={() => handlePayDirect('Chuyển khoản')}
-                  disabled={submittingPayment}
-                  className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm"
-                >
-                  <ArrowRightLeft className="w-8 h-8 text-coffee-primary" />
-                  <span>Chuyển khoản</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 text-center text-[10px] text-coffee-medium/70">
-              Nhân viên thực hiện: {currentUser?.full_name}
-            </div>
           </div>
         </div>
       )}
