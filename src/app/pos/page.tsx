@@ -480,8 +480,8 @@ export default function PosPage() {
             <button 
               onClick={() => {
                 if (posStep === 'menu') {
-                  setSelectedTable(null);
                   setPosStep('table');
+                  setSelectedTable(null);
                 } else if (posStep === 'summary') {
                   setPosStep('menu');
                 }
@@ -492,7 +492,7 @@ export default function PosPage() {
             </button>
             <div>
               <span className="text-xs font-semibold text-coffee-medium uppercase tracking-wider">Đang phục vụ</span>
-              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable.table_name}</h2>
+              <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable?.table_name || ''}</h2>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -729,7 +729,7 @@ export default function PosPage() {
             <h3 className="font-bold text-lg text-coffee-dark border-b border-coffee-light pb-4 flex items-center justify-between">
               <span className="flex items-center space-x-2">
                 <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-                <span>Đơn món - {selectedTable.table_name}</span>
+                <span>Đơn món - {selectedTable?.table_name || ''}</span>
               </span>
               {activeOrder && (
                 <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold uppercase tracking-wider">
@@ -977,7 +977,7 @@ export default function PosPage() {
         {cart.length > 0 && (
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-coffee-light px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-between z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
             <div>
-              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable.table_name}</span>
+              <span className="text-[10px] text-coffee-medium block">Đơn hàng - {selectedTable?.table_name || ''}</span>
               <span className="font-extrabold text-sm text-coffee-primary">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)} món | {totalCartAmount.toLocaleString('vi-VN')}đ
               </span>
@@ -1004,7 +1004,7 @@ export default function PosPage() {
               <h3 className="font-bold text-base text-coffee-dark border-b border-coffee-light pb-3 flex items-center justify-between shrink-0">
                 <span className="flex items-center space-x-2">
                   <ShoppingCart className="w-5 h-5 text-coffee-medium" />
-                  <span>Đơn món - {selectedTable.table_name}</span>
+                  <span>Đơn món - {selectedTable?.table_name || ''}</span>
                 </span>
                 <button 
                   onClick={() => setIsMobileCartOpen(false)} 
@@ -1206,7 +1206,7 @@ export default function PosPage() {
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Bàn phục vụ:</span>
-              <strong className="text-coffee-dark font-extrabold">{selectedTable.table_name}</strong>
+              <strong className="text-coffee-dark font-extrabold">{selectedTable?.table_name || ''}</strong>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-coffee-medium font-medium">Nhân viên ghi đơn:</span>
