@@ -1841,16 +1841,6 @@ export const db = {
           }));
         }
 
-        for (const ing of ingredients) {
-          ing.opening_stock = ing.stock_quantity;
-          if (isSupabaseConfigured && supabase) {
-            await supabase.from('nguyenlieu').update({ ton_dau_ngay: ing.stock_quantity }).eq('id', ing.id);
-          }
-        }
-
-        if (!isSupabaseConfigured || !supabase) {
-          mockDb.setIngredients(ingredients);
-        }
         localStorage.setItem('ava_last_rollover_date', todayStr);
       } catch (e) {
         console.error('Lỗi khi rollover ngày mới cho kho:', e);
