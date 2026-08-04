@@ -703,3 +703,160 @@ export function exportAttendanceToPDF(
   doc.save(`BaoCaoChamCong_${startDate}_${endDate}.pdf`);
 }
 
+export function exportProductSalesToExcel(
+  salesData: {
+    totalLy: number;
+    lyDen: number;
+    lyTrang: number;
+    lyHoaVan: number;
+    lyTraTac: number;
+    sortedSales: Array<{ name: string; quantity: number; price: number; subtotal: number }>;
+  },
+  startDate: string,
+  endDate: string
+) {
+  const fromStr = new Date(startDate).toLocaleDateString('vi-VN');
+  const toStr = new Date(endDate).toLocaleDateString('vi-VN');
+
+  const wsData: any[][] = [
+    ['BÁO CÁO BÁN HÀNG & MÓN ĂN - AVA COFFEE'],
+    [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
+    [],
+    ['THỐNG KÊ SỬ DỤNG LY'],
+    ['Tổng ly đã bán', salesData.totalLy],
+    ['Ly Đen AVA', salesData.lyDen],
+    ['Ly Trắng AVA', salesData.lyTrang],
+    ['Ly Trắng Hoa Văn', salesData.lyHoaVan],
+    ['Ly Trà Tắc', salesData.lyTraTac],
+    [],
+    ['DANH SÁCH MÓN ĂN BÁN RA (SẮP XẾP SỐ LƯỢNG GIẢM DẦN)'],
+    ['STT', 'Tên sản phẩm', 'Số lượng bán', 'Đơn giá', 'Thành tiền']
+  ];
+
+  let totalQty = 0;
+  let totalRevenue = 0;
+
+  salesData.sortedSales.forEach((item, idx) => {
+    totalQty += item.quantity;
+    totalRevenue += item.subtotal;
+    wsData.push([
+      idx + 1,
+      item.name,
+      `${item.quantity} ly`,
+      fmtVND(item.price),
+      fmtVND(item.subtotal)
+    ]);
+  });
+
+  wsData.push([]);
+  wsData.push(['TỔNG CỘNG', '', `${totalQty} ly`, '', fmtVND(totalRevenue)]);
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [
+    { wch: 10 },
+    { wch: 35 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 20 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo bán hàng');
+  XLSX.writeFile(wb, `BaoCaoBanHang_${startDate}_${endDate}.xlsx`);
+}
+
+export function exportProductSalesToPDF(
+  salesData: {
+    totalLy: number;
+    lyDen: number;
+    lyTrang: number;
+    lyHoaVan: number;
+    lyTraTac: number;
+    sortedSales: Array<{ name: string; quantity: number; price: number; subtotal: number }>;
+  },
+  startDate: string,
+  endDate: string
+) {
+  const fromStr = new Date(startDate).toLocaleDateString('vi-VN');
+  const toStr = new Date(endDate).toLocaleDateString('vi-VN');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  doc.addFileToVFS('times.ttf', timesBase64);
+  doc.addFont('times.ttf', 'TimesNewRoman', 'normal');
+  doc.addFont('times.ttf', 'TimesNewRoman', 'bold');
+  doc.setFont('TimesNewRoman');
+
+  doc.setFontSize(16);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('BÁO CÁO BÁN HÀNG & MÓN ĂN - AVA COFFEE', 105, 20, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setFont('TimesNewRoman', 'normal');
+  doc.text(`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`, 105, 28, { align: 'center' });
+
+  doc.setFontSize(11);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('I. THỐNG KÊ SỬ DỤNG LY', 14, 38);
+
+  autoTable(doc, {
+    startY: 42,
+    head: [['Tổng số ly', 'Ly Đen AVA', 'Ly Trắng AVA', 'Ly Hoa Văn', 'Ly Trà Tắc']],
+    body: [
+      [`${salesData.totalLy} ly`, `${salesData.lyDen} ly`, `${salesData.lyTrang} ly`, `${salesData.lyHoaVan} ly`, `${salesData.lyTraTac} ly`]
+    ],
+    styles: { font: 'TimesNewRoman', fontSize: 9, cellPadding: 3, halign: 'center' },
+    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+    theme: 'grid'
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || 60;
+
+  doc.setFontSize(11);
+  doc.setFont('TimesNewRoman', 'bold');
+  doc.text('II. DANH SÁCH MÓN ĂN BÁN RA (XẾP THEO SỐ LƯỢNG GIẢM DẦN)', 14, finalY + 10);
+
+  let totalQty = 0;
+  let totalRevenue = 0;
+
+  const salesTableData = salesData.sortedSales.map((item, idx) => {
+    totalQty += item.quantity;
+    totalRevenue += item.subtotal;
+    return [
+      idx + 1,
+      item.name,
+      `${item.quantity} ly`,
+      fmtVND(item.price),
+      fmtVND(item.subtotal)
+    ];
+  });
+
+  salesTableData.push([
+    '',
+    'TỔNG CỘNG',
+    `${totalQty} ly`,
+    '',
+    fmtVND(totalRevenue)
+  ]);
+
+  autoTable(doc, {
+    startY: finalY + 14,
+    head: [['STT', 'Tên sản phẩm', 'Số lượng bán', 'Đơn giá', 'Thành tiền']],
+    body: salesTableData,
+    styles: { font: 'TimesNewRoman', fontSize: 8.5, cellPadding: 2.5 },
+    headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [250, 246, 240] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
+      3: { cellWidth: 30, halign: 'right' },
+      4: { cellWidth: 40, halign: 'right', fontStyle: 'bold' }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  doc.save(`BaoCaoBanHang_${startDate}_${endDate}.pdf`);
+}
+
