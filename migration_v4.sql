@@ -40,15 +40,26 @@ UPDATE public.nguyenlieu
 SET quy_cach = '200g' 
 WHERE id = 'ing_matcha';
 
--- 9. Cập nhật đơn vị và quy cách Hồng trà (ing_hongtra) thành đơn vị gram (g) và bịch 30g
+-- 9. Cập nhật đơn vị và quy cách Hồng trà (ing_hongtra) thành đơn vị bịch và quy cách 30g
 UPDATE public.nguyenlieu 
-SET don_vi_tinh = 'g', quy_cach = '30g' 
-WHERE id = 'ing_hongtra';
+SET don_vi_tinh = 'bịch', quy_cach = '30g' 
+WHERE id = 'id' OR id = 'ing_hongtra';
 
--- 10. Xóa công thức liên quan đến Muối Iot (ing_muoihong) để dọn dẹp khỏi kho
+-- 10. Cập nhật đơn vị 7-Up chai (ing_7up) thành đơn vị ml và quy cách chai 390ml
+UPDATE public.nguyenlieu 
+SET don_vi_tinh = 'ml', quy_cach = '390ml' 
+WHERE id = 'ing_7up';
+
+UPDATE public.congthuc 
+SET so_luong_can = 195, don_vi_tinh = 'ml' 
+WHERE id_nguyen_lieu = 'ing_7up';
+
+-- 11. Xóa các công thức & nguyên liệu không dùng khỏi kho (Ống hút đen, Ống hút trắng nhỏ/to, Muối Iot, Trà săn mây)
 DELETE FROM public.congthuc 
-WHERE id_nguyen_lieu = 'ing_muoihong';
+WHERE id_nguyen_lieu IN ('ing_muoihong', 'ing_onghutthuong', 'ing_onghuttraicay', 'ing_onghuttrangto', 'ing_trasanmay');
 
--- 11. Xóa các nguyên liệu không dùng khỏi kho (Ống hút đen, Ống hút trắng nhỏ/to, Muối Iot, Trà săn mây)
 DELETE FROM public.nguyenlieu 
 WHERE id IN ('ing_onghutthuong', 'ing_onghuttraicay', 'ing_onghuttrangto', 'ing_muoihong', 'ing_trasanmay');
+
+-- 12. Dọn dẹp cột dư thừa ton_dau_ngay khỏi bảng nguyenlieu (nếu muốn xóa triệt để)
+-- ALTER TABLE public.nguyenlieu DROP COLUMN IF EXISTS ton_dau_ngay;

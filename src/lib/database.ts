@@ -479,6 +479,9 @@ export function getIngredientPackageInfo(unit: string, quyCach?: string): { inpu
   if (qc.includes('1284')) {
     return { inputUnit: 'hộp', multiplier: 1284 };
   }
+  if (qc.includes('390')) {
+    return { inputUnit: 'chai', multiplier: 390 };
+  }
   if (qc === '1kg' || qc === '1000g') {
     return { inputUnit: 'kg', multiplier: 1000 };
   }
@@ -503,7 +506,7 @@ export function getIngredientPackageInfo(unit: string, quyCach?: string): { inpu
   return { inputUnit: unit, multiplier: 1 };
 }
 
-// Helper hiển thị tồn kho dạng ghép đơn vị (VD: 1kg + 982g, 1 bịch + 50g)
+// Helper hiển thị tồn kho dạng ghép đơn vị (VD: 1kg + 982g, 1 bịch + 50g, 1 chai + 195ml)
 export function formatIngredientStock(quantity: number, unit: string, quyCach?: string): string {
   const qty = Math.max(0, quantity);
 
@@ -572,7 +575,13 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
     return `${rounded}${unit === 'g' ? 'g' : ` ${unit}`}`;
   }
 
-  if (unit === 'ml') {
+  if (unit === 'ml' || unit === 'chai') {
+    if (quyCach === '390ml' || quyCach?.includes('390')) {
+      const chai = Math.floor(qty / 390);
+      const ml = Math.round(qty % 390);
+      if (chai > 0) return ml > 0 ? `${chai} chai + ${ml}ml` : `${chai} chai`;
+      return `${ml}ml`;
+    }
     if (quyCach === '1000ml' || quyCach === '1L' || quyCach === '1l') {
       const l = Math.floor(qty / 1000);
       const ml = Math.round(qty % 1000);
@@ -1886,7 +1895,7 @@ export const db = {
               name: ing.ten_nguyen_lieu,
               unit: ing.don_vi_tinh,
               stock_quantity: Number(ing.so_luong_ton),
-              opening_stock: Number(ing.ton_dau_ngay || ing.so_luong_ton),
+              opening_stock: Number(ing.so_luong_ton),
               min_stock: ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : null,
               quy_cach: ing.quy_cach,
               don_gia_nhap: Number(ing.don_gia_nhap || 0)
@@ -1920,7 +1929,7 @@ export const db = {
           name: ing.ten_nguyen_lieu,
           unit: ing.don_vi_tinh,
           stock_quantity: Number(ing.so_luong_ton),
-          opening_stock: Number(ing.ton_dau_ngay !== null ? ing.ton_dau_ngay : ing.so_luong_ton),
+          opening_stock: Number(ing.so_luong_ton),
           min_stock: ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : null,
           quy_cach: ing.quy_cach,
           don_gia_nhap: Number(ing.don_gia_nhap || 0),
