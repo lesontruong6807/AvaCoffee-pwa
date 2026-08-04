@@ -33,10 +33,10 @@ export default function InventoryPage() {
 
   // Bộ lọc lịch sử kho
   const [logStartDate, setLogStartDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA');
   });
   const [logEndDate, setLogEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA');
   });
 
   // Restock Modal
@@ -266,27 +266,14 @@ export default function InventoryPage() {
   const getIngStats = (ingId: string, currentStockQty: number) => {
     const ingLogs = logs.filter(l => l.ingredient_id === ingId);
 
-    // 1. Nhật ký TRƯỚC thời điểm bắt đầu đã chọn (t < startT)
-    const logsBeforeStart = ingLogs.filter(l => new Date(l.created_at).getTime() < startT);
-    const refilledBefore = logsBeforeStart
-      .filter(l => 
-        (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status !== 'Từ chối') ||
-        (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
-      )
+    // Tính ngược từ tồn kho thực tế hiện tại
+    const logsAfterEnd = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
+    const netChangeAfterEnd = logsAfterEnd
+      .filter(l => l.status !== 'Từ chối')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-    const soldBefore = logsBeforeStart
-      .filter(l => 
-        (l.type === 'Bán hàng') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status !== 'Từ chối') ||
-        (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
-      )
-      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
 
-    // Tồn đầu kỳ tại thời điểm startT
-    const openingStock = Math.max(0, refilledBefore - soldBefore);
+    const closingStock = Math.max(0, currentStockQty - netChangeAfterEnd);
 
-    // 2. Nhật ký TRONG khoảng thời gian được chọn [startT, endT]
     const logsInRange = ingLogs.filter(l => {
       const t = new Date(l.created_at).getTime();
       return t >= startT && t <= endT;
@@ -299,6 +286,7 @@ export default function InventoryPage() {
         (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
     const sold = logsInRange
       .filter(l => 
         (l.type === 'Bán hàng') ||
@@ -307,14 +295,13 @@ export default function InventoryPage() {
       )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
 
-    // Tồn thực tế cuối kỳ tại thời điểm endT (Tồn cuối = Tồn đầu + Nhập - Bán)
-    const closingStock = openingStock + refilled - sold;
+    const openingStock = Math.max(0, closingStock - refilled + sold);
 
     return {
-      openingStock: Math.max(0, openingStock),
+      openingStock,
       refilled,
       sold,
-      closingStock: Math.max(0, closingStock)
+      closingStock
     };
   };
 

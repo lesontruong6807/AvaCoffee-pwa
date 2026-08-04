@@ -72,26 +72,26 @@ export default function AdminPage() {
   const [expStartDate, setExpStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return d.toLocaleDateString('en-CA');
   });
   const [expEndDate, setExpEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA');
   });
   const [isExpModalOpen, setIsExpModalOpen] = useState(false);
   const [expName, setExpName] = useState('');
   const [expType, setExpType] = useState<'co_dinh' | 'bien_dong'>('bien_dong');
   const [expAmount, setExpAmount] = useState('');
-  const [expDate, setExpDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [expDate, setExpDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [expNotes, setExpNotes] = useState('');
 
   // Bộ lọc Báo cáo Chấm công
   const [attStartDate, setAttStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return d.toLocaleDateString('en-CA');
   });
   const [attEndDate, setAttEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA');
   });
   const [attUserId, setAttUserId] = useState('all');
   const [attendanceSubTab, setAttendanceSubTab] = useState<'summary' | 'shifts' | 'leaves'>('summary');
@@ -117,7 +117,7 @@ export default function AdminPage() {
       setExpName('');
       setExpType('bien_dong');
       setExpAmount('');
-      setExpDate(new Date().toISOString().split('T')[0]);
+      setExpDate(new Date().toLocaleDateString('en-CA'));
       setExpNotes('');
       loadAllData();
     } catch (err) {
@@ -542,48 +542,20 @@ export default function AdminPage() {
 
 
   // --- LÓGIC BÁO CÁO KHO THEO KHOẢNG NGÀY ---
-  const getLogAppliedAmount = (log: any) => {
-    if (log.type === 'Bán hàng' || log.type === 'Pha chế') {
-      return Number(log.change_amount || 0);
-    }
-    if (log.type === 'Nhập kho') {
-      if (log.status === 'Từ chối') return 0;
-      return Number(log.change_amount || 0);
-    }
-    if (log.type === 'Hao hụt/Cân lại') {
-      if (log.status === 'Đã duyệt') return Number(log.change_amount || 0);
-      return 0;
-    }
-    return Number(log.change_amount || 0);
-  };
-
   const getHistoricalIngStats = (ing: any) => {
     const startT = new Date(invStartDate + 'T00:00:00').getTime();
     const endT = new Date(invEndDate + 'T23:59:59').getTime();
 
     const ingLogs = inventoryLogs.filter(l => l.ingredient_id === ing.id);
 
-    // 1. Nhật ký TRƯỚC thời điểm bắt đầu đã chọn (t < startT)
-    const logsBeforeStart = ingLogs.filter(l => new Date(l.created_at).getTime() < startT);
-    const refilledBefore = logsBeforeStart
-      .filter(l => 
-        (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status !== 'Từ chối') ||
-        (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
-      )
+    // Tính ngược từ tồn kho thực tế hiện tại
+    const logsAfterEnd = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
+    const netChangeAfterEnd = logsAfterEnd
+      .filter(l => l.status !== 'Từ chối')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-    const soldBefore = logsBeforeStart
-      .filter(l => 
-        (l.type === 'Bán hàng') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status !== 'Từ chối') ||
-        (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
-      )
-      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
 
-    // Tồn đầu kỳ tại thời điểm startT
-    const openingStock = Math.max(0, refilledBefore - soldBefore);
+    const endingStockVal = Math.max(0, Number(ing.stock_quantity || 0) - netChangeAfterEnd);
 
-    // 2. Nhật ký TRONG khoảng thời gian đã chọn [startT, endT]
     const logsInRange = ingLogs.filter(l => {
       const t = new Date(l.created_at).getTime();
       return t >= startT && t <= endT;
@@ -596,6 +568,7 @@ export default function AdminPage() {
         (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
+
     const sold = logsInRange
       .filter(l => 
         (l.type === 'Bán hàng') ||
@@ -604,12 +577,11 @@ export default function AdminPage() {
       )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
 
-    // Tồn thực tế cuối kỳ tại thời điểm endT (Tồn cuối = Tồn đầu + Nhập - Bán)
-    const endingStock = openingStock + refilled - sold;
+    const openingStock = Math.max(0, endingStockVal - refilled + sold);
 
     return {
-      openingStock: Math.max(0, openingStock),
-      endingStock: Math.max(0, endingStock),
+      openingStock,
+      endingStock: endingStockVal,
       refilled,
       sold
     };
