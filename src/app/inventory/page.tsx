@@ -262,20 +262,20 @@ export default function InventoryPage() {
   const getIngStats = (ingId: string, currentStockQty: number) => {
     const ingLogs = logs.filter(l => l.ingredient_id === ingId);
 
-    // 1. Nhật ký SAU khoảng thời gian được chọn (t > endT)
-    const logsAfter = ingLogs.filter(l => new Date(l.created_at).getTime() > endT);
-    const refilledAfter = logsAfter
+    // 1. Nhật ký TRƯỚC thời điểm bắt đầu đã chọn (t < startT)
+    const logsBeforeStart = ingLogs.filter(l => new Date(l.created_at).getTime() < startT);
+    const refilledBefore = logsBeforeStart
       .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
-    const soldAfter = logsAfter
+    const soldBefore = logsBeforeStart
       .filter(l => l.type === 'Bán hàng')
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
-    const otherAfter = logsAfter
+    const otherBefore = logsBeforeStart
       .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
 
-    // Tồn thực tế tại thời điểm Cuối Kỳ (endT)
-    const closingStock = Number(currentStockQty || 0) - refilledAfter + soldAfter - otherAfter;
+    // Tồn đầu kỳ tại thời điểm startT (Bắt đầu từ 0 vào ngày 03/08)
+    const openingStock = Math.max(0, refilledBefore - soldBefore + otherBefore);
 
     // 2. Nhật ký TRONG khoảng thời gian được chọn [startT, endT]
     const logsInRange = ingLogs.filter(l => {
@@ -293,8 +293,8 @@ export default function InventoryPage() {
       .filter(l => l.type !== 'Nhập kho' && l.type !== 'Bán hàng')
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
 
-    // Tồn đầu kỳ tại thời điểm Đầu Kỳ (startT)
-    const openingStock = closingStock - refilled + sold - otherInRange;
+    // Tồn thực tế cuối kỳ tại thời điểm endT (Đảm bảo toán học: Tồn cuối = Tồn đầu + Nhập - Bán + Khác)
+    const closingStock = openingStock + refilled - sold + otherInRange;
 
     return {
       openingStock: Math.max(0, openingStock),
