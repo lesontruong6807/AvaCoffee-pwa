@@ -271,14 +271,14 @@ export default function InventoryPage() {
     const refilledBefore = logsBeforeStart
       .filter(l => 
         (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status !== 'Từ chối') ||
         (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
     const soldBefore = logsBeforeStart
       .filter(l => 
         (l.type === 'Bán hàng') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status !== 'Từ chối') ||
         (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
@@ -295,14 +295,14 @@ export default function InventoryPage() {
     const refilled = logsInRange
       .filter(l => 
         (l.type === 'Nhập kho' && l.status !== 'Từ chối') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount > 0 && l.status !== 'Từ chối') ||
         (l.type === 'Khác' && l.change_amount > 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Number(l.change_amount || 0), 0);
     const sold = logsInRange
       .filter(l => 
         (l.type === 'Bán hàng') ||
-        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status === 'Đã duyệt') ||
+        (l.type === 'Hao hụt/Cân lại' && l.change_amount < 0 && l.status !== 'Từ chối') ||
         (l.type === 'Khác' && l.change_amount < 0 && l.status !== 'Từ chối')
       )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);

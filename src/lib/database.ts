@@ -2127,6 +2127,8 @@ export const db = {
   },
 
   // Kiểm kho Cuối ngày / Cuối tuần (Stocktake)
+  // Cập nhật tồn kho NGAY LẬP TỨC, nhưng ghi nhận trạng thái "Chờ duyệt" để Admin xác nhận.
+  // Nếu Admin từ chối → hoàn lại tồn kho về lúc ban đầu.
   async submitStocktake(payload: {
     ingredient_id: string;
     actual_stock: number;
@@ -2146,11 +2148,11 @@ export const db = {
       note: `Kiểm kho thực tế: ${payload.actual_stock} (Hệ thống: ${payload.system_stock}). ${payload.note || ''}`,
       staff_id: payload.staff_id,
       created_at: new Date().toISOString(),
-      status: 'Đã duyệt' as const
+      status: 'Chờ duyệt' as const
     };
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Ghi nhận lịch sử kho trạng thái Đã duyệt lập tức
+      // 1. Ghi nhận lịch sử kho trạng thái Chờ duyệt
       await supabase.from('lichsukho').insert([{
         id: logId,
         id_nguyen_lieu: payload.ingredient_id,
@@ -2159,10 +2161,10 @@ export const db = {
         chi_phi: 0,
         ghi_chu: newLog.note,
         id_nhan_vien: payload.staff_id,
-        trang_thai: 'Đã duyệt'
+        trang_thai: 'Chờ duyệt'
       }]);
 
-      // 2. Cập nhật trực tiếp số lượng tồn kho thực tế trong nguyenlieu
+      // 2. Cập nhật trực tiếp số lượng tồn kho thực tế trong nguyenlieu (cập nhật liền)
       await supabase.from('nguyenlieu')
         .update({ so_luong_ton: payload.actual_stock })
         .eq('id', payload.ingredient_id);
@@ -2183,6 +2185,9 @@ export const db = {
   },
 
   // Admin Phê duyệt / Từ chối đơn Nhập kho & Kiểm kho
+  // Logic: Cả Nhập kho lẫn Kiểm kho đều cập nhật tồn kho NGAY khi submit.
+  // → Duyệt = giữ nguyên (chỉ đổi trạng thái).
+  // → Từ chối = hoàn lại tồn kho về trạng thái trước khi submit.
   async approveInventoryLog(id: string, status: 'Đã duyệt' | 'Từ chối') {
     const logs = await this.getInventoryLogs();
     const targetLog = logs.find(l => l.id === id);
@@ -2190,12 +2195,12 @@ export const db = {
 
     targetLog.status = status;
 
-    const ingredients = await this.getIngredients();
-
-    // Nếu từ chối đơn "Nhập kho" -> Trừ lại số lượng đã cộng trước đó
-    if (status === 'Từ chối' && targetLog.type === 'Nhập kho' && targetLog.ingredient_id) {
+    // Khi TỪ CHỐI: Hoàn lại tồn kho vì tồn kho đã được cập nhật ngay khi submit
+    if (status === 'Từ chối' && targetLog.ingredient_id) {
+      const ingredients = await this.getIngredients();
       const ing = ingredients.find(i => i.id === targetLog.ingredient_id);
       if (ing) {
+        // Trừ lại change_amount (Nhập kho: change > 0 → trừ bớt; Kiểm kho dư: change > 0 → trừ bớt; Kiểm kho thiếu: change < 0 → cộng lại)
         ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) - targetLog.change_amount);
         if (isSupabaseConfigured && supabase) {
           await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', targetLog.ingredient_id);
@@ -2204,18 +2209,7 @@ export const db = {
         }
       }
     }
-    // Nếu chấp nhận đơn "Hao hụt/Cân lại" -> Cập nhật tồn kho theo số chênh lệch kiểm kho
-    else if (status === 'Đã duyệt' && targetLog.type === 'Hao hụt/Cân lại' && targetLog.ingredient_id) {
-      const ing = ingredients.find(i => i.id === targetLog.ingredient_id);
-      if (ing) {
-        ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) + targetLog.change_amount);
-        if (isSupabaseConfigured && supabase) {
-          await supabase.from('nguyenlieu').update({ so_luong_ton: ing.stock_quantity }).eq('id', targetLog.ingredient_id);
-        } else {
-          mockDb.setIngredients(ingredients);
-        }
-      }
-    }
+    // Khi DUYỆT: Không cần làm gì với tồn kho vì đã cập nhật ngay khi submit rồi
 
     if (isSupabaseConfigured && supabase) {
       await supabase.from('lichsukho').update({ trang_thai: status }).eq('id', id);
