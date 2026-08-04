@@ -109,26 +109,30 @@ export default function PaymentPage() {
 
   const handlePay = async (method: 'Tiền mặt' | 'Chuyển khoản') => {
     if (!selectedOrder) return;
+    const targetOrder = selectedOrder;
     setSubmittingPayment(true);
-    try {
-      await db.payOrder(selectedOrder.id, method);
-      
-      // Hiển thị Confetti
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        colors: ['#4A3525', '#FFE4C4', '#FFFDD0', '#8C6A5C']
-      });
+    
+    // Optimistic UI Update: Đóng modal và loại bỏ đơn hàng khỏi danh sách chờ thanh toán ngay lập tức
+    setIsPayModalOpen(false);
+    setOrders(prev => prev.filter(o => o.id !== targetOrder.id));
+    setSelectedOrder(null);
+    setOrderItems([]);
+    setEditingOrderId(null);
 
-      setIsPayModalOpen(false);
-      
-      // Reload danh sách
-      await loadOrders();
-      
+    confetti({
+      particleCount: 150,
+      spread: 80,
+      colors: ['#4A3525', '#FFE4C4', '#FFFDD0', '#8C6A5C']
+    });
+
+    try {
+      await db.payOrder(targetOrder.id, method);
       toast.success(`Thanh toán thành công qua phương thức: ${method}`);
     } catch (e) {
       console.error('Lỗi thanh toán:', e);
       toast.error('Gặp lỗi khi xử lý thanh toán.');
+      // Rollback nếu có lỗi mạng
+      await loadOrders();
     } finally {
       setSubmittingPayment(false);
     }

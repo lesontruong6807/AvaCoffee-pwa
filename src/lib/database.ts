@@ -1357,7 +1357,7 @@ export const db = {
     const paidAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // Song song: lấy thông tin bàn + lấy danh sách items cùng lúc
+      // 1. Lấy thông tin bàn & chi tiết items cùng lúc
       const [orderResult, itemsResult] = await Promise.all([
         supabase.from('hoadon').select('id_ban').eq('id', orderId).single(),
         supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId)
@@ -1365,13 +1365,15 @@ export const db = {
       const order = orderResult.data;
       const items = itemsResult.data;
 
-      // Trừ kho nguyên liệu khi thanh toán
+      // 2. Trừ kho nguyên liệu chạy ngầm bất đồng bộ (Non-blocking Fast Response)
       if (items && items.length > 0) {
         const cartItems = items.map(item => ({ product_id: item.idsp, quantity: item.so_luong }));
-        await this.deductStockFromOrder(cartItems);
+        this.deductStockFromOrder(cartItems).catch(err => {
+          console.error('Lỗi khấu trừ kho ngầm khi thanh toán:', err);
+        });
       }
 
-      // Song song: cập nhật trạng thái thanh toán + cập nhật trạng thái bàn cùng lúc
+      // 3. Song song: cập nhật trạng thái thanh toán + cập nhật trạng thái bàn cùng lúc
       const updatePromises: any[] = [
         supabase
           .from('hoadon')
@@ -2377,8 +2379,23 @@ export const db = {
   // Tự động khấu trừ kho khi có đơn bán hàng mới ở POS
   async deductStockFromOrder(items: Array<{ product_id: string; quantity: number }>) {
     try {
-      const recipes = await this.getRecipes();
-      const ingredients = await this.getIngredients();
+      // Song song: lấy công thức, lấy nguyên liệu, và lấy nhật ký kho hôm nay cùng lúc
+      const now = new Date();
+      const vnDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+      const [recipes, ingredients, historyLogsResult] = await Promise.all([
+        this.getRecipes(),
+        this.getIngredients(),
+        isSupabaseConfigured && supabase
+          ? supabase
+              .from('lichsukho')
+              .select('*')
+              .eq('loai_giao_dich', 'Bán hàng')
+              .order('thoi_gian_tao', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: null })
+      ]);
+
       let updated = false;
 
       const ingChanges: { [id: string]: { deductQty: number; productIds: string[] } } = {};
@@ -2396,25 +2413,12 @@ export const db = {
         }
       }
 
-      // Xác định ngày địa phương Việt Nam (YYYY-MM-DD)
-      const now = new Date();
-      const vnDateStr = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
-
       let existingTodayLogs: any[] = [];
-      if (isSupabaseConfigured && supabase) {
-        const { data } = await supabase
-          .from('lichsukho')
-          .select('*')
-          .eq('loai_giao_dich', 'Bán hàng')
-          .order('thoi_gian_tao', { ascending: false })
-          .limit(100);
-
-        if (data) {
-          existingTodayLogs = data.filter(l => {
-            const logVnDate = new Date(l.thoi_gian_tao).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
-            return logVnDate === vnDateStr;
-          });
-        }
+      if (historyLogsResult?.data) {
+        existingTodayLogs = historyLogsResult.data.filter(l => {
+          const logVnDate = new Date(l.thoi_gian_tao).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+          return logVnDate === vnDateStr;
+        });
       }
 
       const dbUpdates: any[] = [];
