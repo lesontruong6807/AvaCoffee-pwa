@@ -85,10 +85,11 @@ export default function DailyReportPage() {
     const restockExpenses = restockCosts + totalDiscount; 
     const restockItems = shiftLogs;
 
-    // Tiền mặt hiện tại sau khi trừ chi phí thực tế
-    const currentCash = Math.max(0, totalCash - restockCosts);
     // Doanh thu thực tế sau khi trừ chi phí nhập & giảm giá
     const netRevenue = grossRevenue - restockExpenses;
+
+    // Tiền mặt hiện tại sau khi trừ chi phí thực tế (Tiền mặt thực tế = Doanh thu thực tế ca - Chuyển khoản)
+    const currentCash = Math.max(0, netRevenue - totalTransfer);
 
     // --- Tính toán thống kê bán hàng ---
     const shiftItems = orderItems.filter(item => shiftOrders.some(o => o.id === item.order_id));
@@ -142,6 +143,8 @@ export default function DailyReportPage() {
       grossRevenue,
       totalCash,
       totalTransfer,
+      totalDiscount,
+      restockCosts,
       restockExpenses,
       restockItems,
       currentCash,
@@ -413,18 +416,25 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
           💵 Bảng tính dòng tiền thực tế ca
         </h4>
         <div className="space-y-3 text-xs text-coffee-dark font-medium">
-          {/* Thanh Tiền mặt */}
+          {/* Doanh thu Tiền mặt */}
           <div className="flex justify-between items-center bg-amber-50/70 p-3 rounded-xl border border-amber-200/60 font-bold">
-            <span className="text-amber-900">+ Doanh thu Tiền mặt (cả giảm giá):</span>
+            <span className="text-amber-900">Doanh thu Tiền mặt:</span>
             <span className="font-extrabold text-amber-900 text-sm">+{metrics.totalCash.toLocaleString('vi-VN')}đ</span>
           </div>
 
-          {/* Thanh Chuyển khoản */}
+          {/* Doanh thu Chuyển khoản */}
           <div className="flex justify-between items-center bg-blue-50/70 p-3 rounded-xl border border-blue-200/60 font-bold">
-            <span className="text-blue-900">+ Doanh thu Chuyển khoản (Ngân hàng):</span>
+            <span className="text-blue-900">Doanh thu Chuyển khoản:</span>
             <span className="font-extrabold text-blue-900 text-sm">+{metrics.totalTransfer.toLocaleString('vi-VN')}đ</span>
           </div>
 
+          {/* Giảm giá */}
+          <div className="flex justify-between items-center bg-red-50/60 p-3 rounded-xl border border-red-200/50 font-bold">
+            <span className="text-red-950">Giảm giá:</span>
+            <span className="font-extrabold text-red-950 text-sm">-{metrics.totalDiscount.toLocaleString('vi-VN')}đ</span>
+          </div>
+
+          {/* Chi tiết chi phí nhập trong ca */}
           {metrics.restockItems.length > 0 ? (
             <div className="space-y-1.5 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
               <span className="text-[10px] text-coffee-medium uppercase font-bold block">Chi tiết chi phí nhập trong ca:</span>
@@ -436,20 +446,22 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
               ))}
             </div>
           ) : (
-            <div className="flex justify-between items-center text-coffee-medium/70 text-[11px] px-1">
-              <span>- Chi phí nhập/phát sinh:</span>
-              <span>0đ</span>
+            <div className="flex justify-between items-center text-coffee-medium/70 text-[11px] px-1 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
+              <span className="text-[10px] text-coffee-medium uppercase font-bold block">Chi tiết chi phí nhập trong ca:</span>
+              <span className="text-[11px] text-coffee-medium font-semibold">0đ</span>
             </div>
           )}
 
-          <div className="flex justify-between items-center p-3 bg-amber-100/40 rounded-xl border border-amber-200 font-extrabold text-coffee-dark text-sm">
-            <span>👉 Tiền mặt thực tế trong két:</span>
-            <span className="text-amber-900 text-base">{metrics.currentCash.toLocaleString('vi-VN')}đ</span>
-          </div>
-
+          {/* Doanh thu thực tế ca */}
           <div className="flex justify-between items-center p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 font-black text-base text-emerald-900">
             <span>= Doanh thu thực tế ca:</span>
             <span className="text-lg">{metrics.netRevenue.toLocaleString('vi-VN')}đ</span>
+          </div>
+
+          {/* Tiền mặt thực tế trong két */}
+          <div className="flex justify-between items-center p-3 bg-amber-100/40 rounded-xl border border-amber-200 font-extrabold text-coffee-dark text-sm">
+            <span>👉 Tiền mặt thực tế trong két:</span>
+            <span className="text-amber-900 text-base">{metrics.currentCash.toLocaleString('vi-VN')}đ</span>
           </div>
         </div>
       </div>
