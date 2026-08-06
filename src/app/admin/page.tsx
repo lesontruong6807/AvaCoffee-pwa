@@ -1584,6 +1584,10 @@ export default function AdminPage() {
 
                   <div className="text-[10px] sm:text-xs space-y-1">
                     <p className="flex justify-between">
+                      <span className="text-coffee-medium">Giá vốn:</span>
+                      <strong className="text-coffee-medium">{(prod.cost_price || 0).toLocaleString('vi-VN')}đ</strong>
+                    </p>
+                    <p className="flex justify-between">
                       <span className="text-coffee-medium">Giá bán:</span>
                       <strong className="text-coffee-primary">{prod.price.toLocaleString('vi-VN')}đ</strong>
                     </p>
@@ -2302,6 +2306,19 @@ export default function AdminPage() {
                   type="number"
                   value={prodPrice}
                   onChange={(e) => setProdPrice(Number(e.target.value))}
+                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                  min={0}
+                  required
+                />
+              </div>
+
+              {/* Giá vốn */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-medium uppercase">Giá vốn (đ)</label>
+                <input
+                  type="number"
+                  value={prodCostPrice}
+                  onChange={(e) => setProdCostPrice(Number(e.target.value))}
                   className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
                   min={0}
                   required
