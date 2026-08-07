@@ -337,7 +337,7 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_n007', name: 'Revive (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
   { id: 'ing_n008', name: 'Sting (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
   { id: 'ing_lytratac', name: 'Ly trà tắc', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 2, quy_cach: 'cái' },
-  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: '500g' }
+  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'g', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: '500g' }
 ];
 
 export const MOCK_RECIPES = [
