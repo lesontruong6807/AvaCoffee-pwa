@@ -28,7 +28,7 @@ export default function TimeLogPage() {
   const [activeLog, setActiveLog] = useState<any>(null);
 
   // Trạng thái Form chấm công
-  const [shift, setShift] = useState('Ca sáng (06:00 - 14:00)');
+  const [shift, setShift] = useState('Ca sáng (05:30 - 12:00)');
   const [timeInput, setTimeInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [gettingLocation, setGettingLocation] = useState(false);
@@ -249,14 +249,14 @@ export default function TimeLogPage() {
       // 2. Kiểm tra giới hạn giờ khai báo theo ca
       const currentShift = logType === 'in' ? shift : activeLog.shift;
       if (currentShift.startsWith('Ca sáng')) {
-        if (totalMinutes < 6 * 60 || totalMinutes > 14 * 60) {
-          toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 06:00 đến 14:00!');
+        if (totalMinutes < 330 || totalMinutes > 720) {
+          toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 05:30 đến 12:00!');
           setSubmitting(false);
           return;
         }
       } else if (currentShift.startsWith('Ca chiều')) {
-        if (totalMinutes < 14 * 60 || totalMinutes > 22 * 60) {
-          toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 14:00 đến 22:00!');
+        if (totalMinutes < 12 * 60 || totalMinutes > 22 * 60) {
+          toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 12:00 đến 22:00!');
           setSubmitting(false);
           return;
         }
@@ -393,8 +393,8 @@ export default function TimeLogPage() {
                       onChange={(e) => setShift(e.target.value)}
                       className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                     >
-                      <option>Ca sáng (06:00 - 14:00)</option>
-                      <option>Ca chiều (14:00 - 22:00)</option>
+                      <option>Ca sáng (05:30 - 12:00)</option>
+                      <option>Ca chiều (12:00 - 22:00)</option>
                     </select>
                   </div>
                 ) : (

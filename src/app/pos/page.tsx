@@ -47,6 +47,7 @@ export default function PosPage() {
   const [posStep, setPosStep] = useState<'table' | 'menu' | 'summary'>('table');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const isSavingRef = React.useRef(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -177,7 +178,9 @@ export default function PosPage() {
 
   // --- LÓGIC CONFIRM & SUBMIT ORDER ---
   const handleConfirmOrder = async () => {
+    if (isSavingRef.current) return;
     if (!selectedTable || cart.length === 0) return;
+    isSavingRef.current = true;
     setSavingOrder(true);
 
     const oldTables = [...tables];
@@ -213,6 +216,7 @@ export default function PosPage() {
       setTables(oldTables);
       toast.error('Không thể lưu đơn hàng. Vui lòng thử lại!');
     } finally {
+      isSavingRef.current = false;
       setSavingOrder(false);
     }
   };
@@ -659,9 +663,17 @@ export default function PosPage() {
                   </button>
                   <button
                     onClick={handleConfirmOrder}
-                    className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition shadow shadow-coffee-primary/20"
+                    disabled={savingOrder}
+                    className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl transition shadow shadow-coffee-primary/20 disabled:opacity-50 flex items-center justify-center space-x-1"
                   >
-                    Xác nhận đơn
+                    {savingOrder ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <span>Xác nhận đơn</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -828,12 +840,21 @@ export default function PosPage() {
                   </button>
                   <button
                     onClick={async () => {
+                      if (savingOrder) return;
                       setIsMobileCartOpen(false);
                       await handleConfirmOrder();
                     }}
-                    className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow"
+                    disabled={savingOrder}
+                    className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow disabled:opacity-50 flex items-center justify-center space-x-1"
                   >
-                    Xác nhận đơn
+                    {savingOrder ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <span>Xác nhận đơn</span>
+                    )}
                   </button>
                 </div>
               </div>

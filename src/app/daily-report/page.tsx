@@ -53,24 +53,28 @@ export default function DailyReportPage() {
   });
 
   // 2. Phân loại theo Ca làm việc
-  // Ca sáng: 6h - 14h (6:00:00 - 13:59:59)
+  // Ca sáng: 5h30 - 12h (5:30:00 - 11:59:59)
   const morningOrders = todayOrders.filter(o => {
-    const hour = new Date(o.created_at).getHours();
-    return hour >= 6 && hour < 14;
+    const d = new Date(o.created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    return mins >= (5 * 60 + 30) && mins < (12 * 60);
   });
   const morningLogs = todayLogs.filter(l => {
-    const hour = new Date(l.created_at).getHours();
-    return hour >= 6 && hour < 14;
+    const d = new Date(l.created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    return mins >= (5 * 60 + 30) && mins < (12 * 60);
   });
 
-  // Ca chiều: 14h - 22h (và các giờ muộn/sớm khác ngoài ca sáng)
+  // Ca chiều: 12h - 22h (và các giờ muộn/sớm khác ngoài ca sáng)
   const afternoonOrders = todayOrders.filter(o => {
-    const hour = new Date(o.created_at).getHours();
-    return hour >= 14 || hour < 6;
+    const d = new Date(o.created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    return mins >= (12 * 60) || mins < (5 * 60 + 30);
   });
   const afternoonLogs = todayLogs.filter(l => {
-    const hour = new Date(l.created_at).getHours();
-    return hour >= 14 || hour < 6;
+    const d = new Date(l.created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    return mins >= (12 * 60) || mins < (5 * 60 + 30);
   });
 
   // 3. Hàm tính toán các chỉ số cho từng ca
