@@ -231,37 +231,47 @@ export default function TimeLogPage() {
       return;
     }
 
+    // 1. Kiểm tra tồn tại ca trực nếu là Ra ca
+    if (logType === 'out' && !activeLog) {
+      toast.error('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
+      return;
+    }
+
+    const currentShift = logType === 'in' ? shift : activeLog.shift;
+    const [h, m] = timeInput.split(':');
+    const checkHour = parseInt(h, 10);
+    const checkMin = parseInt(m, 10);
+    const totalMinutes = checkHour * 60 + checkMin;
+
+    // 2. Kiểm tra giới hạn giờ khai báo theo ca
+    if (currentShift.startsWith('Ca sáng')) {
+      if (totalMinutes < 330 || totalMinutes > 720) {
+        toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 05:30 đến 12:00!');
+        return;
+      }
+    } else if (currentShift.startsWith('Ca chiều')) {
+      if (totalMinutes < 12 * 60 || totalMinutes > 22 * 60) {
+        toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 12:00 đến 22:00!');
+        return;
+      }
+    }
+
+    // 3. Hiển thị thông báo xác nhận trước khi gửi
+    const typeText = logType === 'in' ? 'VÀO CA' : 'RA CA';
+    const confirmMsg = `XÁC NHẬN CHẤM CÔNG ${typeText}\n\n` +
+      `• Ca làm việc: ${currentShift}\n` +
+      `• Ngày làm việc: ${new Date().toLocaleDateString('vi-VN')}\n` +
+      `• Giờ khai báo: ${timeInput}\n` +
+      `• Vị trí: ${address || 'Mock GPS location'}\n\n` +
+      `Bạn có chắc chắn thông tin trên đã chính xác?`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
     setSubmitting(true);
     try {
       const shiftDate = new Date();
-      const [h, m] = timeInput.split(':');
-      const checkHour = parseInt(h, 10);
-      const checkMin = parseInt(m, 10);
-      const totalMinutes = checkHour * 60 + checkMin;
-
-      // 1. Kiểm tra tồn tại ca trực nếu là Ra ca
-      if (logType === 'out' && !activeLog) {
-        toast.error('Không tìm thấy ca trực đang hoạt động để chấm công ra.');
-        setSubmitting(false);
-        return;
-      }
-
-      // 2. Kiểm tra giới hạn giờ khai báo theo ca
-      const currentShift = logType === 'in' ? shift : activeLog.shift;
-      if (currentShift.startsWith('Ca sáng')) {
-        if (totalMinutes < 330 || totalMinutes > 720) {
-          toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 05:30 đến 12:00!');
-          setSubmitting(false);
-          return;
-        }
-      } else if (currentShift.startsWith('Ca chiều')) {
-        if (totalMinutes < 12 * 60 || totalMinutes > 22 * 60) {
-          toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 12:00 đến 22:00!');
-          setSubmitting(false);
-          return;
-        }
-      }
-
       shiftDate.setHours(checkHour, checkMin, 0, 0);
 
       if (logType === 'in') {
