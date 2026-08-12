@@ -18,7 +18,10 @@ import {
   Loader2,
   ArrowLeft,
   Printer,
-  Pencil
+  Pencil,
+  Scissors,
+  SplitSquareVertical,
+  Check
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -32,10 +35,12 @@ export default function PaymentPage() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [isNative, setIsNative] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [isSplitMode, setIsSplitMode] = useState(false);
+  const [selectedSplitItems, setSelectedSplitItems] = useState<string[]>([]);
 
   const getDisplayedItems = () => {
     const isEditing = editingOrderId === selectedOrder?.id;
-    if (!isEditing) return orderItems;
+    if (!isEditing && !isSplitMode) return orderItems;
 
     const items: any[] = [];
     orderItems.forEach((item) => {
@@ -190,6 +195,53 @@ export default function PaymentPage() {
     } finally {
       setLoadingItems(false);
     }
+  // Chia đơn/Tách hóa đơn mới
+  const handleSplitOrder = async () => {
+    if (!selectedOrder || selectedSplitItems.length === 0) return;
+    const confirmSplit = window.confirm(`Bạn có chắc chắn muốn TÁCH ${selectedSplitItems.length} món đã chọn ra thành một hóa đơn mới không?`);
+    if (!confirmSplit) return;
+
+    setLoadingItems(true);
+    try {
+      // Group các items cần tách theo originalId
+      const itemSplitRequests: { [itemId: string]: number } = {};
+      const displayedItems = getDisplayedItems();
+      
+      selectedSplitItems.forEach(id => {
+         const matched = displayedItems.find(item => item.id === id);
+         if (matched) {
+           const origId = matched.originalId || matched.id;
+           itemSplitRequests[origId] = (itemSplitRequests[origId] || 0) + 1;
+         }
+      });
+
+      const requestPayload = Object.entries(itemSplitRequests).map(([itemId, splitQuantity]) => ({
+         itemId,
+         splitQuantity
+      }));
+
+      const result = await db.splitOrder(selectedOrder.id, requestPayload);
+      if (result.success) {
+        toast.success("Tách hóa đơn thành công!");
+        setIsSplitMode(false);
+        setSelectedSplitItems([]);
+        
+        // Load lại dữ liệu hóa đơn
+        await loadOrders();
+        
+        // Reset trạng thái chọn đơn hàng hiện tại
+        setSelectedOrder(null);
+        setOrderItems([]);
+        setEditingOrderId(null);
+      } else {
+        toast.error("Không thể tách hóa đơn.");
+      }
+    } catch (err) {
+      console.error("Lỗi khi tách hóa đơn:", err);
+      toast.error("Gặp lỗi trong quá trình tách hóa đơn.");
+    } finally {
+      setLoadingItems(false);
+    }
   };
 
   // In lại hóa đơn thô (chỉ chạy trên thiết bị native Android)
@@ -272,9 +324,13 @@ export default function PaymentPage() {
                         setSelectedOrder(null);
                         setOrderItems([]);
                         setEditingOrderId(null);
+                        setIsSplitMode(false);
+                        setSelectedSplitItems([]);
                       } else {
                         setSelectedOrder(order);
                         setEditingOrderId(null);
+                        setIsSplitMode(false);
+                        setSelectedSplitItems([]);
                       }
                     }}
                     className="w-full flex items-center justify-between p-5 text-left transition hover:bg-[#FAF6F0]/30"
@@ -329,6 +385,8 @@ export default function PaymentPage() {
                                   setEditingOrderId(null);
                                 } else {
                                   setEditingOrderId(selectedOrder.id);
+                                  setIsSplitMode(false);
+                                  setSelectedSplitItems([]);
                                 }
                               }}
                               className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-[10px] font-black border transition uppercase tracking-wider ${
@@ -340,8 +398,38 @@ export default function PaymentPage() {
                               <Pencil className="w-3 h-3" />
                               <span>{editingOrderId === selectedOrder.id ? 'Hoàn tất' : 'Sửa'}</span>
                             </button>
+
+                            <button
+                              onClick={() => {
+                                if (isSplitMode) {
+                                  setIsSplitMode(false);
+                                  setSelectedSplitItems([]);
+                                } else {
+                                  setIsSplitMode(true);
+                                  setEditingOrderId(null);
+                                }
+                              }}
+                              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-[10px] font-black border transition uppercase tracking-wider ${
+                                isSplitMode
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-white text-coffee-primary border-coffee-light hover:bg-[#FAF6F0]'
+                              }`}
+                            >
+                              <Scissors className="w-3 h-3" />
+                              <span>{isSplitMode ? 'Hủy chia' : 'Chia đơn'}</span>
+                            </button>
+
                             <h5 className="font-bold text-xs text-coffee-dark uppercase tracking-wider">Danh sách món ăn</h5>
                           </div>
+                          {isSplitMode && selectedSplitItems.length > 0 && (
+                            <button
+                              onClick={handleSplitOrder}
+                              className="px-3 py-1.5 bg-coffee-primary hover:bg-coffee-dark text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center space-x-1 shadow transition animate-fade-in animate-duration-200"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Chia ({selectedSplitItems.length} món)</span>
+                            </button>
+                          )}
                           {editingOrderId === selectedOrder.id && (
                             <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
                               Chế độ tách món lẻ
@@ -356,9 +444,25 @@ export default function PaymentPage() {
                           <div className="border border-coffee-light bg-white rounded-2xl overflow-hidden divide-y divide-coffee-light/50">
                              {getDisplayedItems().map((item) => (
                               <div key={item.id} className="flex justify-between items-center p-3.5 text-xs">
-                                <div className="space-y-0.5">
-                                  <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn đã xoá'}</p>
-                                  <p className="text-[10px] text-coffee-medium">Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ</p>
+                                <div className="flex items-center">
+                                  {isSplitMode && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedSplitItems.includes(item.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedSplitItems(prev => [...prev, item.id]);
+                                        } else {
+                                          setSelectedSplitItems(prev => prev.filter(id => id !== item.id));
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-coffee-light text-coffee-primary focus:ring-coffee-accent mr-3 cursor-pointer"
+                                    />
+                                  )}
+                                  <div className="space-y-0.5">
+                                    <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn đã xoá'}</p>
+                                    <p className="text-[10px] text-coffee-medium">Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ</p>
+                                  </div>
                                 </div>
                                 <div className="flex items-center space-x-4">
                                   <span className="font-bold text-coffee-medium">x {item.quantity}</span>

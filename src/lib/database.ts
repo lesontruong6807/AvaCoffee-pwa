@@ -1660,6 +1660,202 @@ export const db = {
     }
 
     return { orderDeleted: false, newTotal: 0, newDiscount: 0 };
+  async splitOrder(orderId: string, itemSplitRequests: Array<{ itemId: string, splitQuantity: number }>) {
+    if (isSupabaseConfigured && supabase) {
+      // 1. Lấy thông tin hóa đơn cũ
+      const { data: oldOrder } = await supabase
+        .from('hoadon')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (!oldOrder) throw new Error('Không tìm thấy hóa đơn cần chia.');
+
+      // 2. Tạo hóa đơn mới
+      const newOrderId = generateShortId('ord_');
+      const createdAt = new Date().toISOString();
+      const { data: newOrderData, error: newOrderErr } = await supabase
+        .from('hoadon')
+        .insert([{
+          id: newOrderId,
+          id_ban: oldOrder.id_ban,
+          id_nhan_vien: oldOrder.id_nhan_vien,
+          tong_tien: 0, // Sẽ tính và cập nhật sau
+          giam_gia: 0,
+          trang_thai_thanh_toan: 'Chưa thanh toán',
+          ngay_tao: createdAt
+        }])
+        .select()
+        .single();
+
+      if (newOrderErr || !newOrderData) throw new Error('Không thể tạo hóa đơn mới khi chia đơn.');
+
+      let totalNewAmount = 0;
+      const orderItemsToInsert: any[] = [];
+
+      // 3. Xử lý từng món được chia
+      for (const req of itemSplitRequests) {
+        const { itemId, splitQuantity } = req;
+        if (splitQuantity <= 0) continue;
+
+        // Lấy chi tiết món hiện tại
+        const { data: detail } = await supabase
+          .from('hoadondetail')
+          .select('*')
+          .eq('id', itemId)
+          .single();
+
+        if (detail) {
+          const currentQty = Number(detail.so_luong || 0);
+          const price = Number(detail.don_gia || 0);
+          const splitSubtotal = splitQuantity * price;
+          totalNewAmount += splitSubtotal;
+
+          // Thêm vào hóa đơn mới
+          orderItemsToInsert.push({
+            id: generateShortId('item_'),
+            idhoadon: newOrderId,
+            idsp: detail.idsp,
+            ten_san_pham: detail.ten_san_pham,
+            don_vi_tinh: detail.don_vi_tinh,
+            don_gia: price,
+            so_luong: splitQuantity,
+            thanh_tien: splitSubtotal,
+            ghi_chu: detail.ghi_chu || '',
+            gia_von: Number(detail.gia_von || 0)
+          });
+
+          // Trừ số lượng ở hóa đơn cũ
+          if (currentQty > splitQuantity) {
+            const newQty = currentQty - splitQuantity;
+            const newSubtotal = newQty * price;
+            await supabase
+              .from('hoadondetail')
+              .update({
+                so_luong: newQty,
+                thanh_tien: newSubtotal
+              })
+              .eq('id', itemId);
+          } else {
+            // Nếu chia toàn bộ số lượng -> Xóa khỏi hóa đơn cũ
+            await supabase.from('hoadondetail').delete().eq('id', itemId);
+          }
+        }
+      }
+
+      // Thêm các chi tiết vào hóa đơn mới
+      if (orderItemsToInsert.length > 0) {
+        await supabase.from('hoadondetail').insert(orderItemsToInsert);
+      }
+
+      // Cập nhật tổng tiền hóa đơn mới
+      await supabase
+        .from('hoadon')
+        .update({ tong_tien: totalNewAmount })
+        .eq('id', newOrderId);
+
+      // 4. Tính toán lại tiền hóa đơn cũ
+      const { data: remaining } = await supabase
+        .from('hoadondetail')
+        .select('thanh_tien')
+        .eq('idhoadon', orderId);
+
+      if (!remaining || remaining.length === 0) {
+        // Hóa đơn cũ không còn món nào -> Hủy luôn hóa đơn cũ
+        await this.cancelOrder(orderId);
+      } else {
+        const sumRemaining = remaining.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
+        const newDiscount = Math.min(sumRemaining, Number(oldOrder.giam_gia || 0));
+        const newTotal = Math.max(0, sumRemaining - newDiscount);
+
+        await supabase
+          .from('hoadon')
+          .update({
+            tong_tien: newTotal,
+            giam_gia: newDiscount
+          })
+          .eq('id', orderId);
+      }
+
+      return { success: true, newOrderId };
+    }
+
+    // Mock DB Fallback
+    const orders = mockDb.getOrders();
+    const orderItems = mockDb.getOrderItems();
+    const oldOrder = orders.find(o => o.id === orderId);
+    if (!oldOrder) throw new Error('Không tìm thấy hóa đơn.');
+
+    const newOrderId = generateShortId('ord_');
+    const newOrder = {
+      id: newOrderId,
+      table_id: oldOrder.table_id,
+      staff_id: oldOrder.staff_id,
+      total_amount: 0,
+      discount: 0,
+      payment_status: 'Chưa thanh toán',
+      created_at: new Date().toISOString()
+    };
+
+    let totalNewAmount = 0;
+    const newItems: any[] = [];
+
+    for (const req of itemSplitRequests) {
+      const { itemId, splitQuantity } = req;
+      const detailIdx = orderItems.findIndex(d => d.id === itemId);
+      if (detailIdx !== -1) {
+        const detail = orderItems[detailIdx];
+        const currentQty = Number(detail.quantity || 0);
+        const price = Number(detail.unit_price || 0);
+        const splitSubtotal = splitQuantity * price;
+        totalNewAmount += splitSubtotal;
+
+        newItems.push({
+          id: generateShortId('item_'),
+          order_id: newOrderId,
+          product_id: detail.product_id,
+          quantity: splitQuantity,
+          unit_price: price,
+          subtotal: splitSubtotal,
+          ghi_chu: detail.ghi_chu || '',
+          cost_price: Number(detail.cost_price || 0),
+          products: detail.products
+        });
+
+        if (currentQty > splitQuantity) {
+          orderItems[detailIdx].quantity = currentQty - splitQuantity;
+          orderItems[detailIdx].subtotal = (currentQty - splitQuantity) * price;
+        } else {
+          orderItems.splice(detailIdx, 1);
+        }
+      }
+    }
+
+    newOrder.total_amount = totalNewAmount;
+    orders.push(newOrder);
+    mockDb.setOrders(orders);
+    mockDb.setOrderItems([...orderItems, ...newItems]);
+
+    // Recalculate old order total
+    const oldRemaining = orderItems.filter(item => item.order_id === orderId);
+    if (oldRemaining.length === 0) {
+      const idx = orders.findIndex(o => o.id === orderId);
+      if (idx !== -1) orders.splice(idx, 1);
+      mockDb.setOrders(orders);
+    } else {
+      const sumRemaining = oldRemaining.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+      const newDiscount = Math.min(sumRemaining, Number(oldOrder.discount || 0));
+      const newTotal = Math.max(0, sumRemaining - newDiscount);
+      
+      const idx = orders.findIndex(o => o.id === orderId);
+      if (idx !== -1) {
+        orders[idx].total_amount = newTotal;
+        orders[idx].discount = newDiscount;
+        mockDb.setOrders(orders);
+      }
+    }
+
+    return { success: true, newOrderId };
   },
 
   // --- TIME LOGS (chamcong) ---

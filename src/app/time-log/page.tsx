@@ -25,7 +25,9 @@ export default function TimeLogPage() {
 
   // Loại chấm công: 'in' (Vào ca) hoặc 'out' (Ra ca)
   const [logType, setLogType] = useState<'in' | 'out'>('in');
-  const [activeLog, setActiveLog] = useState<any>(null);
+  const [selectedActiveLogId, setSelectedActiveLogId] = useState<string>('');
+  const activeLogs = logs.filter(log => log.status === 'Đang trong ca');
+  const activeLog = logs.find(log => log.id === selectedActiveLogId) || activeLogs[0] || null;
 
   // Trạng thái Form chấm công
   const [shift, setShift] = useState('Ca sáng (05:30 - 12:00)');
@@ -131,9 +133,20 @@ export default function TimeLogPage() {
       const userLogs = allLogs.filter(log => log.user_id === userId);
       setLogs(userLogs);
 
-      // Tìm xem nhân viên có ca làm việc nào đang "Đang trong ca" hay không
-      const active = userLogs.find(log => log.status === 'Đang trong ca');
-      setActiveLog(active || null);
+      // Thiết lập selectedActiveLogId
+      const activeList = userLogs.filter(log => log.status === 'Đang trong ca');
+      if (activeList.length > 0) {
+        // Mặc định chọn ca của ngày hôm nay nếu có, nếu không thì lấy ca gần nhất
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const todayActive = activeList.find(l => {
+          const logLocalDate = new Date(new Date(l.check_in_time).getTime() + (7 * 60 * 60 * 1000)).toISOString().split('T')[0];
+          return logLocalDate === todayStr;
+        });
+        const defaultActive = todayActive || activeList[0];
+        setSelectedActiveLogId(defaultActive.id);
+      } else {
+        setSelectedActiveLogId('');
+      }
     } catch (e) {
       console.error('Lỗi khi tải lịch sử chấm công:', e);
     } finally {
@@ -386,10 +399,29 @@ export default function TimeLogPage() {
           {(logType === 'in' || activeLog) && (
             <form onSubmit={handleSubmit} className="space-y-5 pt-2">
               {logType === 'out' && activeLog && (
-                <div className="p-4 bg-coffee-light/40 border border-coffee-light rounded-2xl text-xs text-coffee-dark space-y-1">
-                  <p>Ca trực đang hoạt động: <strong>{activeLog.shift}</strong></p>
-                  <p>Giờ vào ca đã chọn: <strong>{formatClockTime(activeLog.check_in_time)}</strong> (Thực tế vào lúc: {formatClockTime(activeLog.submitted_at)} - {formatDateString(activeLog.submitted_at)})</p>
-                  {activeLog.ghi_chu_vao && <p className="italic text-coffee-medium mt-1">Ghi chú vào ca: "{activeLog.ghi_chu_vao}"</p>}
+                <div className="space-y-4">
+                  {activeLogs.length > 1 && (
+                    <div className="space-y-1.5 animate-fade-in">
+                      <label className="text-xs font-bold text-coffee-medium uppercase">Chọn ca trực cần ra ca</label>
+                      <select
+                        value={selectedActiveLogId}
+                        onChange={(e) => setSelectedActiveLogId(e.target.value)}
+                        className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs font-bold border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block cursor-pointer transition"
+                      >
+                        {activeLogs.map(l => (
+                          <option key={l.id} value={l.id}>
+                            {l.shift} - Ngày {formatDateString(l.check_in_time)} (Vào: {formatClockTime(l.check_in_time)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="p-4 bg-coffee-light/40 border border-coffee-light rounded-2xl text-xs text-coffee-dark space-y-1">
+                    <p>Ca trực đang hoạt động: <strong>{activeLog.shift}</strong></p>
+                    <p>Giờ vào ca đã chọn: <strong>{formatClockTime(activeLog.check_in_time)}</strong> (Thực tế vào lúc: {formatClockTime(activeLog.submitted_at)} - {formatDateString(activeLog.submitted_at)})</p>
+                    {activeLog.ghi_chu_vao && <p className="italic text-coffee-medium mt-1">Ghi chú vào ca: "{activeLog.ghi_chu_vao}"</p>}
+                  </div>
                 </div>
               )}
 

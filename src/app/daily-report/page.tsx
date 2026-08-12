@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db, getCurrentUser } from '@/lib/database';
+import { toast } from '@/lib/toast';
 import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft, ArrowLeft } from 'lucide-react';
 
 export default function DailyReportPage() {
@@ -283,6 +284,36 @@ export default function DailyReportPage() {
 // Component phụ hiển thị các chỉ số chi tiết cho từng ca
 function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: () => void }) {
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [expandedOrderItems, setExpandedOrderItems] = useState<any[]>([]);
+  const [loadingExpandedItems, setLoadingExpandedItems] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!expandedOrderId) {
+      setExpandedOrderItems([]);
+      return;
+    }
+    async function fetchExpandedItems() {
+      setLoadingExpandedItems(true);
+      try {
+        const items = await db.getOrderItems(expandedOrderId);
+        setExpandedOrderItems(items || []);
+      } catch (e) {
+        console.error('Lỗi khi tải chi tiết đơn hàng:', e);
+        toast.error('Không thể tải chi tiết sản phẩm.');
+      } finally {
+        setLoadingExpandedItems(false);
+      }
+    }
+    fetchExpandedItems();
+  }, [expandedOrderId]);
+
+  // Reset page when metrics change
+  useEffect(() => {
+    setCurrentPage(1);
+    setExpandedOrderId(null);
+  }, [metrics]);
 
   const handleCancelOrder = async (orderId: string) => {
     const isConfirm = window.confirm(
@@ -478,48 +509,142 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
         ) : (
           <div className="space-y-3">
             <div className="divide-y divide-coffee-light/60">
-              {metrics.orders.slice(0, 10).map((order: any) => {
-                const date = new Date(order.created_at);
-                const hh = String(date.getHours()).padStart(2, '0');
-                const mm = String(date.getMinutes()).padStart(2, '0');
-                const dd = String(date.getDate()).padStart(2, '0');
-                const mMonth = String(date.getMonth() + 1).padStart(2, '0');
-                const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
+              {(() => {
+                const itemsPerPage = 10;
+                const totalOrders = metrics.orders.length;
+                const totalPages = Math.ceil(totalOrders / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const displayedOrders = metrics.orders.slice(startIndex, endIndex);
+
                 return (
-                  <div key={order.id} className="py-3.5 space-y-2 text-xs animate-fade-in">
-                    {/* Hàng 1: Mã HĐ và Giờ */}
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
-                      <span className="text-[10px] text-coffee-medium font-medium">{timeFormatted}</span>
-                    </div>
-                    {/* Hàng 2: Bàn, hình thức thanh toán, tổng tiền */}
-                    <div className="flex justify-between items-center text-[11px]">
-                      <div className="flex items-center space-x-2.5">
-                        <span className="font-semibold text-coffee-dark bg-coffee-light px-2 py-0.5 rounded">{order.tables?.table_name || 'Khách mang về'}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
-                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {order.payment_method}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-extrabold text-coffee-primary mr-1">{order.total_amount.toLocaleString('vi-VN')}đ</span>
-                        <button
-                          onClick={() => handleCancelOrder(order.id)}
-                          disabled={cancelingId !== null}
-                          className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold transition disabled:opacity-50 flex items-center space-x-1"
+                  <>
+                    {displayedOrders.map((order: any) => {
+                      const date = new Date(order.created_at);
+                      const hh = String(date.getHours()).padStart(2, '0');
+                      const mm = String(date.getMinutes()).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      const mMonth = String(date.getMonth() + 1).padStart(2, '0');
+                      const timeFormatted = `${hh}:${mm} - ${dd}/${mMonth}`;
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                          className="py-3.5 space-y-2 text-xs cursor-pointer hover:bg-[#FAF6F0]/50 -mx-3 px-3 rounded-2xl transition"
                         >
-                          <span>Hủy</span>
+                          {/* Hàng 1: Mã HĐ và Giờ */}
+                          <div className="flex justify-between items-center">
+                            <span className="font-mono font-bold text-coffee-dark uppercase">#{order.id.substring(0, 6)}</span>
+                            <span className="text-[10px] text-coffee-medium font-medium">{timeFormatted}</span>
+                          </div>
+                          {/* Hàng 2: Bàn, hình thức thanh toán, tổng tiền */}
+                          <div className="flex justify-between items-center text-[11px]">
+                            <div className="flex items-center space-x-2.5">
+                              <span className="font-semibold text-coffee-dark bg-coffee-light px-2 py-0.5 rounded">{order.tables?.table_name || 'Khách mang về'}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
+                                order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {order.payment_method}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-extrabold text-coffee-primary mr-1">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelOrder(order.id);
+                                }}
+                                disabled={cancelingId !== null}
+                                className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold transition disabled:opacity-50 flex items-center space-x-1"
+                              >
+                                <span>Hủy</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mở rộng chi tiết món hàng */}
+                          {expandedOrderId === order.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-3 p-3.5 bg-coffee-cream/20 rounded-2xl border border-coffee-light/40 space-y-2 text-[11px]"
+                            >
+                              <p className="font-bold text-[9px] text-coffee-medium uppercase tracking-wider">Chi tiết món ăn:</p>
+                              {loadingExpandedItems ? (
+                                <div className="py-3 flex justify-center">
+                                  <Loader2 className="w-4 h-4 text-coffee-primary animate-spin" />
+                                </div>
+                              ) : expandedOrderItems.length === 0 ? (
+                                <p className="italic text-coffee-medium/70">Không có chi tiết sản phẩm.</p>
+                              ) : (
+                                <div className="space-y-2 divide-y divide-coffee-light/25">
+                                  {expandedOrderItems.map((item, idx) => (
+                                    <div key={item.id || idx} className="flex justify-between items-center pt-2 first:pt-0">
+                                      <span className="text-coffee-dark font-medium">
+                                        {item.products?.name || 'Sản phẩm'} <span className="text-coffee-medium font-black">x{item.quantity}</span>
+                                      </span>
+                                      <span className="font-bold text-coffee-dark">
+                                        {(item.subtotal || 0).toLocaleString('vi-VN')}đ
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="flex justify-between items-center font-extrabold text-coffee-primary pt-2.5">
+                                    <span>Tạm tính tiền món:</span>
+                                    <span>
+                                      {expandedOrderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0).toLocaleString('vi-VN')}đ
+                                    </span>
+                                  </div>
+                                  {order.discount > 0 && (
+                                    <div className="flex justify-between items-center text-red-600 font-extrabold pt-1">
+                                      <span>Giảm giá hóa đơn:</span>
+                                      <span>
+                                        -{order.discount.toLocaleString('vi-VN')}đ
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Điều khiển phân trang */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center space-x-1.5 pt-4 border-t border-coffee-light/40">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition"
+                        >
+                          Trước
+                        </button>
+                        {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-7 h-7 rounded-lg text-[10px] font-bold transition ${
+                              currentPage === page
+                                ? 'bg-coffee-primary text-white shadow-sm font-black'
+                                : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition"
+                        >
+                          Sau
                         </button>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 );
-              })}
+              })()}
             </div>
-            {metrics.orders.length > 10 && (
-              <p className="text-[10px] text-coffee-medium text-center pt-2 italic border-t border-coffee-light/40">Hiển thị 10 hóa đơn gần nhất...</p>
-            )}
           </div>
         )}
       </div>
