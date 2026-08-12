@@ -748,6 +748,11 @@ export default function AdminPage() {
                   if (!dStr) return '';
                   return new Date(dStr).toLocaleDateString('vi-VN');
                 };
+                const calculateHours = (logItem: any) => {
+                  if (!logItem.gio_vao || !logItem.gio_ra) return 0;
+                  const diffMs = new Date(logItem.gio_ra).getTime() - new Date(logItem.gio_vao).getTime();
+                  return Math.max(0, Number((diffMs / (1000 * 60 * 60)).toFixed(2)));
+                };
 
                 const isWorking = log.status === 'Đang trong ca';
 
@@ -778,9 +783,16 @@ export default function AdminPage() {
                     </div>
 
                     <div className="text-xs space-y-3">
-                      <p className="font-extrabold text-coffee-dark text-xs bg-coffee-light/30 px-2 py-1 rounded w-fit">
-                        Ca trực: {log.shift}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-extrabold text-coffee-dark text-xs bg-coffee-light/30 px-2 py-1 rounded w-fit">
+                          Ca trực: {log.shift}
+                        </p>
+                        {!isWorking && (
+                          <span className="font-extrabold text-[#D05A3F] text-xs bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                            ⏱️ Số giờ làm: <strong>{calculateHours(log)}h</strong>
+                          </span>
+                        )}
+                      </div>
                       
                       <div className="grid grid-cols-2 gap-3 bg-[#FAF6F0] p-3 rounded-2xl border border-coffee-light/60">
                         {/* Chi tiết Vào ca */}

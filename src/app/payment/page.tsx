@@ -195,6 +195,8 @@ export default function PaymentPage() {
     } finally {
       setLoadingItems(false);
     }
+  };
+
   // Chia đơn/Tách hóa đơn mới
   const handleSplitOrder = async () => {
     if (!selectedOrder || selectedSplitItems.length === 0) return;

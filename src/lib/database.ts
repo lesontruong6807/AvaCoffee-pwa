@@ -1660,6 +1660,8 @@ export const db = {
     }
 
     return { orderDeleted: false, newTotal: 0, newDiscount: 0 };
+  },
+
   async splitOrder(orderId: string, itemSplitRequests: Array<{ itemId: string, splitQuantity: number }>) {
     if (isSupabaseConfigured && supabase) {
       // 1. Lấy thông tin hóa đơn cũ

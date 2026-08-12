@@ -295,9 +295,11 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
       return;
     }
     async function fetchExpandedItems() {
+      const orderId = expandedOrderId;
+      if (!orderId) return;
       setLoadingExpandedItems(true);
       try {
-        const items = await db.getOrderItems(expandedOrderId);
+        const items = await db.getOrderItems(orderId);
         setExpandedOrderItems(items || []);
       } catch (e) {
         console.error('Lỗi khi tải chi tiết đơn hàng:', e);
