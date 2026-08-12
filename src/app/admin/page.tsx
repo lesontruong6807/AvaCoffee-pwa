@@ -23,7 +23,10 @@ import {
   Loader2,
   CheckCircle2,
   Map,
-  ArrowLeft
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF, exportProductSalesToExcel, exportProductSalesToPDF, exportAttendanceToExcel, exportAttendanceToPDF } from '@/lib/exportUtils';
@@ -95,6 +98,15 @@ export default function AdminPage() {
   });
   const [attUserId, setAttUserId] = useState('all');
   const [attendanceSubTab, setAttendanceSubTab] = useState<'summary' | 'shifts' | 'leaves'>('summary');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [currentCalDate, setCurrentCalDate] = useState<Date>(() => new Date());
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (attStartDate) {
+      setCurrentCalDate(new Date(attStartDate));
+    }
+  }, [attStartDate]);
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1814,14 +1826,28 @@ export default function AdminPage() {
             if (diff > 0) hours = diff / (1000 * 60 * 60);
           }
           const staff = users.find(u => u.id === log.user_id);
+          
+          // Tính ngày dạng YYYY-MM-DD theo múi giờ GMT+7 địa phương
+          const checkInDate = new Date(log.check_in_time);
+          const localTime = new Date(checkInDate.getTime() + (7 * 60 * 60 * 1000));
+          const yyyy = localTime.getUTCFullYear();
+          const mm = String(localTime.getUTCMonth() + 1).padStart(2, '0');
+          const dd = String(localTime.getUTCDate()).padStart(2, '0');
+          const localYmd = `${yyyy}-${mm}-${dd}`;
+
           return {
             staffName: staff?.full_name || log.users?.full_name || 'Nhân viên',
             date: new Date(log.check_in_time).toLocaleDateString('vi-VN'),
+            localYmd: localYmd,
             shiftName: log.shift,
             checkIn: new Date(log.check_in_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.check_in_time).toLocaleDateString('vi-VN'),
             checkOut: log.check_out_time ? new Date(log.check_out_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.check_out_time).toLocaleDateString('vi-VN') : '-',
             hours: hours,
-            status: log.status
+            status: log.status,
+            noteIn: log.ghi_chu_vao || '',
+            noteOut: log.ghi_chu_ra || '',
+            submittedAt: log.submitted_at ? new Date(log.submitted_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '-',
+            realCheckOut: log.real_check_out_time ? new Date(log.real_check_out_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '-'
           };
         });
 
@@ -1830,11 +1856,16 @@ export default function AdminPage() {
           const startStr = new Date(leave.start_date).toLocaleDateString('vi-VN');
           const endStr = new Date(leave.end_date).toLocaleDateString('vi-VN');
           const daysInPeriod = getOverlapDays(leave.start_date, leave.end_date, attStartDate, attEndDate);
+          
+          const startYmd = leave.start_date.split('T')[0];
+          const endYmd = leave.end_date.split('T')[0];
 
           return {
             staffName: staff?.full_name || leave.users?.full_name || 'Nhân viên',
             startDate: startStr,
             endDate: endStr,
+            startYmd,
+            endYmd,
             days: daysInPeriod,
             reason: leave.reason,
             status: leave.status
@@ -1945,32 +1976,55 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Sub-tabs điều hướng bảng */}
-            <div className="bg-white p-2 rounded-2xl border border-coffee-light flex space-x-1 shadow-sm w-fit text-xs">
-              <button
-                onClick={() => setAttendanceSubTab('summary')}
-                className={`px-4 py-2 rounded-xl font-bold transition ${
-                  attendanceSubTab === 'summary' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
-                }`}
-              >
-                Tổng hợp công
-              </button>
-              <button
-                onClick={() => setAttendanceSubTab('shifts')}
-                className={`px-4 py-2 rounded-xl font-bold transition ${
-                  attendanceSubTab === 'shifts' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
-                }`}
-              >
-                Lịch sử ca làm ({shiftsDetails.length})
-              </button>
-              <button
-                onClick={() => setAttendanceSubTab('leaves')}
-                className={`px-4 py-2 rounded-xl font-bold transition ${
-                  attendanceSubTab === 'leaves' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
-                }`}
-              >
-                Lịch sử nghỉ phép ({leavesDetails.length})
-              </button>
+            {/* Sub-tabs điều hướng bảng + Toggle View Mode */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+              <div className="bg-white p-2 rounded-2xl border border-coffee-light flex space-x-1 shadow-sm w-fit text-xs">
+                <button
+                  onClick={() => setAttendanceSubTab('summary')}
+                  className={`px-4 py-2 rounded-xl font-bold transition ${
+                    attendanceSubTab === 'summary' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                  }`}
+                >
+                  Tổng hợp công
+                </button>
+                <button
+                  onClick={() => setAttendanceSubTab('shifts')}
+                  className={`px-4 py-2 rounded-xl font-bold transition ${
+                    attendanceSubTab === 'shifts' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                  }`}
+                >
+                  Lịch sử ca làm ({shiftsDetails.length})
+                </button>
+                <button
+                  onClick={() => setAttendanceSubTab('leaves')}
+                  className={`px-4 py-2 rounded-xl font-bold transition ${
+                    attendanceSubTab === 'leaves' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                  }`}
+                >
+                  Lịch sử nghỉ phép ({leavesDetails.length})
+                </button>
+              </div>
+
+              {attendanceSubTab !== 'summary' && (
+                <div className="bg-white p-2 rounded-2xl border border-coffee-light flex space-x-1 shadow-sm w-fit text-xs">
+                  <button
+                    onClick={() => setViewMode('calendar')}
+                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1 ${
+                      viewMode === 'calendar' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                    }`}
+                  >
+                    <span>📅 Dạng Lịch</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1 ${
+                      viewMode === 'table' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:bg-coffee-light'
+                    }`}
+                  >
+                    <span>📋 Dạng Bảng</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Render các bảng dữ liệu */}
@@ -2014,89 +2068,119 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Modal chi tiết ngày của Lịch */}
+            {selectedCalendarDay && (
+              <CalendarDayDetailsModal
+                type={attendanceSubTab === 'shifts' ? 'shifts' : 'leaves'}
+                day={selectedCalendarDay}
+                items={attendanceSubTab === 'shifts' ? shiftsDetails : leavesDetails}
+                onClose={() => setSelectedCalendarDay(null)}
+              />
+            )}
+
             {attendanceSubTab === 'shifts' && (
-              <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead>
-                      <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
-                        <th className="p-4">STT</th>
-                        <th className="p-4">Nhân viên</th>
-                        <th className="p-4">Ngày</th>
-                        <th className="p-4">Ca làm</th>
-                        <th className="p-4">Giờ vào thực tế</th>
-                        <th className="p-4">Giờ ra thực tế</th>
-                        <th className="p-4 text-right">Số giờ làm</th>
-                        <th className="p-4 text-center">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-coffee-light/50">
-                      {shiftsDetails.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
-                          <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
-                          <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
-                          <td className="p-4 text-coffee-medium">{row.date}</td>
-                          <td className="p-4 text-coffee-dark font-medium">{row.shiftName}</td>
-                          <td className="p-4 text-coffee-medium font-mono">{row.checkIn}</td>
-                          <td className="p-4 text-coffee-medium font-mono">{row.checkOut}</td>
-                          <td className="p-4 text-right font-bold text-coffee-dark">{row.hours.toFixed(1)} h</td>
-                          <td className="p-4 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
-                              row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
-                              row.status === 'Từ chối' ? 'bg-red-100 text-red-800' :
-                              'bg-blue-100 text-blue-800'
-                            }`}>
-                              {row.status}
-                            </span>
-                          </td>
+              viewMode === 'calendar' ? (
+                <CalendarView
+                  type="shifts"
+                  items={shiftsDetails}
+                  currentCalDate={currentCalDate}
+                  setCurrentCalDate={setCurrentCalDate}
+                  onSelectDay={(day) => setSelectedCalendarDay(day)}
+                />
+              ) : (
+                <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden animate-fade-in">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                          <th className="p-4">STT</th>
+                          <th className="p-4">Nhân viên</th>
+                          <th className="p-4">Ngày</th>
+                          <th className="p-4">Ca làm</th>
+                          <th className="p-4">Giờ vào thực tế</th>
+                          <th className="p-4">Giờ ra thực tế</th>
+                          <th className="p-4 text-right">Số giờ làm</th>
+                          <th className="p-4 text-center">Trạng thái</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-coffee-light/50">
+                        {shiftsDetails.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
+                            <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
+                            <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
+                            <td className="p-4 text-coffee-medium">{row.date}</td>
+                            <td className="p-4 text-coffee-dark font-medium">{row.shiftName}</td>
+                            <td className="p-4 text-coffee-medium font-mono">{row.checkIn}</td>
+                            <td className="p-4 text-coffee-medium font-mono">{row.checkOut}</td>
+                            <td className="p-4 text-right font-bold text-coffee-dark">{row.hours.toFixed(1)} h</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
+                                row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
+                                row.status === 'Từ chối' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )
             )}
 
             {attendanceSubTab === 'leaves' && (
-              <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead>
-                      <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
-                        <th className="p-4">STT</th>
-                        <th className="p-4">Nhân viên</th>
-                        <th className="p-4">Từ ngày</th>
-                        <th className="p-4">Đến ngày</th>
-                        <th className="p-4 text-center">Số ngày nghỉ</th>
-                        <th className="p-4">Lý do xin nghỉ</th>
-                        <th className="p-4 text-center">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-coffee-light/50">
-                      {leavesDetails.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
-                          <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
-                          <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
-                          <td className="p-4 text-coffee-dark">{row.startDate}</td>
-                          <td className="p-4 text-coffee-dark">{row.endDate}</td>
-                          <td className="p-4 text-center font-bold text-coffee-dark">{row.days} ngày</td>
-                          <td className="p-4 text-coffee-medium italic max-w-xs truncate" title={row.reason}>{row.reason}</td>
-                          <td className="p-4 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
-                              row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {row.status}
-                            </span>
-                          </td>
+              viewMode === 'calendar' ? (
+                <CalendarView
+                  type="leaves"
+                  items={leavesDetails}
+                  currentCalDate={currentCalDate}
+                  setCurrentCalDate={setCurrentCalDate}
+                  onSelectDay={(day) => setSelectedCalendarDay(day)}
+                />
+              ) : (
+                <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden animate-fade-in">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
+                          <th className="p-4">STT</th>
+                          <th className="p-4">Nhân viên</th>
+                          <th className="p-4">Từ ngày</th>
+                          <th className="p-4">Đến ngày</th>
+                          <th className="p-4 text-center">Số ngày nghỉ</th>
+                          <th className="p-4">Lý do xin nghỉ</th>
+                          <th className="p-4 text-center">Trạng thái</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-coffee-light/50">
+                        {leavesDetails.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-coffee-light/20 transition-colors">
+                            <td className="p-4 text-coffee-medium font-mono">{idx + 1}</td>
+                            <td className="p-4 font-bold text-coffee-dark">{row.staffName}</td>
+                            <td className="p-4 text-coffee-dark">{row.startDate}</td>
+                            <td className="p-4 text-coffee-dark">{row.endDate}</td>
+                            <td className="p-4 text-center font-bold text-coffee-dark">{row.days} ngày</td>
+                            <td className="p-4 text-coffee-medium italic max-w-xs truncate" title={row.reason}>{row.reason}</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                row.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
+                                row.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )
             )}
           </div>
         );
@@ -2476,6 +2560,308 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// --- HELPER CALENDAR COMPONENTS FOR ADMIN ---
+
+function CalendarView({
+  type,
+  items,
+  currentCalDate,
+  setCurrentCalDate,
+  onSelectDay
+}: {
+  type: 'shifts' | 'leaves';
+  items: any[];
+  currentCalDate: Date;
+  setCurrentCalDate: React.Dispatch<React.SetStateAction<Date>>;
+  onSelectDay: (day: Date) => void;
+}) {
+  const year = currentCalDate.getFullYear();
+  const month = currentCalDate.getMonth();
+
+  const getDaysInMonth = (y: number, m: number) => {
+    const firstDay = new Date(y, m, 1);
+    const startDayOfWeek = firstDay.getDay();
+    const totalDays = new Date(y, m + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(y, m, 0).getDate();
+    const cells: Array<{ date: Date; isCurrentMonth: boolean }> = [];
+
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      cells.push({
+        date: new Date(y, m - 1, prevMonthTotalDays - i),
+        isCurrentMonth: false
+      });
+    }
+
+    for (let i = 1; i <= totalDays; i++) {
+      cells.push({
+        date: new Date(y, m, i),
+        isCurrentMonth: true
+      });
+    }
+
+    const remaining = 42 - cells.length;
+    for (let i = 1; i <= remaining; i++) {
+      cells.push({
+        date: new Date(y, m + 1, i),
+        isCurrentMonth: false
+      });
+    }
+
+    return cells;
+  };
+
+  const cells = getDaysInMonth(year, month);
+  const weekdayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+  const getLocalDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  return (
+    <div className="bg-white rounded-3xl border border-coffee-light shadow-sm p-4 space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between pb-2 border-b border-coffee-light/60">
+        <div className="flex items-center space-x-1.5">
+          <Calendar className="w-5 h-5 text-coffee-primary" />
+          <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">
+            Tháng {month + 1} / {year}
+          </h4>
+        </div>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setCurrentCalDate(new Date(year, month - 1, 1))}
+            className="p-1.5 hover:bg-[#FAF6F0] border border-coffee-light rounded-xl transition text-coffee-medium"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setCurrentCalDate(new Date())}
+            className="px-3 py-1.5 hover:bg-[#FAF6F0] border border-coffee-light rounded-xl text-[10px] font-bold transition text-coffee-primary"
+          >
+            Hôm nay
+          </button>
+          <button
+            onClick={() => setCurrentCalDate(new Date(year, month + 1, 1))}
+            className="p-1.5 hover:bg-[#FAF6F0] border border-coffee-light rounded-xl transition text-coffee-medium"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] uppercase text-coffee-medium">
+        {weekdayNames.map((day, idx) => (
+          <div key={idx} className="py-2 bg-[#FAF6F0] rounded-xl border border-coffee-light/40">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 border-t border-l border-coffee-light/35 animate-fade-in">
+        {cells.map((cell, idx) => {
+          const cellYmd = getLocalDateString(cell.date);
+          const isToday = getLocalDateString(new Date()) === cellYmd;
+          
+          let cellEvents: any[] = [];
+          if (type === 'shifts') {
+            cellEvents = items.filter(s => s.localYmd === cellYmd);
+          } else {
+            cellEvents = items.filter(l => cellYmd >= l.startYmd && cellYmd <= l.endYmd);
+          }
+
+          const visibleEvents = cellEvents.slice(0, 3);
+          const extraCount = cellEvents.length - visibleEvents.length;
+
+          return (
+            <div
+              key={idx}
+              onClick={() => onSelectDay(cell.date)}
+              className={`min-h-[105px] p-2 border-r border-b border-coffee-light/35 flex flex-col justify-between transition cursor-pointer hover:bg-[#FAF6F0]/40 ${
+                cell.isCurrentMonth ? 'bg-white' : 'bg-[#FAF6F0]/20'
+              } ${isToday ? 'ring-2 ring-coffee-accent ring-inset' : ''}`}
+            >
+              <div className="flex justify-between items-start">
+                <span
+                  className={`text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center ${
+                    isToday
+                      ? 'bg-coffee-primary text-white'
+                      : cell.isCurrentMonth
+                      ? 'text-coffee-dark'
+                      : 'text-coffee-medium/40'
+                  }`}
+                >
+                  {cell.date.getDate()}
+                </span>
+                {cellEvents.length > 0 && (
+                  <span className="text-[8px] bg-coffee-light px-1.5 py-0.5 rounded-full text-coffee-medium font-bold">
+                    {cellEvents.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1 mt-1.5 flex-grow overflow-hidden">
+                {visibleEvents.map((ev, evIdx) => {
+                  let pillBg = 'bg-green-50 text-green-700 border-green-200';
+                  if (ev.status === 'Chờ duyệt') {
+                    pillBg = 'bg-yellow-50 text-yellow-800 border-yellow-200';
+                  } else if (ev.status === 'Từ chối') {
+                    pillBg = 'bg-red-50 text-red-700 border-red-200';
+                  } else if (ev.status === 'Đang trong ca') {
+                    pillBg = 'bg-blue-50 text-blue-700 border-blue-200';
+                  }
+
+                  const text = type === 'shifts' 
+                    ? `${ev.staffName.split(' ').pop()} (${ev.hours.toFixed(1)}h)`
+                    : `${ev.staffName.split(' ').pop()} (Nghỉ)`;
+
+                  return (
+                    <div
+                      key={evIdx}
+                      className={`text-[8px] font-extrabold px-1 py-0.5 rounded border leading-tight truncate shadow-sm ${pillBg}`}
+                      title={type === 'shifts' ? `${ev.staffName} - ${ev.shiftName}` : `${ev.staffName} - Nghỉ: ${ev.reason}`}
+                    >
+                      {text}
+                    </div>
+                  );
+                })}
+                {extraCount > 0 && (
+                  <div className="text-[8px] text-coffee-medium font-bold text-center italic py-0.5">
+                    + {extraCount} khác...
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CalendarDayDetailsModal({
+  type,
+  day,
+  items,
+  onClose
+}: {
+  type: 'shifts' | 'leaves';
+  day: Date;
+  items: any[];
+  onClose: () => void;
+}) {
+  const getLocalDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const cellYmd = getLocalDateString(day);
+  
+  let dayEvents: any[] = [];
+  if (type === 'shifts') {
+    dayEvents = items.filter(s => s.localYmd === cellYmd);
+  } else {
+    dayEvents = items.filter(l => cellYmd >= l.startYmd && cellYmd <= l.endYmd);
+  }
+
+  const formattedDate = day.toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white rounded-3xl max-w-md w-full border border-coffee-light shadow-2xl p-6 flex flex-col max-h-[85vh] overflow-hidden space-y-4">
+        <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
+          <div className="space-y-0.5">
+            <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">
+              {type === 'shifts' ? 'Ca trực trong ngày' : 'Nghỉ phép trong ngày'}
+            </h4>
+            <p className="text-[10px] text-coffee-medium font-bold">{formattedDate}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-[#FAF6F0] rounded-full text-coffee-medium transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-grow overflow-y-auto space-y-3 pr-1">
+          {dayEvents.length === 0 ? (
+            <p className="text-center italic text-coffee-medium/70 text-xs py-8">
+              Không có bản ghi nào trong ngày này.
+            </p>
+          ) : (
+            dayEvents.map((ev, idx) => (
+              <div
+                key={idx}
+                className="p-4 bg-[#FAF6F0]/40 rounded-2xl border border-coffee-light/60 space-y-3 text-xs"
+              >
+                <div className="flex justify-between items-center border-b border-coffee-light/30 pb-2">
+                  <span className="font-bold text-coffee-dark text-sm">{ev.staffName}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                    ev.status === 'Đã duyệt' ? 'bg-green-100 text-green-800' :
+                    ev.status === 'Chờ duyệt' ? 'bg-yellow-100 text-yellow-800' :
+                    ev.status === 'Từ chối' ? 'bg-red-100 text-red-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {ev.status}
+                  </span>
+                </div>
+
+                {type === 'shifts' ? (
+                  <div className="grid grid-cols-2 gap-2 text-[11px] leading-relaxed">
+                    <p className="col-span-2 text-coffee-dark font-extrabold">Ca làm: {ev.shiftName}</p>
+                    <div>
+                      <p className="text-[9px] uppercase font-bold text-coffee-medium">Khai báo vào</p>
+                      <p className="text-coffee-dark font-medium">{ev.checkIn.split(' ')[0]}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase font-bold text-coffee-medium">Khai báo ra</p>
+                      <p className="text-coffee-dark font-medium">{ev.checkOut.split(' ')[0]}</p>
+                    </div>
+                    <div className="col-span-2 border-t border-coffee-light/20 pt-2 flex justify-between items-center text-xs">
+                      <span className="font-bold text-coffee-primary">Số giờ làm:</span>
+                      <span className="font-black text-coffee-primary text-sm">{ev.hours.toFixed(2)}h</span>
+                    </div>
+                    {ev.noteIn && (
+                      <p className="col-span-2 text-coffee-medium italic">Ghi chú vào: "{ev.noteIn}"</p>
+                    )}
+                    {ev.noteOut && (
+                      <p className="col-span-2 text-coffee-medium italic">Ghi chú ra: "{ev.noteOut}"</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1 text-[11px] leading-relaxed">
+                    <p className="text-coffee-dark">Thời gian nghỉ: <strong>{ev.startDate}</strong> đến <strong>{ev.endDate}</strong></p>
+                    <p className="text-coffee-dark">Số ngày nghỉ: <strong>{ev.days} ngày</strong></p>
+                    <p className="text-coffee-medium italic">Lý do nghỉ: "{ev.reason}"</p>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="pt-2 border-t border-coffee-light/60 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-coffee-primary hover:bg-coffee-dark text-white rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
