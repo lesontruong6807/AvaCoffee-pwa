@@ -271,9 +271,13 @@ export default function TimeLogPage() {
 
     // 3. Hiển thị thông báo xác nhận trước khi gửi
     const typeText = logType === 'in' ? 'VÀO CA' : 'RA CA';
+    const localDateStr = logType === 'in'
+      ? new Date().toLocaleDateString('vi-VN')
+      : new Date(activeLog.check_in_time).toLocaleDateString('vi-VN');
+      
     const confirmMsg = `XÁC NHẬN CHẤM CÔNG ${typeText}\n\n` +
       `• Ca làm việc: ${currentShift}\n` +
-      `• Ngày làm việc: ${new Date().toLocaleDateString('vi-VN')}\n` +
+      `• Ngày làm việc: ${localDateStr}\n` +
       `• Giờ khai báo: ${timeInput}\n` +
       `• Vị trí: ${address || 'Mock GPS location'}\n\n` +
       `Bạn có chắc chắn thông tin trên đã chính xác?`;
@@ -284,7 +288,7 @@ export default function TimeLogPage() {
 
     setSubmitting(true);
     try {
-      const shiftDate = new Date();
+      const shiftDate = logType === 'in' ? new Date() : new Date(activeLog.check_in_time);
       shiftDate.setHours(checkHour, checkMin, 0, 0);
 
       if (logType === 'in') {
