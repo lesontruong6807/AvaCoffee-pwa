@@ -761,8 +761,10 @@ export default function AdminPage() {
                   return new Date(dStr).toLocaleDateString('vi-VN');
                 };
                 const calculateHours = (logItem: any) => {
-                  if (!logItem.gio_vao || !logItem.gio_ra) return 0;
-                  const diffMs = new Date(logItem.gio_ra).getTime() - new Date(logItem.gio_vao).getTime();
+                  const checkIn = logItem.check_in_time || logItem.gio_vao;
+                  const checkOut = logItem.check_out_time || logItem.gio_ra;
+                  if (!checkIn || !checkOut) return 0;
+                  const diffMs = new Date(checkOut).getTime() - new Date(checkIn).getTime();
                   return Math.max(0, Number((diffMs / (1000 * 60 * 60)).toFixed(2)));
                 };
 

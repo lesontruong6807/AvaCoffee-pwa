@@ -496,7 +496,7 @@ export function getIngredientPackageInfo(unit: string, quyCach?: string): { inpu
   if (qc === '150g') {
     return { inputUnit: 'bịch', multiplier: 150 };
   }
-  if (qc === '30g' || u === 'bịch') {
+  if (qc === '30g') {
     return { inputUnit: 'bịch', multiplier: 30 };
   }
   if (qc === '1000ml' || qc === '1l') {

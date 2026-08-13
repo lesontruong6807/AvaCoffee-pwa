@@ -50,7 +50,7 @@ export default function DailyReportPage() {
 
   const todayLogs = inventoryLogs.filter(l => {
     const logDate = new Date(l.created_at);
-    return logDate.toDateString() === todayStr && l.type === 'Nhập kho';
+    return logDate.toDateString() === todayStr && l.type === 'Nhập kho' && l.status !== 'Từ chối';
   });
 
   // 2. Phân loại theo Ca làm việc

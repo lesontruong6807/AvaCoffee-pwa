@@ -115,7 +115,7 @@ export default function InventoryPage() {
   const todayStr = new Date().toLocaleDateString('en-CA');
 
   const todayRestockCost = logs
-    .filter(l => l.type === 'Nhập kho' && new Date(l.created_at).toLocaleDateString('en-CA') === todayStr)
+    .filter(l => l.type === 'Nhập kho' && l.status !== 'Từ chối' && new Date(l.created_at).toLocaleDateString('en-CA') === todayStr)
     .reduce((sum, l) => sum + Number(l.cost || 0), 0);
 
   // --- XỬ LÝ NHẬP THÊM (RESTOCK) ---
