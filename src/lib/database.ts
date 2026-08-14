@@ -64,7 +64,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê sữa tươi',
     price: 22000,
-    cost_price: 8186,
+    cost_price: 7833,
     image_url: '/products/CP003.png',
     status: 'Còn hàng' as const
   },
@@ -73,16 +73,16 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê muối',
     price: 22000,
-    cost_price: 8844,
+    cost_price: 8845,
     image_url: '/products/CP004.png',
     status: 'Còn hàng' as const
   },
   {
     id: 'CP005',
     category_id: 'c_caphe',
-    name: 'Bạc xìu',
+    name: 'Bạc xỉu',
     price: 22000,
-    cost_price: 7258,
+    cost_price: 7267,
     image_url: '/products/CP005.png',
     status: 'Còn hàng' as const
   },
@@ -92,7 +92,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_douongkhac',
     name: 'Cacao sữa',
     price: 20000,
-    cost_price: 7052,
+    cost_price: 7057,
     image_url: '/products/TUK001.png',
     status: 'Còn hàng' as const
   },
@@ -101,7 +101,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_douongkhac',
     name: 'Cacao kem muối',
     price: 25000,
-    cost_price: 9322,
+    cost_price: 9327,
     image_url: '/products/TUK002.png',
     status: 'Còn hàng' as const
   },
@@ -110,7 +110,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_douongkhac',
     name: 'Matcha Latte',
     price: 25000,
-    cost_price: 8705,
+    cost_price: 8173,
     image_url: '/products/TUK003.png',
     status: 'Còn hàng' as const
   },
@@ -119,7 +119,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_douongkhac',
     name: 'Matcha Latte kem muối',
     price: 30000,
-    cost_price: 9609,
+    cost_price: 9619,
     image_url: '/products/TUK004.png',
     status: 'Còn hàng' as const
   },
@@ -129,7 +129,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_tra',
     name: 'Trà tắc',
     price: 15000,
-    cost_price: 680,
+    cost_price: 1513,
     image_url: '/products/T001.png',
     status: 'Còn hàng' as const
   },
@@ -166,7 +166,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_yaourt',
     name: 'Yaourt đá',
     price: 20000,
-    cost_price: 10583,
+    cost_price: 8886,
     image_url: '/products/Y001.png',
     status: 'Còn hàng' as const
   },
@@ -175,7 +175,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_yaourt',
     name: 'Yaourt dâu',
     price: 25000,
-    cost_price: 13867,
+    cost_price: 12170,
     image_url: '/products/Y002.png',
     status: 'Còn hàng' as const
   },
@@ -184,7 +184,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_yaourt',
     name: 'Yaourt việt quất',
     price: 25000,
-    cost_price: 14747,
+    cost_price: 13050,
     image_url: '/products/Y003.png',
     status: 'Còn hàng' as const
   },
@@ -353,8 +353,8 @@ export const MOCK_RECIPES = [
 
   // 3. Cà phê sữa tươi
   { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 11, unit: 'g' },
-  { id: 'rec_cp3_2', product_id: 'CP003', ingredient_id: 'ing_suadac', quantity_needed: 25, unit: 'g' },
-  { id: 'rec_cp3_3', product_id: 'CP003', ingredient_id: 'ing_suatuoi', quantity_needed: 100, unit: 'ml' },
+  { id: 'rec_cp3_2', product_id: 'CP003', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
+  { id: 'rec_cp3_3', product_id: 'CP003', ingredient_id: 'ing_suatuoi', quantity_needed: 80, unit: 'ml' },
   { id: 'rec_cp3_4', product_id: 'CP003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
   // 4. Cà phê muối
@@ -389,7 +389,7 @@ export const MOCK_RECIPES = [
   // 8. Matcha Latte
   { id: 'rec_tuk3_1', product_id: 'TUK003', ingredient_id: 'ing_matcha', quantity_needed: 3.5, unit: 'g' },
   { id: 'rec_tuk3_2', product_id: 'TUK003', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
-  { id: 'rec_tuk3_3', product_id: 'TUK003', ingredient_id: 'ing_suatuoi', quantity_needed: 100, unit: 'ml' },
+  { id: 'rec_tuk3_3', product_id: 'TUK003', ingredient_id: 'ing_suatuoi', quantity_needed: 80, unit: 'ml' },
   { id: 'rec_tuk3_4', product_id: 'TUK003', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 9. Matcha Latte kem muối
@@ -403,6 +403,7 @@ export const MOCK_RECIPES = [
 
   // 10. Trà tắc
   { id: 'rec_t1_lytratac', product_id: 'T001', ingredient_id: 'ing_lytratac', quantity_needed: 1, unit: 'cái' },
+  { id: 'rec_t1_duong', product_id: 'T001', ingredient_id: 'ing_duong', quantity_needed: 41.67, unit: 'g' },
 
   // 11. Trà dâu
   { id: 'rec_t2_hongtra', product_id: 'T002', ingredient_id: 'ing_hongtra', quantity_needed: 0.09375, unit: 'bịch' },
@@ -558,7 +559,7 @@ export function formatIngredientStock(quantity: number, unit: string, quyCach?: 
       if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
       return `${g}g`;
     }
-    if (quyCach === '30g' || unit === 'bịch') {
+    if (quyCach === '30g') {
       const bich = Math.floor(qty / 30);
       const g = Math.round(qty % 30);
       if (bich > 0) return g > 0 ? `${bich} bịch + ${g}g` : `${bich} bịch`;
