@@ -64,7 +64,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê sữa tươi',
     price: 22000,
-    cost_price: 7833,
+    cost_price: 9649,
     image_url: '/products/CP003.png',
     status: 'Còn hàng' as const
   },
@@ -73,7 +73,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê muối',
     price: 22000,
-    cost_price: 8845,
+    cost_price: 9621,
     image_url: '/products/CP004.png',
     status: 'Còn hàng' as const
   },
@@ -82,7 +82,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Bạc xỉu',
     price: 22000,
-    cost_price: 7267,
+    cost_price: 9082,
     image_url: '/products/CP005.png',
     status: 'Còn hàng' as const
   },
@@ -297,7 +297,9 @@ const MOCK_TABLES: Array<{ id: string; table_name: string; capacity: number; sta
   { id: 'tb4', table_name: 'Bàn 4', capacity: 2, status: 'Trống' },
   { id: 'tb5', table_name: 'Bàn 5', capacity: 6, status: 'Trống' },
   { id: 'tb6', table_name: 'Bàn 6', capacity: 6, status: 'Trống' },
-  { id: 'tb7', table_name: 'Khách mang về', capacity: 99, status: 'Trống' }
+  { id: 'tb7', table_name: 'Bàn 7', capacity: 4, status: 'Trống' },
+  { id: 'tb8', table_name: 'Bàn 8', capacity: 4, status: 'Trống' },
+  { id: 'tb_mangve', table_name: 'Khách mang về', capacity: 99, status: 'Trống' }
 ];
 
 const MOCK_USERS = [
@@ -352,13 +354,13 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp2_3', product_id: 'CP002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 3. Cà phê sữa tươi
-  { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 11, unit: 'g' },
+  { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
   { id: 'rec_cp3_2', product_id: 'CP003', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_cp3_3', product_id: 'CP003', ingredient_id: 'ing_suatuoi', quantity_needed: 80, unit: 'ml' },
   { id: 'rec_cp3_4', product_id: 'CP003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
   // 4. Cà phê muối
-  { id: 'rec_cp4_1', product_id: 'CP004', ingredient_id: 'ing_caphe', quantity_needed: 15, unit: 'g' },
+  { id: 'rec_cp4_1', product_id: 'CP004', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
   { id: 'rec_cp4_2', product_id: 'CP004', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_cp4_kembeo', product_id: 'CP004', ingredient_id: 'ing_kembeo', quantity_needed: 0.0667, unit: 'hộp' },
   { id: 'rec_cp4_suadac_km', product_id: 'CP004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
@@ -366,7 +368,7 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp4_4', product_id: 'CP004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 5. Bạc xỉu
-  { id: 'rec_cp5_1', product_id: 'CP005', ingredient_id: 'ing_caphe', quantity_needed: 11, unit: 'g' },
+  { id: 'rec_cp5_1', product_id: 'CP005', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
   { id: 'rec_cp5_2', product_id: 'CP005', ingredient_id: 'ing_suadac', quantity_needed: 40, unit: 'g' },
   { id: 'rec_cp5_3', product_id: 'CP005', ingredient_id: 'ing_suatuoi', quantity_needed: 50, unit: 'ml' },
   { id: 'rec_cp5_4', product_id: 'CP005', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
@@ -1097,40 +1099,34 @@ export const db = {
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
-      // Tải trước giá vốn của các sản phẩm để ghi nhận snapshot gia_von vào hoadondetail
       const productIds = items.map(item => item.product_id);
-      const { data: dbProducts } = await supabase
-        .from('sanpham')
-        .select('id, gia_von')
-        .in('id', productIds);
 
-      // 1. Lấy thông tin bàn trước để kiểm tra tên bàn
-      const { data: tableData } = await supabase
-        .from('danhsachban')
-        .select('ten_ban')
-        .eq('id', table_id)
-        .single();
-      
-      const isTakeaway = tableData?.ten_ban === 'Khách mang về';
-
-      if (!isTakeaway) {
-        // Kiểm tra xem có hóa đơn chưa thanh toán cho bàn này hay không
-        const { data: existingUnpaidOrder, error: unpaidError } = await supabase
-          .from('hoadon')
+      // Tải song song: giá vốn sản phẩm, thông tin bàn, và hóa đơn chưa thanh toán (nếu có)
+      const [productsResult, tableResult, unpaidResult] = await Promise.all([
+        supabase.from('sanpham').select('id, gia_von').in('id', productIds),
+        supabase.from('danhsachban').select('ten_ban').eq('id', table_id).maybeSingle(),
+        supabase.from('hoadon')
           .select('*')
           .eq('id_ban', table_id)
           .eq('trang_thai_thanh_toan', 'Chưa thanh toán')
           .order('ngay_tao', { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .maybeSingle()
+      ]);
 
-        if (!unpaidError && existingUnpaidOrder) {
-          const existingOrderId = existingUnpaidOrder.id;
-          const newTotalAmount = Number(existingUnpaidOrder.tong_tien || 0) + total_amount;
-          const newDiscount = Number(existingUnpaidOrder.giam_gia || 0) + discount;
+      const dbProducts = productsResult.data || [];
+      const tableData = tableResult.data;
+      const existingUnpaidOrder = unpaidResult.data;
+      const isTakeaway = tableData?.ten_ban === 'Khách mang về' || table_id === 'tb_mangve';
 
-          // Cập nhật hóa đơn chính với tổng tiền mới và giảm giá mới
-          const { data: updatedOrder, error: updateErr } = await supabase
+      // 1. Nếu bàn đã có hóa đơn chưa thanh toán (và không phải mang về) -> Cộng dồn món
+      if (!isTakeaway && existingUnpaidOrder) {
+        const existingOrderId = existingUnpaidOrder.id;
+        const newTotalAmount = Number(existingUnpaidOrder.tong_tien || 0) + total_amount;
+        const newDiscount = Number(existingUnpaidOrder.giam_gia || 0) + discount;
+
+        const [updateOrderResult, detailsResult] = await Promise.all([
+          supabase
             .from('hoadon')
             .update({
               tong_tien: newTotalAmount,
@@ -1138,136 +1134,147 @@ export const db = {
             })
             .eq('id', existingOrderId)
             .select()
-            .single();
+            .single(),
+          supabase
+            .from('hoadondetail')
+            .select('*')
+            .eq('idhoadon', existingOrderId)
+        ]);
 
-          if (!updateErr && updatedOrder) {
-            // Tải các chi tiết hóa đơn cũ của hóa đơn này
-            const { data: existingDetails } = await supabase
-              .from('hoadondetail')
-              .select('*')
-              .eq('idhoadon', existingOrderId);
+        if (updateOrderResult.error) {
+          console.error('Lỗi cập nhật hóa đơn cộng dồn:', updateOrderResult.error);
+          throw updateOrderResult.error;
+        }
 
-            const dbInserts: any[] = [];
-            const dbUpdates: any[] = [];
+        const updatedOrder = updateOrderResult.data;
+        const existingDetails = detailsResult.data || [];
+        const dbInserts: any[] = [];
+        const dbUpdates: any[] = [];
 
-            for (const item of items) {
-              const matchedDetail = existingDetails?.find(d => d.idsp === item.product_id);
-              const dbProd = dbProducts?.find(p => p.id === item.product_id);
-              const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+        for (const item of items) {
+          const matchedDetail = existingDetails.find(d => d.idsp === item.product_id);
+          const dbProd = dbProducts.find(p => p.id === item.product_id);
+          const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
 
-              if (matchedDetail) {
-                // Đã có -> Cập nhật số lượng và thành tiền
-                const newQty = Number(matchedDetail.so_luong || 0) + item.quantity;
-                const newSubtotal = Number(matchedDetail.thanh_tien || 0) + item.subtotal;
-                dbUpdates.push(
-                  supabase
-                    .from('hoadondetail')
-                    .update({
-                      so_luong: newQty,
-                      thanh_tien: newSubtotal
-                    })
-                    .eq('id', matchedDetail.id)
-                );
-              } else {
-                // Chưa có -> Thêm mới
-                dbInserts.push({
-                  id: generateShortId('item_'),
-                  idhoadon: existingOrderId,
-                  idsp: item.product_id,
-                  ten_san_pham: item.name || 'Sản phẩm',
-                  don_vi_tinh: item.don_vi_tinh || 'Ly',
-                  don_gia: item.unit_price || item.price,
-                  so_luong: item.quantity,
-                  thanh_tien: item.subtotal,
-                  ghi_chu: item.notes || '',
-                  gia_von: costPrice
-                });
-              }
-            }
-
-            if (dbUpdates.length > 0) {
-              await Promise.all(dbUpdates);
-            }
-            if (dbInserts.length > 0) {
-              await supabase.from('hoadondetail').insert(dbInserts);
-            }
-
-            return mapOrderToClient(updatedOrder);
+          if (matchedDetail) {
+            const newQty = Number(matchedDetail.so_luong || 0) + item.quantity;
+            const newSubtotal = Number(matchedDetail.thanh_tien || 0) + item.subtotal;
+            dbUpdates.push(
+              supabase
+                .from('hoadondetail')
+                .update({
+                  so_luong: newQty,
+                  thanh_tien: newSubtotal
+                })
+                .eq('id', matchedDetail.id)
+            );
+          } else {
+            dbInserts.push({
+              id: generateShortId('item_'),
+              idhoadon: existingOrderId,
+              idsp: item.product_id,
+              ten_san_pham: item.name || 'Sản phẩm',
+              don_vi_tinh: item.don_vi_tinh || 'Ly',
+              don_gia: item.unit_price || item.price,
+              so_luong: item.quantity,
+              thanh_tien: item.subtotal,
+              ghi_chu: item.notes || '',
+              gia_von: costPrice
+            });
           }
         }
+
+        const promises: any[] = [...dbUpdates];
+        if (dbInserts.length > 0) {
+          promises.push(supabase.from('hoadondetail').insert(dbInserts));
+        }
+        if (promises.length > 0) {
+          await Promise.all(promises);
+        }
+
+        return mapOrderToClient(updatedOrder);
       }
 
-      // 2. Nếu chưa có, tạo hóa đơn mới như bình thường
+      // 2. Tạo hóa đơn mới
       const orderId = generateShortId('ord_');
-      let order = null;
-      let orderErr = null;
+      const validStaffId = (staff_id && staff_id !== 'u1') ? staff_id : 'admin';
 
-      const firstAttempt = await supabase
+      const insertPayload: any = {
+        id: orderId,
+        id_ban: table_id,
+        id_nhan_vien: validStaffId,
+        tong_tien: total_amount,
+        giam_gia: discount,
+        trang_thai_thanh_toan: 'Chưa thanh toán',
+        ngay_tao: createdAt
+      };
+
+      let { data: order, error: orderErr } = await supabase
         .from('hoadon')
-        .insert([{
-          id: orderId,
-          id_ban: table_id,
-          id_nhan_vien: staff_id,
-          tong_tien: total_amount,
-          giam_gia: discount,
-          trang_thai_thanh_toan: 'Chưa thanh toán',
-          ngay_tao: createdAt
-        }])
+        .insert([insertPayload])
         .select()
         .single();
 
-      if (firstAttempt.error) {
-        console.warn('Lỗi ghi hoadon kèm giam_gia, thử lại không kèm giam_gia:', firstAttempt.error);
-        const retryAttempt = await supabase
+      // Nếu lỗi do khóa ngoại nhân viên hoặc cột giam_gia, thử lại an toàn
+      if (orderErr) {
+        console.warn('Thử lại lưu hóa đơn với staff_id an toàn:', orderErr);
+        const retryResult = await supabase
           .from('hoadon')
           .insert([{
             id: orderId,
             id_ban: table_id,
-            id_nhan_vien: staff_id,
+            id_nhan_vien: null,
             tong_tien: total_amount,
             trang_thai_thanh_toan: 'Chưa thanh toán',
             ngay_tao: createdAt
           }])
           .select()
           .single();
-        order = retryAttempt.data;
-        orderErr = retryAttempt.error;
-      } else {
-        order = firstAttempt.data;
-        orderErr = firstAttempt.error;
+        
+        order = retryResult.data;
+        orderErr = retryResult.error;
       }
 
-      if (!orderErr && order) {
-        const orderItemsToInsert = items.map(item => {
-          const dbProd = dbProducts?.find(p => p.id === item.product_id);
-          const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
-          return {
-            id: generateShortId('item_'),
-            idhoadon: orderId,
-            idsp: item.product_id,
-            ten_san_pham: item.name || 'Sản phẩm',
-            don_vi_tinh: item.don_vi_tinh || 'Ly',
-            don_gia: item.unit_price || item.price,
-            so_luong: item.quantity,
-            thanh_tien: item.subtotal,
-            ghi_chu: item.notes || '',
-            gia_von: costPrice
-          };
-        });
-
-        await Promise.all([
-          supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id),
-          supabase.from('hoadondetail').insert(orderItemsToInsert)
-        ]);
-        return mapOrderToClient(order);
+      if (orderErr || !order) {
+        console.error('Lỗi không thể tạo hóa đơn trên Supabase:', orderErr);
+        throw new Error(orderErr?.message || 'Không thể tạo đơn hàng trên máy chủ.');
       }
+
+      const orderItemsToInsert = items.map(item => {
+        const dbProd = dbProducts.find(p => p.id === item.product_id);
+        const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+        return {
+          id: generateShortId('item_'),
+          idhoadon: orderId,
+          idsp: item.product_id,
+          ten_san_pham: item.name || 'Sản phẩm',
+          don_vi_tinh: item.don_vi_tinh || 'Ly',
+          don_gia: item.unit_price || item.price,
+          so_luong: item.quantity,
+          thanh_tien: item.subtotal,
+          ghi_chu: item.notes || '',
+          gia_von: costPrice
+        };
+      });
+
+      const detailPromises: any[] = [
+        supabase.from('hoadondetail').insert(orderItemsToInsert)
+      ];
+      if (!isTakeaway) {
+        detailPromises.push(
+          supabase.from('danhsachban').update({ trang_thai: 'Đang phục vụ' }).eq('id', table_id)
+        );
+      }
+
+      await Promise.all(detailPromises);
+      return mapOrderToClient(order);
     }
 
     // Mock DB Fallback
     const orders = mockDb.getOrders();
     const tables = mockDb.getTables();
     const targetTable = tables.find(t => t.id === table_id);
-    const isTakeaway = targetTable?.table_name === 'Khách mang về';
+    const isTakeaway = targetTable?.table_name === 'Khách mang về' || table_id === 'tb_mangve';
 
     if (!isTakeaway) {
       const existingUnpaidOrder = orders.find(o => o.table_id === table_id && o.payment_status === 'Chưa thanh toán');

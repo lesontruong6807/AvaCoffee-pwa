@@ -186,7 +186,7 @@ export default function PosPage() {
     const oldTables = [...tables];
     
     // Optimistic Update: Cập nhật trạng thái bàn sang Đang phục vụ ngay lập tức trên UI
-    if (selectedTable?.id !== 'tb7') { // Khách mang về không đổi trạng thái
+    if (selectedTable?.table_name !== 'Khách mang về') { // Khách mang về không đổi trạng thái
       setTables(prev => prev.map(tb => 
         tb.id === selectedTable?.id ? { ...tb, status: 'Đang phục vụ' } : tb
       ));
@@ -194,8 +194,8 @@ export default function PosPage() {
 
     try {
       const newOrder = await db.createOrder({
-        table_id: selectedTable?.id || 'tb7',
-        staff_id: currentUser?.id || 'u1',
+        table_id: selectedTable?.id || 'tb_mangve',
+        staff_id: currentUser?.id || 'admin',
         total_amount: finalTotalAmount,
         discount: discountAmount,
         items: cart
@@ -328,7 +328,7 @@ export default function PosPage() {
               .sort((a, b) => {
                 if (a.table_name === 'Khách mang về') return -1;
                 if (b.table_name === 'Khách mang về') return 1;
-                return 0;
+                return a.table_name.localeCompare(b.table_name, 'vi', { numeric: true });
               })
               .map((table) => {
               const isOccupied = table.status === 'Đang phục vụ';
