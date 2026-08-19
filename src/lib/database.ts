@@ -19,6 +19,88 @@ let cachedCategories: any[] | null = null;
 let cachedProducts: any[] | null = null;
 let cachedRecipes: any[] | null = null;
 
+// Shared Realtime Sync Channel & Event Listeners
+let sharedRealtimeChannel: any = null;
+const realtimeListeners: { [event: string]: Set<(payload: any) => void> } = {
+  table_update: new Set(),
+  order_update: new Set(),
+  report_update: new Set()
+};
+
+function getSharedRealtimeChannel() {
+  if (!isSupabaseConfigured || !supabase) return null;
+  if (!sharedRealtimeChannel) {
+    sharedRealtimeChannel = supabase.channel('ava-coffee-live-sync');
+
+    // 1. Lắng nghe phát sóng từ các thiết bị khác (Broadcast - siêu nhanh ~20ms, không phụ thuộc Postgres publication)
+    sharedRealtimeChannel
+      .on('broadcast', { event: 'table_update' }, (payload: any) => {
+        realtimeListeners['table_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('broadcast', { event: 'order_update' }, (payload: any) => {
+        realtimeListeners['order_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('broadcast', { event: 'report_update' }, (payload: any) => {
+        realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      // 2. Lắng nghe thay đổi trực tiếp từ Postgres DB (Postgres Changes)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'danhsachban' }, (payload: any) => {
+        realtimeListeners['table_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hoadon' }, (payload: any) => {
+        realtimeListeners['order_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+        realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hoadondetail' }, (payload: any) => {
+        realtimeListeners['order_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+        realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chiphivanhang' }, (payload: any) => {
+        realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lichsukho' }, (payload: any) => {
+        realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .subscribe();
+  }
+  return sharedRealtimeChannel;
+}
+
+export function broadcastRealtimeEvent(event: 'table_update' | 'order_update' | 'report_update', payload?: any) {
+  try {
+    const ch = getSharedRealtimeChannel();
+    if (ch) {
+      ch.send({
+        type: 'broadcast',
+        event,
+        payload: payload || { timestamp: Date.now() }
+      });
+    }
+  } catch (err) {
+    console.warn('Lỗi gửi broadcast realtime:', err);
+  }
+}
+
 // Helper tạo ID ngắn giống trên database khi offline (ví dụ: p_3a4b5c)
 export const generateShortId = (prefix: string): string => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -1267,6 +1349,9 @@ export const db = {
       }
 
       await Promise.all(detailPromises);
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return mapOrderToClient(order);
     }
 
@@ -1313,6 +1398,9 @@ export const db = {
           }
         });
         mockDb.setOrderItems(orderItems);
+        broadcastRealtimeEvent('order_update');
+        broadcastRealtimeEvent('table_update');
+        broadcastRealtimeEvent('report_update');
         return existingUnpaidOrder;
       }
     }
@@ -1356,6 +1444,9 @@ export const db = {
       };
     });
     mockDb.setOrderItems([...orderItems, ...newItems]);
+    broadcastRealtimeEvent('order_update');
+    broadcastRealtimeEvent('table_update');
+    broadcastRealtimeEvent('report_update');
 
     return newOrder;
   },
@@ -1406,6 +1497,9 @@ export const db = {
       }
       const [payResult] = await Promise.all(updatePromises);
       if (!payResult.error && payResult.data) {
+        broadcastRealtimeEvent('order_update');
+        broadcastRealtimeEvent('table_update');
+        broadcastRealtimeEvent('report_update');
         return mapOrderToClient(payResult.data);
       }
     }
@@ -1432,6 +1526,9 @@ export const db = {
         tables[tIdx].status = 'Trống';
         mockDb.setTables(tables);
       }
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return orders[oIdx];
     }
     return null;
@@ -1450,6 +1547,9 @@ export const db = {
       if (!error && order?.id_ban) {
         // 3. Reset table status
         await supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban);
+        broadcastRealtimeEvent('order_update');
+        broadcastRealtimeEvent('table_update');
+        broadcastRealtimeEvent('report_update');
         return true;
       }
       return false;
@@ -1477,6 +1577,9 @@ export const db = {
         tables[tIdx].status = 'Trống';
         mockDb.setTables(tables);
       }
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return true;
     }
     return false;
@@ -1637,6 +1740,9 @@ export const db = {
         })
         .eq('id', orderId);
 
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return { orderDeleted: false, newTotal, newDiscount };
     }
 
@@ -1669,6 +1775,9 @@ export const db = {
       order.giam_gia = newDiscount;
       order.total_amount = Math.max(0, sumRemaining - newDiscount);
       mockDb.setOrders(orders);
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return { orderDeleted: false, newTotal: order.total_amount, newDiscount };
     }
 
@@ -1792,6 +1901,9 @@ export const db = {
           .eq('id', orderId);
       }
 
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('table_update');
+      broadcastRealtimeEvent('report_update');
       return { success: true, newOrderId };
     }
 
@@ -1870,6 +1982,9 @@ export const db = {
       }
     }
 
+    broadcastRealtimeEvent('order_update');
+    broadcastRealtimeEvent('table_update');
+    broadcastRealtimeEvent('report_update');
     return { success: true, newOrderId };
   },
 
@@ -2915,6 +3030,7 @@ export const db = {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('chiphivanhang').insert([newExpense]).select().single();
       if (!error && data) {
+        broadcastRealtimeEvent('report_update');
         return {
           id: data.id,
           name: data.ten_chi_phi,
@@ -2939,123 +3055,54 @@ export const db = {
     };
     expenses.push(clientExpense);
     setStorageItem('ava_expenses', expenses);
+    broadcastRealtimeEvent('report_update');
     return clientExpense;
   },
 
   async deleteExpense(id: string) {
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from('chiphivanhang').delete().eq('id', id);
-      if (!error) return true;
+      if (!error) {
+        broadcastRealtimeEvent('report_update');
+        return true;
+      }
     }
 
     const expenses = getStorageItem<any[]>('ava_expenses', []);
     const filtered = expenses.filter(e => e.id !== id);
     setStorageItem('ava_expenses', filtered);
+    broadcastRealtimeEvent('report_update');
     return true;
   },
 
   // --- SUPABASE REALTIME SUBSCRIPTION HELPERS ---
   subscribeToTableChanges(callback: (payload: any) => void): () => void {
     if (!isSupabaseConfigured || !supabase) return () => {};
-    
-    const channel = supabase
-      .channel(`rt-tables-${generateShortId('')}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'danhsachban' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in table realtime callback:', err);
-          }
-        }
-      )
-      .subscribe();
-
+    getSharedRealtimeChannel();
+    realtimeListeners['table_update'].add(callback);
     return () => {
-      supabase?.removeChannel(channel);
+      realtimeListeners['table_update'].delete(callback);
     };
   },
 
   subscribeToOrderChanges(callback: (payload: any) => void): () => void {
     if (!isSupabaseConfigured || !supabase) return () => {};
-
-    const channel = supabase
-      .channel(`rt-orders-${generateShortId('')}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hoadon' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in order realtime callback:', err);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hoadondetail' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in order detail realtime callback:', err);
-          }
-        }
-      )
-      .subscribe();
-
+    getSharedRealtimeChannel();
+    realtimeListeners['order_update'].add(callback);
     return () => {
-      supabase?.removeChannel(channel);
+      realtimeListeners['order_update'].delete(callback);
     };
   },
 
   subscribeToReportChanges(callback: (payload: any) => void): () => void {
     if (!isSupabaseConfigured || !supabase) return () => {};
-
-    const channel = supabase
-      .channel(`rt-reports-${generateShortId('')}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hoadon' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in report hoadon realtime callback:', err);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chiphivanhang' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in report chiphivanhang realtime callback:', err);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'lichsukho' },
-        (payload) => {
-          try {
-            callback(payload);
-          } catch (err) {
-            console.error('Error in report lichsukho realtime callback:', err);
-          }
-        }
-      )
-      .subscribe();
-
+    getSharedRealtimeChannel();
+    realtimeListeners['report_update'].add(callback);
     return () => {
-      supabase?.removeChannel(channel);
+      realtimeListeners['report_update'].delete(callback);
     };
   }
 };
+
 
 
