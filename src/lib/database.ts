@@ -1366,11 +1366,17 @@ export const db = {
     if (isSupabaseConfigured && supabase) {
       // 1. Lấy thông tin bàn & chi tiết items cùng lúc
       const [orderResult, itemsResult] = await Promise.all([
-        supabase.from('hoadon').select('id_ban').eq('id', orderId).single(),
+        supabase.from('hoadon').select('id, id_ban, trang_thai_thanh_toan, tong_tien, giam_gia, ngay_tao, ngay_thanh_toan, id_nhan_vien').eq('id', orderId).single(),
         supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId)
       ]);
       const order = orderResult.data;
       const items = itemsResult.data;
+
+      // Bảo vệ chống thanh toán trùng lặp (Idempotency Guard)
+      if (order?.trang_thai_thanh_toan === 'Đã thanh toán') {
+        console.warn(`Hóa đơn ${orderId} đã được thanh toán trước đó, bỏ qua trừ kho lặp.`);
+        return mapOrderToClient(order);
+      }
 
       // 2. Trừ kho nguyên liệu chạy ngầm bất đồng bộ (Non-blocking Fast Response)
       if (items && items.length > 0) {
@@ -2761,6 +2767,85 @@ export const db = {
       }
     } catch (e) {
       console.error('Lỗi khi gộp nhật ký bán hàng trùng lặp:', e);
+    }
+  },
+
+  // Đối soát và tự động hiệu chỉnh tồn kho + nhật ký kho khớp 100% với đơn bán hàng trong ngày
+  async reconcileDailyInventoryWithSales(targetDateVN?: string) {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const dateVN = targetDateVN || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+      
+      const [allOrdersResult, recipesResult, logsResult, ingredientsResult] = await Promise.all([
+        supabase.from('hoadon').select('*, hoadondetail(*)').eq('trang_thai_thanh_toan', 'Đã thanh toán'),
+        supabase.from('congthuc').select('*'),
+        supabase.from('lichsukho').select('*').eq('loai_giao_dich', 'Bán hàng'),
+        supabase.from('nguyenlieu').select('*')
+      ]);
+
+      const paidOrders = (allOrdersResult.data || []).filter(o => {
+        const dVN = new Date(new Date(o.ngay_thanh_toan || o.ngay_tao).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+        return dVN === dateVN;
+      });
+
+      const recipes = recipesResult.data || [];
+      const theoreticalDeductions: { [ingId: string]: number } = {};
+
+      paidOrders.forEach(o => {
+        o.hoadondetail?.forEach((item: any) => {
+          const prodId = item.idsp;
+          const qty = Number(item.so_luong || 0);
+          const prodRecipes = recipes.filter(r => r.id_san_pham === prodId);
+          prodRecipes.forEach(rec => {
+            const deduct = Number(rec.so_luong_can || 0) * qty;
+            theoreticalDeductions[rec.id_nguyen_lieu] = (theoreticalDeductions[rec.id_nguyen_lieu] || 0) + deduct;
+          });
+        });
+      });
+
+      const todayLogs = (logsResult.data || []).filter(l => {
+        const dVN = new Date(new Date(l.thoi_gian_tao).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+        return dVN === dateVN;
+      });
+
+      const ingredients = ingredientsResult.data || [];
+      const dbUpdates: any[] = [];
+
+      for (const ing of ingredients) {
+        const ingId = ing.id;
+        const theoQty = theoreticalDeductions[ingId] || 0;
+        const log = todayLogs.find(l => l.id_nguyen_lieu === ingId);
+
+        if (log) {
+          const currentLoggedQty = Math.abs(Number(log.so_luong_thay_doi));
+          const diff = currentLoggedQty - theoQty;
+          if (Math.abs(diff) > 0.0001) {
+            dbUpdates.push(
+              supabase.from('lichsukho').update({ so_luong_thay_doi: -theoQty }).eq('id', log.id),
+              supabase.from('nguyenlieu').update({ so_luong_ton: Number(ing.so_luong_ton) + diff }).eq('id', ingId)
+            );
+          }
+        } else if (theoQty > 0) {
+          dbUpdates.push(
+            supabase.from('lichsukho').insert({
+              id: generateShortId('inv_'),
+              id_nguyen_lieu: ingId,
+              so_luong_thay_doi: -theoQty,
+              loai_giao_dich: 'Bán hàng',
+              chi_phi: 0,
+              ghi_chu: `Khấu trừ tổng hợp bán hàng POS ngày ${dateVN}`,
+              trang_thai: 'Đã duyệt'
+            }),
+            supabase.from('nguyenlieu').update({ so_luong_ton: Math.max(0, Number(ing.so_luong_ton) - theoQty) }).eq('id', ingId)
+          );
+        }
+      }
+
+      if (dbUpdates.length > 0) {
+        await Promise.all(dbUpdates);
+      }
+    } catch (e) {
+      console.error('Lỗi khi tự động đối soát kho với đơn bán hàng:', e);
     }
   },
 

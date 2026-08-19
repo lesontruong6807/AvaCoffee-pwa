@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
 import { db } from '@/lib/database';
@@ -112,9 +112,14 @@ export default function PaymentPage() {
     loadItems();
   }, [selectedOrder]);
 
+  const processingPayIdsRef = useRef<{ [orderId: string]: boolean }>({});
+
   const handlePay = async (method: 'Tiền mặt' | 'Chuyển khoản') => {
-    if (!selectedOrder) return;
+    if (!selectedOrder || submittingPayment) return;
+    if (processingPayIdsRef.current[selectedOrder.id]) return;
+
     const targetOrder = selectedOrder;
+    processingPayIdsRef.current[targetOrder.id] = true;
     setSubmittingPayment(true);
     
     // Optimistic UI Update: Đóng modal và loại bỏ đơn hàng khỏi danh sách chờ thanh toán ngay lập tức
@@ -136,6 +141,7 @@ export default function PaymentPage() {
     } catch (e) {
       console.error('Lỗi thanh toán:', e);
       toast.error('Gặp lỗi khi xử lý thanh toán.');
+      delete processingPayIdsRef.current[targetOrder.id];
       // Rollback nếu có lỗi mạng
       await loadOrders();
     } finally {
