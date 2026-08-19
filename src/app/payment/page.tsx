@@ -66,33 +66,71 @@ export default function PaymentPage() {
     return items;
   };
 
-  const loadOrders = async () => {
+  const selectedOrderRef = useRef<any>(null);
+  useEffect(() => {
+    selectedOrderRef.current = selectedOrder;
+  }, [selectedOrder]);
+
+  const loadOrders = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const allOrders = await db.getOrders();
       // Chỉ lấy hóa đơn "Chưa thanh toán"
       const unpaid = allOrders.filter(o => o.payment_status === 'Chưa thanh toán');
       setOrders(unpaid);
       
-      // Nếu có hóa đơn được chọn trước đó, cập nhật lại thông tin
-      if (selectedOrder) {
-        const updatedSelected = unpaid.find(o => o.id === selectedOrder.id);
+      // Nếu có hóa đơn được chọn trước đó, kiểm tra xem còn tồn tại chưa thanh toán không
+      const currentSelected = selectedOrderRef.current;
+      if (currentSelected) {
+        const updatedSelected = unpaid.find(o => o.id === currentSelected.id);
         if (updatedSelected) {
           setSelectedOrder(updatedSelected);
         } else {
           setSelectedOrder(null);
           setOrderItems([]);
+          setIsPayModalOpen(false);
+          setIsSplitMode(false);
+          setEditingOrderId(null);
+          toast.info('Hóa đơn đang xem đã được thanh toán hoặc cập nhật từ thiết bị khác.');
         }
       }
     } catch (e) {
       console.error('Lỗi khi tải hóa đơn:', e);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
     loadOrders();
+
+    // 1. Realtime listener cho hóa đơn & chi tiết hóa đơn
+    const unsubscribe = db.subscribeToOrderChanges(() => {
+      loadOrders(true);
+    });
+
+    // 2. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại
+    const handleWakeup = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadOrders(true);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleWakeup);
+      window.addEventListener('focus', handleWakeup);
+      window.addEventListener('online', handleWakeup);
+    }
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleWakeup);
+        window.removeEventListener('focus', handleWakeup);
+        window.removeEventListener('online', handleWakeup);
+      }
+    };
   }, []);
 
   // Tải chi tiết các món trong hóa đơn

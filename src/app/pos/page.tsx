@@ -55,6 +55,18 @@ export default function PosPage() {
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountValue, setDiscountValue] = useState<number>(0);
 
+  const refreshTables = async () => {
+    try {
+      const tablesData = await db.getTables();
+      setTables(tablesData);
+      try {
+        localStorage.setItem('ava_pos_cache_tables', JSON.stringify(tablesData));
+      } catch (_) {}
+    } catch (e) {
+      console.error('Lỗi làm mới danh sách bàn POS:', e);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       // 1. Đọc dữ liệu từ cache trước để hiển thị ngay lập tức (Offline-first / Fast Load)
@@ -110,6 +122,33 @@ export default function PosPage() {
       }
     }
     loadData();
+
+    // 2. Realtime listener cho bảng danhsachban
+    const unsubscribe = db.subscribeToTableChanges(() => {
+      refreshTables();
+    });
+
+    // 3. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại
+    const handleWakeup = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshTables();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleWakeup);
+      window.addEventListener('focus', handleWakeup);
+      window.addEventListener('online', handleWakeup);
+    }
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleWakeup);
+        window.removeEventListener('focus', handleWakeup);
+        window.removeEventListener('online', handleWakeup);
+      }
+    };
   }, []);
 
   if (loading) {

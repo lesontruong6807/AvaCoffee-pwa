@@ -2952,6 +2952,110 @@ export const db = {
     const filtered = expenses.filter(e => e.id !== id);
     setStorageItem('ava_expenses', filtered);
     return true;
+  },
+
+  // --- SUPABASE REALTIME SUBSCRIPTION HELPERS ---
+  subscribeToTableChanges(callback: (payload: any) => void): () => void {
+    if (!isSupabaseConfigured || !supabase) return () => {};
+    
+    const channel = supabase
+      .channel(`rt-tables-${generateShortId('')}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'danhsachban' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in table realtime callback:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  },
+
+  subscribeToOrderChanges(callback: (payload: any) => void): () => void {
+    if (!isSupabaseConfigured || !supabase) return () => {};
+
+    const channel = supabase
+      .channel(`rt-orders-${generateShortId('')}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hoadon' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in order realtime callback:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hoadondetail' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in order detail realtime callback:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  },
+
+  subscribeToReportChanges(callback: (payload: any) => void): () => void {
+    if (!isSupabaseConfigured || !supabase) return () => {};
+
+    const channel = supabase
+      .channel(`rt-reports-${generateShortId('')}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hoadon' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in report hoadon realtime callback:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chiphivanhang' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in report chiphivanhang realtime callback:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'lichsukho' },
+        (payload) => {
+          try {
+            callback(payload);
+          } catch (err) {
+            console.error('Error in report lichsukho realtime callback:', err);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
   }
 };
+
 

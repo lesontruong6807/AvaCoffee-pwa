@@ -15,8 +15,8 @@ export default function DailyReportPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeShiftFilter, setActiveShiftFilter] = useState<'morning' | 'afternoon' | 'both'>('both');
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const [allOrders, allLogs, allItems, allRecipes] = await Promise.all([
         db.getOrders(),
@@ -31,13 +31,40 @@ export default function DailyReportPage() {
     } catch (e) {
       console.error('Lỗi khi tải hóa đơn báo cáo:', e);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
     loadData();
+
+    // 1. Realtime listener cho báo cáo ca trực (Đơn hàng, Chi phí, Nhập kho)
+    const unsubscribe = db.subscribeToReportChanges(() => {
+      loadData(true);
+    });
+
+    // 2. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại
+    const handleWakeup = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadData(true);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleWakeup);
+      window.addEventListener('focus', handleWakeup);
+      window.addEventListener('online', handleWakeup);
+    }
+
+    return () => {
+      unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleWakeup);
+        window.removeEventListener('focus', handleWakeup);
+        window.removeEventListener('online', handleWakeup);
+      }
+    };
   }, []);
 
   // 1. Chỉ lấy hóa đơn đã thanh toán trong ngày hôm nay (dựa trên toDateString)
