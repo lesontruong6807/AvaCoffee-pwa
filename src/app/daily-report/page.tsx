@@ -295,7 +295,7 @@ export default function DailyReportPage() {
           <div className="bg-coffee-dark text-white p-5 rounded-3xl shadow flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-lg">Ca Chiều</h3>
-              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 16:00 - 21:30 (Ghi nhận đơn: 15:30 - 23:59)</p>
+              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 16:00 - 21:00 (Ghi nhận đơn: 15:30 - 23:59)</p>
             </div>
             <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
               {afternoon.orders.length} Đơn hàng

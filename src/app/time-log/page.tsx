@@ -263,8 +263,8 @@ export default function TimeLogPage() {
         return;
       }
     } else if (currentShift.startsWith('Ca chiều')) {
-      if (totalMinutes < 16 * 60 || totalMinutes > 21 * 60 + 30) {
-        toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 16:00 đến 21:30!');
+      if (totalMinutes < 16 * 60 || totalMinutes > 21 * 60) {
+        toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 16:00 đến 21:00!');
         return;
       }
     }
@@ -440,7 +440,7 @@ export default function TimeLogPage() {
                       className="w-full h-11 bg-[#FAF6F0] px-4 py-0 rounded-2xl text-xs border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark block"
                     >
                       <option>Ca sáng (05:30 - 12:00)</option>
-                      <option>Ca chiều (16:00 - 21:30)</option>
+                      <option>Ca chiều (16:00 - 21:00)</option>
                     </select>
                   </div>
                 ) : (
