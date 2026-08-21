@@ -824,6 +824,13 @@ const mapOrderToClient = (o: any) => o ? {
   payment_method: o.phuong_thuc_thanh_toan,
   created_at: o.ngay_tao,
   paid_at: o.ngay_thanh_toan,
+  notes: o.ghi_chu || (o.hoadondetail && Array.isArray(o.hoadondetail) ? o.hoadondetail.map((d: any) => {
+    if (d.ghi_chu && typeof d.ghi_chu === 'string' && d.ghi_chu.includes('[Ghi chú đơn: ')) {
+      const m = d.ghi_chu.match(/\[Ghi chú đơn:\s*([^\]]+)\]/);
+      return m ? m[1] : '';
+    }
+    return '';
+  }).filter(Boolean)[0] : '') || o.notes || '',
   tables: o.danhsachban ? { table_name: o.danhsachban.ten_ban } : null,
   users: o.nguoidung ? { full_name: o.nguoidung.ho_ten } : null
 } : null;
@@ -1201,8 +1208,8 @@ export const db = {
     return mockDb.getOrderItems();
   },
 
-  async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; discount?: number; items: any[] }) {
-    const { table_id, staff_id, total_amount, discount = 0, items } = orderData;
+  async createOrder(orderData: { table_id: string; staff_id: string; total_amount: number; discount?: number; notes?: string; items: any[] }) {
+    const { table_id, staff_id, total_amount, discount = 0, notes = '', items } = orderData;
     const createdAt = new Date().toISOString();
 
     if (isSupabaseConfigured && supabase) {
@@ -1232,13 +1239,18 @@ export const db = {
         const newTotalAmount = Number(existingUnpaidOrder.tong_tien || 0) + total_amount;
         const newDiscount = Number(existingUnpaidOrder.giam_gia || 0) + discount;
 
+        const updateOrderPayload: any = {
+          tong_tien: newTotalAmount,
+          giam_gia: newDiscount
+        };
+        if (notes) {
+          updateOrderPayload.ghi_chu = existingUnpaidOrder.ghi_chu ? `${existingUnpaidOrder.ghi_chu}; ${notes}` : notes;
+        }
+
         const [updateOrderResult, detailsResult] = await Promise.all([
           supabase
             .from('hoadon')
-            .update({
-              tong_tien: newTotalAmount,
-              giam_gia: newDiscount
-            })
+            .update(updateOrderPayload)
             .eq('id', existingOrderId)
             .select()
             .single(),
@@ -1258,10 +1270,16 @@ export const db = {
         const dbInserts: any[] = [];
         const dbUpdates: any[] = [];
 
-        for (const item of items) {
+        for (let idx = 0; idx < items.length; idx++) {
+          const item = items[idx];
           const matchedDetail = existingDetails.find(d => d.idsp === item.product_id);
           const dbProd = dbProducts.find(p => p.id === item.product_id);
           const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+
+          let itemNote = item.notes || '';
+          if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
+            itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
+          }
 
           if (matchedDetail) {
             const newQty = Number(matchedDetail.so_luong || 0) + item.quantity;
@@ -1285,7 +1303,7 @@ export const db = {
               don_gia: item.unit_price || item.price,
               so_luong: item.quantity,
               thanh_tien: item.subtotal,
-              ghi_chu: item.notes || '',
+              ghi_chu: itemNote,
               gia_von: costPrice
             });
           }
@@ -1315,6 +1333,9 @@ export const db = {
         trang_thai_thanh_toan: 'Chưa thanh toán',
         ngay_tao: createdAt
       };
+      if (notes) {
+        insertPayload.ghi_chu = notes;
+      }
 
       let { data: order, error: orderErr } = await supabase
         .from('hoadon')
@@ -1322,9 +1343,9 @@ export const db = {
         .select()
         .single();
 
-      // Nếu lỗi do khóa ngoại nhân viên hoặc cột giam_gia, thử lại an toàn
+      // Nếu lỗi do khóa ngoại nhân viên hoặc cột ghi_chu, thử lại an toàn
       if (orderErr) {
-        console.warn('Thử lại lưu hóa đơn với staff_id an toàn:', orderErr);
+        console.warn('Thử lại lưu hóa đơn an toàn:', orderErr);
         const retryResult = await supabase
           .from('hoadon')
           .insert([{
@@ -1347,9 +1368,14 @@ export const db = {
         throw new Error(orderErr?.message || 'Không thể tạo đơn hàng trên máy chủ.');
       }
 
-      const orderItemsToInsert = items.map(item => {
+      const orderItemsToInsert = items.map((item, idx) => {
         const dbProd = dbProducts.find(p => p.id === item.product_id);
         const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
+        let itemNote = item.notes || '';
+        if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
+          itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
+        }
+
         return {
           id: generateShortId('item_'),
           idhoadon: orderId,
@@ -1359,7 +1385,7 @@ export const db = {
           don_gia: item.unit_price || item.price,
           so_luong: item.quantity,
           thanh_tien: item.subtotal,
-          ghi_chu: item.notes || '',
+          ghi_chu: itemNote,
           gia_von: costPrice
         };
       });
@@ -1393,16 +1419,24 @@ export const db = {
         const existingOrderId = existingUnpaidOrder.id;
         existingUnpaidOrder.total_amount = Number(existingUnpaidOrder.total_amount || 0) + total_amount;
         existingUnpaidOrder.giam_gia = Number(existingUnpaidOrder.giam_gia || 0) + discount;
+        if (notes) {
+          existingUnpaidOrder.notes = existingUnpaidOrder.notes ? `${existingUnpaidOrder.notes}; ${notes}` : notes;
+        }
 
         mockDb.setOrders(orders);
 
         const orderItems = mockDb.getOrderItems();
         const products = mockDb.getProducts();
 
-        items.forEach((item) => {
+        items.forEach((item, idx) => {
           const matchedItem = orderItems.find(
             oi => oi.order_id === existingOrderId && oi.product_id === item.product_id
           );
+          let itemNote = item.notes || '';
+          if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
+            itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
+          }
+
           if (matchedItem) {
             matchedItem.quantity = Number(matchedItem.quantity || 0) + item.quantity;
             matchedItem.subtotal = Number(matchedItem.subtotal || 0) + item.subtotal;
@@ -1417,7 +1451,7 @@ export const db = {
               quantity: item.quantity,
               unit_price: item.unit_price || item.price,
               subtotal: item.subtotal,
-              ghi_chu: item.notes || '',
+              ghi_chu: itemNote,
               gia_von: prod ? Number(prod.cost_price || 0) : 0
             });
           }
@@ -1437,6 +1471,7 @@ export const db = {
       staff_id,
       total_amount,
       giam_gia: discount,
+      notes: notes || '',
       payment_status: 'Chưa thanh toán' as const,
       payment_method: null,
       created_at: createdAt,
@@ -1453,8 +1488,12 @@ export const db = {
 
     const orderItems = mockDb.getOrderItems();
     const products = mockDb.getProducts();
-    const newItems = items.map((item) => {
+    const newItems = items.map((item, idx) => {
       const prod = products.find(p => p.id === item.product_id);
+      let itemNote = item.notes || '';
+      if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
+        itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
+      }
       return {
         id: generateShortId('item_'),
         order_id: orderId,
@@ -1464,7 +1503,7 @@ export const db = {
         quantity: item.quantity,
         unit_price: item.unit_price || item.price,
         subtotal: item.subtotal,
-        ghi_chu: item.notes || '',
+        ghi_chu: itemNote,
         gia_von: prod ? Number(prod.cost_price || 0) : 0
       };
     });

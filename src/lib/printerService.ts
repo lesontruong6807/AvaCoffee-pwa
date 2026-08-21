@@ -121,6 +121,7 @@ interface OrderData {
   discount: number;
   totalAmount: number;
   orderId: string;
+  notes?: string;
 }
 
 // Build standard K80 format ESC/POS receipt data
@@ -145,8 +146,13 @@ export function buildReceiptBytes(orderData: OrderData): Uint8Array {
     .line(`BAN: ${orderData.tableName.toUpperCase()}`)
     .fontSizeNormal()
     .bold(false)
-    .line(`Thoi gian: ${now}`)
-    .line('------------------------------------------------');
+    .line(`Thoi gian: ${now}`);
+
+  if (orderData.notes) {
+    builder.line(`Ghi chu: ${removeDiacritics(orderData.notes)}`);
+  }
+
+  builder.line('------------------------------------------------');
 
   // Items Header
   builder.bold(true)

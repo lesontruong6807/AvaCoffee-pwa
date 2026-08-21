@@ -21,7 +21,8 @@ import {
   Tag, 
   CheckCircle, 
   ArrowLeft,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 
 interface CartItem {
@@ -47,6 +48,7 @@ export default function PosPage() {
   const [posStep, setPosStep] = useState<'table' | 'menu' | 'summary'>('table');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [orderNotes, setOrderNotes] = useState('');
   const isSavingRef = React.useRef(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
@@ -205,6 +207,7 @@ export default function PosPage() {
     setCart([]);
     setDiscountValue(0);
     setDiscountType('amount');
+    setOrderNotes('');
   };
 
   const totalCartAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -237,6 +240,7 @@ export default function PosPage() {
         staff_id: currentUser?.id || 'admin',
         total_amount: finalTotalAmount,
         discount: discountAmount,
+        notes: orderNotes.trim(),
         items: cart
       });
 
@@ -626,6 +630,21 @@ export default function PosPage() {
             {/* Phần dưới hóa đơn nháp */}
             {cart.length > 0 && (
               <div className="border-t border-coffee-light pt-4 space-y-4">
+                {/* Phần ghi chú đơn hàng */}
+                <div className="bg-[#FAF6F0] p-3.5 rounded-2xl border border-coffee-light space-y-2">
+                  <div className="flex items-center space-x-1.5 text-[10px] font-bold text-coffee-medium uppercase tracking-wider">
+                    <FileText className="w-3.5 h-3.5 text-coffee-primary" />
+                    <span>Ghi chú đơn hàng</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Khách mang về ít đường, thêm ly đá..."
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    className="w-full h-9 px-3 bg-white border border-coffee-light rounded-xl text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition placeholder-coffee-medium/60"
+                  />
+                </div>
+
                 {/* Phần giảm giá */}
                 <div className="bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light space-y-3">
                   <div className="flex items-center justify-between">
@@ -800,6 +819,21 @@ export default function PosPage() {
               </div>
 
               <div className="border-t border-coffee-light pt-3 space-y-3 bg-white shrink-0">
+                {/* Phần ghi chú đơn hàng di động */}
+                <div className="bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light space-y-1.5">
+                  <div className="flex items-center space-x-1.5 text-[9px] font-bold text-coffee-medium uppercase tracking-wider">
+                    <FileText className="w-3 h-3 text-coffee-primary" />
+                    <span>Ghi chú đơn hàng</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Khách mang về ít đường, thêm ly đá..."
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    className="w-full h-8 px-2.5 bg-white border border-coffee-light rounded-lg text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition placeholder-coffee-medium/60"
+                  />
+                </div>
+
                 {/* Phần giảm giá di động */}
                 <div className="bg-[#FAF6F0] p-3.5 rounded-xl border border-coffee-light space-y-2.5">
                   <div className="flex items-center justify-between">

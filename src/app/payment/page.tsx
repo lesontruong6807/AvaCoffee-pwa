@@ -21,7 +21,8 @@ import {
   Pencil,
   Scissors,
   SplitSquareVertical,
-  Check
+  Check,
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -309,7 +310,8 @@ export default function PaymentPage() {
         items: itemsForPrint,
         discount: selectedOrder.discount || 0,
         totalAmount: selectedOrder.total_amount,
-        orderId: selectedOrder.id
+        orderId: selectedOrder.id,
+        notes: selectedOrder.notes || ''
       });
       toast.success('Đã gửi lệnh in tới máy in!');
     } catch (e) {
@@ -396,6 +398,12 @@ export default function PaymentPage() {
                         <span className="mx-2">•</span>
                         <span>{new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                       </p>
+                      {order.notes && (
+                        <div className="flex items-center text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200/80 w-fit mt-1">
+                          <FileText className="w-3.5 h-3.5 text-amber-700 mr-1.5 shrink-0" />
+                          <span className="font-semibold">{order.notes}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-right space-y-0.5">
@@ -420,6 +428,17 @@ export default function PaymentPage() {
                           Nhân viên lập đơn: <strong>{order.users?.full_name || 'Không xác định'}</strong>
                         </div>
                       </div>
+
+                      {/* Ghi chú đơn hàng nếu có */}
+                      {order.notes && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 flex items-start space-x-2.5 shadow-sm">
+                          <FileText className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold uppercase tracking-wider text-[10px] text-amber-800 block mb-0.5">Ghi chú đơn hàng</span>
+                            <p className="font-medium text-amber-950">{order.notes}</p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Items List */}
                       <div className="space-y-3">
@@ -606,6 +625,14 @@ export default function PaymentPage() {
               <p className="text-sm text-coffee-medium">
                 Bạn đang thực hiện thanh toán cho bàn: <strong>{selectedOrder.tables?.table_name}</strong>
               </p>
+              {selectedOrder.notes && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-xs text-amber-900 flex items-start space-x-2">
+                  <FileText className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Ghi chú:</span> {selectedOrder.notes}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light">
                 <span className="text-sm font-semibold text-coffee-dark">Tổng tiền cần thu:</span>
                 <span className="text-xl font-black text-coffee-primary">
