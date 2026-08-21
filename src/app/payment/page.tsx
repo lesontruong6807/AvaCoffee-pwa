@@ -391,6 +391,14 @@ export default function PaymentPage() {
                         <span className="text-[9px] px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold uppercase tracking-wider">
                           Chờ thanh toán
                         </span>
+                        {order.notes && (
+                          <span 
+                            title="Đơn hàng có ghi chú" 
+                            className="inline-flex items-center justify-center p-1 bg-amber-100/90 text-amber-800 border border-amber-300/80 rounded-lg shadow-2xs"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-amber-700" />
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-coffee-medium flex items-center">
                         <User className="w-3.5 h-3.5 mr-1" />
@@ -398,12 +406,6 @@ export default function PaymentPage() {
                         <span className="mx-2">•</span>
                         <span>{new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                       </p>
-                      {order.notes && (
-                        <div className="flex items-center text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200/80 w-fit mt-1">
-                          <FileText className="w-3.5 h-3.5 text-amber-700 mr-1.5 shrink-0" />
-                          <span className="font-semibold">{order.notes}</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="text-right space-y-0.5">
