@@ -814,26 +814,36 @@ const mapProductToClient = (p: any) => p ? {
   mo_ta: p.mo_ta || ''
 } : null;
 
-const mapOrderToClient = (o: any) => o ? {
-  id: o.id,
-  table_id: o.id_ban,
-  staff_id: o.id_nhan_vien,
-  total_amount: Number(o.tong_tien),
-  discount: Number(o.giam_gia || 0),
-  payment_status: o.trang_thai_thanh_toan,
-  payment_method: o.phuong_thuc_thanh_toan,
-  created_at: o.ngay_tao,
-  paid_at: o.ngay_thanh_toan,
-  notes: o.ghi_chu || (o.hoadondetail && Array.isArray(o.hoadondetail) ? o.hoadondetail.map((d: any) => {
-    if (d.ghi_chu && typeof d.ghi_chu === 'string' && d.ghi_chu.includes('[Ghi chú đơn: ')) {
-      const m = d.ghi_chu.match(/\[Ghi chú đơn:\s*([^\]]+)\]/);
-      return m ? m[1] : '';
+const mapOrderToClient = (o: any) => {
+  if (!o) return null;
+  let orderNote = o.ghi_chu || o.notes || '';
+  if (!orderNote && o.hoadondetail && Array.isArray(o.hoadondetail)) {
+    for (const d of o.hoadondetail) {
+      if (d.ghi_chu && typeof d.ghi_chu === 'string' && d.ghi_chu.includes('[Ghi chú đơn: ')) {
+        const m = d.ghi_chu.match(/\[Ghi chú đơn:\s*([^\]]+)\]/);
+        if (m) {
+          orderNote = m[1].trim();
+          break;
+        }
+      }
     }
-    return '';
-  }).filter(Boolean)[0] : '') || o.notes || '',
-  tables: o.danhsachban ? { table_name: o.danhsachban.ten_ban } : null,
-  users: o.nguoidung ? { full_name: o.nguoidung.ho_ten } : null
-} : null;
+  }
+
+  return {
+    id: o.id,
+    table_id: o.id_ban,
+    staff_id: o.id_nhan_vien,
+    total_amount: Number(o.tong_tien),
+    discount: Number(o.giam_gia || 0),
+    payment_status: o.trang_thai_thanh_toan,
+    payment_method: o.phuong_thuc_thanh_toan,
+    created_at: o.ngay_tao,
+    paid_at: o.ngay_thanh_toan,
+    notes: orderNote,
+    tables: o.danhsachban ? { table_name: o.danhsachban.ten_ban } : null,
+    users: o.nguoidung ? { full_name: o.nguoidung.ho_ten } : null
+  };
+};
 
 const mapOrderItemToClient = (oi: any) => oi ? {
   id: oi.id,
@@ -1132,7 +1142,8 @@ export const db = {
           .select(`
             *,
             danhsachban (ten_ban),
-            nguoidung (ho_ten)
+            nguoidung (ho_ten),
+            hoadondetail (id, ghi_chu)
           `)
           .order('ngay_tao', { ascending: false })
           .range(from, from + step - 1);
@@ -1169,10 +1180,16 @@ export const db = {
     const products = mockDb.getProducts();
     return items
       .filter(item => item.order_id === orderId)
-      .map(item => ({
-        ...item,
-        products: products.find(p => p.id === item.product_id) || null
-      }));
+      .map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        return {
+          ...item,
+          products: product ? {
+            name: product.name,
+            image_url: product.image_url
+          } : null
+        };
+      });
   },
 
   async getAllOrderItems() {
@@ -1215,7 +1232,6 @@ export const db = {
     if (isSupabaseConfigured && supabase) {
       const productIds = items.map(item => item.product_id);
 
-      // Tải song song: giá vốn sản phẩm, thông tin bàn, và hóa đơn chưa thanh toán (nếu có)
       const [productsResult, tableResult, unpaidResult] = await Promise.all([
         supabase.from('sanpham').select('id, gia_von').in('id', productIds),
         supabase.from('danhsachban').select('ten_ban').eq('id', table_id).maybeSingle(),
@@ -1233,26 +1249,24 @@ export const db = {
       const existingUnpaidOrder = unpaidResult.data;
       const isTakeaway = tableData?.ten_ban === 'Khách mang về' || table_id === 'tb_mangve';
 
-      // 1. Nếu bàn đã có hóa đơn chưa thanh toán (và không phải mang về) -> Cộng dồn món
       if (!isTakeaway && existingUnpaidOrder) {
         const existingOrderId = existingUnpaidOrder.id;
         const newTotalAmount = Number(existingUnpaidOrder.tong_tien || 0) + total_amount;
         const newDiscount = Number(existingUnpaidOrder.giam_gia || 0) + discount;
 
-        const updateOrderPayload: any = {
-          tong_tien: newTotalAmount,
-          giam_gia: newDiscount
-        };
-        if (notes) {
-          updateOrderPayload.ghi_chu = existingUnpaidOrder.ghi_chu ? `${existingUnpaidOrder.ghi_chu}; ${notes}` : notes;
-        }
-
         const [updateOrderResult, detailsResult] = await Promise.all([
           supabase
             .from('hoadon')
-            .update(updateOrderPayload)
+            .update({
+              tong_tien: newTotalAmount,
+              giam_gia: newDiscount
+            })
             .eq('id', existingOrderId)
-            .select()
+            .select(`
+              *,
+              danhsachban (ten_ban),
+              nguoidung (ho_ten)
+            `)
             .single(),
           supabase
             .from('hoadondetail')
@@ -1289,7 +1303,8 @@ export const db = {
                 .from('hoadondetail')
                 .update({
                   so_luong: newQty,
-                  thanh_tien: newSubtotal
+                  thanh_tien: newSubtotal,
+                  ghi_chu: itemNote || matchedDetail.ghi_chu
                 })
                 .eq('id', matchedDetail.id)
             );
@@ -1320,7 +1335,6 @@ export const db = {
         return mapOrderToClient(updatedOrder);
       }
 
-      // 2. Tạo hóa đơn mới
       const orderId = generateShortId('ord_');
       const validStaffId = (staff_id && staff_id !== 'u1') ? staff_id : 'admin';
 
@@ -1340,19 +1354,23 @@ export const db = {
       let { data: order, error: orderErr } = await supabase
         .from('hoadon')
         .insert([insertPayload])
-        .select()
+        .select(`
+          *,
+          danhsachban (ten_ban),
+          nguoidung (ho_ten)
+        `)
         .single();
 
-      // Nếu lỗi do khóa ngoại nhân viên hoặc cột ghi_chu, thử lại an toàn
       if (orderErr) {
-        console.warn('Thử lại lưu hóa đơn an toàn:', orderErr);
+        console.warn('Thử lại lưu hóa đơn với tài khoản admin:', orderErr);
         const retryResult = await supabase
           .from('hoadon')
           .insert([{
             id: orderId,
             id_ban: table_id,
-            id_nhan_vien: null,
+            id_nhan_vien: 'admin',
             tong_tien: total_amount,
+            giam_gia: discount,
             trang_thai_thanh_toan: 'Chưa thanh toán',
             ngay_tao: createdAt
           }])

@@ -419,26 +419,30 @@ export default function PaymentPage() {
                   {/* EXPANDED CONTENT */}
                   {isSelected && (
                     <div className="border-t border-coffee-light/60 p-5 bg-[#FAF6F0]/20 space-y-5">
-                      {/* Meta Info */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-coffee-medium border-b border-coffee-light/60 pb-4">
-                        <div>
-                          Thời gian đặt: <strong>{new Date(order.created_at).toLocaleString('vi-VN')}</strong>
-                        </div>
-                        <div>
-                          Nhân viên lập đơn: <strong>{order.users?.full_name || 'Không xác định'}</strong>
-                        </div>
-                      </div>
-
-                      {/* Ghi chú đơn hàng nếu có */}
-                      {order.notes && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 flex items-start space-x-2.5 shadow-sm">
-                          <FileText className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      {/* Meta Info & Order Note */}
+                      <div className="space-y-3 border-b border-coffee-light/60 pb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-coffee-medium">
                           <div>
-                            <span className="font-bold uppercase tracking-wider text-[10px] text-amber-800 block mb-0.5">Ghi chú đơn hàng</span>
-                            <p className="font-medium text-amber-950">{order.notes}</p>
+                            Thời gian đặt: <strong>{new Date(order.created_at).toLocaleString('vi-VN')}</strong>
+                          </div>
+                          <div>
+                            Nhân viên lập đơn: <strong>{order.users?.full_name || 'Admin'}</strong>
                           </div>
                         </div>
-                      )}
+
+                        {/* Ghi chú đơn hàng nếu có (nằm ngay dưới Thời gian đặt) */}
+                        {(order.notes || orderItems.find(i => i.ghi_chu?.includes('[Ghi chú đơn:'))?.ghi_chu) && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900 flex items-start space-x-2.5 shadow-sm">
+                            <FileText className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold uppercase tracking-wider text-[10px] text-amber-800 block mb-0.5">Ghi chú:</span>
+                              <span className="font-semibold text-amber-950 text-xs">
+                                {order.notes || orderItems.find(i => i.ghi_chu?.includes('[Ghi chú đơn:'))?.ghi_chu?.match(/\[Ghi chú đơn:\s*([^\]]+)\]/)?.[1] || ''}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Items List */}
                       <div className="space-y-3">
@@ -527,6 +531,11 @@ export default function PaymentPage() {
                                   <div className="space-y-0.5">
                                     <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn đã xoá'}</p>
                                     <p className="text-[10px] text-coffee-medium">Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ</p>
+                                    {item.ghi_chu && item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim() && (
+                                      <p className="text-[10px] text-amber-700 italic font-medium">
+                                        📝 {item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim()}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-4">
