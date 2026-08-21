@@ -1116,15 +1116,26 @@ export const db = {
   // --- ORDERS & ORDER ITEMS (hoadon & hoadondetail) ---
   async getOrders() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('hoadon')
-        .select(`
-          *,
-          danhsachban (ten_ban),
-          nguoidung (ho_ten)
-        `)
-        .order('ngay_tao', { ascending: false });
-      if (!error && data) return data.map(mapOrderToClient).filter(Boolean) as any[];
+      let allOrders: any[] = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('hoadon')
+          .select(`
+            *,
+            danhsachban (ten_ban),
+            nguoidung (ho_ten)
+          `)
+          .order('ngay_tao', { ascending: false })
+          .range(from, from + step - 1);
+
+        if (error || !data || data.length === 0) break;
+        allOrders = allOrders.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+      if (allOrders.length > 0) return allOrders.map(mapOrderToClient).filter(Boolean) as any[];
     }
     const orders = mockDb.getOrders();
     const tables = mockDb.getTables();
@@ -1155,16 +1166,30 @@ export const db = {
         ...item,
         products: products.find(p => p.id === item.product_id) || null
       }));
-  },  async getAllOrderItems() {
+  },
+
+  async getAllOrderItems() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('hoadondetail')
-        .select(`
-          *,
-          sanpham (ten_san_pham, hinh_anh)
-        `);
-      if (!error && data) {
-        return data.map(oi => ({
+      let allItems: any[] = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('hoadondetail')
+          .select(`
+            *,
+            sanpham (ten_san_pham, hinh_anh)
+          `)
+          .range(from, from + step - 1);
+
+        if (error || !data || data.length === 0) break;
+        allItems = allItems.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+
+      if (allItems.length > 0) {
+        return allItems.map(oi => ({
           ...mapOrderItemToClient(oi),
           products: {
             name: oi.sanpham?.ten_san_pham || oi.ten_san_pham || '',
@@ -1991,14 +2016,25 @@ export const db = {
   // --- TIME LOGS (chamcong) ---
   async getTimeLogs() {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('chamcong')
-        .select(`
-          *,
-          nguoidung (ho_ten, email)
-        `)
-        .order('thoi_gian_thuc_vao', { ascending: false });
-      if (!error && data) return data.map(mapTimeLogToClient).filter(Boolean) as any[];
+      let allLogs: any[] = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('chamcong')
+          .select(`
+            *,
+            nguoidung (ho_ten, email)
+          `)
+          .order('thoi_gian_thuc_vao', { ascending: false })
+          .range(from, from + step - 1);
+
+        if (error || !data || data.length === 0) break;
+        allLogs = allLogs.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+      if (allLogs.length > 0) return allLogs.map(mapTimeLogToClient).filter(Boolean) as any[];
     }
     const logs = mockDb.getTimeLogs();
     const users = mockDb.getUsers();
@@ -2308,16 +2344,28 @@ export const db = {
   async getInventoryLogs() {
     this.consolidateDuplicateSalesLogs().catch(err => console.error(err));
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('lichsukho')
-        .select(`
-          *,
-          nguyenlieu (ten_nguyen_lieu, don_vi_tinh),
-          nguoidung (ho_ten)
-        `)
-        .order('thoi_gian_tao', { ascending: false });
-      if (!error && data) {
-        return data.map(log => ({
+      let allLogs: any[] = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('lichsukho')
+          .select(`
+            *,
+            nguyenlieu (ten_nguyen_lieu, don_vi_tinh),
+            nguoidung (ho_ten)
+          `)
+          .order('thoi_gian_tao', { ascending: false })
+          .range(from, from + step - 1);
+
+        if (error || !data || data.length === 0) break;
+        allLogs = allLogs.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+
+      if (allLogs.length > 0) {
+        return allLogs.map(log => ({
           id: log.id,
           ingredient_id: log.id_nguyen_lieu,
           custom_ingredient_name: log.ten_nguyen_lieu_khac,
