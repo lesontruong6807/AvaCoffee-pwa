@@ -22,8 +22,15 @@ import {
   CheckCircle, 
   ArrowLeft,
   Loader2,
-  FileText
+  FileText,
+  CreditCard,
+  DollarSign,
+  ArrowRightLeft,
+  X,
+  Check,
+  Eye
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface CartItem {
   product_id: string;
@@ -52,6 +59,14 @@ export default function PosPage() {
   const isSavingRef = React.useRef(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+  // Trạng thái đơn đang phục vụ & Thanh toán nhanh tại POS
+  const [existingOrder, setExistingOrder] = useState<any>(null);
+  const [existingOrderItems, setExistingOrderItems] = useState<any[]>([]);
+  const [loadingExistingOrder, setLoadingExistingOrder] = useState(false);
+  const [isQuickPayOpen, setIsQuickPayOpen] = useState(false);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
 
   // Trạng thái giảm giá
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
@@ -218,6 +233,129 @@ export default function PosPage() {
 
   const finalTotalAmount = Math.max(0, totalCartAmount - discountAmount);
 
+  // --- TÍNH TOÁN TỔNG CỘNG ---
+  const existingItemsCount = existingOrderItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const displayTotalItems = (existingOrder ? existingItemsCount : 0) + cartItemsCount;
+  const existingOrderTotal = existingOrder ? Number(existingOrder.total_amount || 0) : 0;
+  const displayTotalAmount = (existingOrder ? existingOrderTotal : 0) + finalTotalAmount;
+
+  // Chọn bàn
+  const handleSelectTable = async (table: any) => {
+    setSelectedTable(table);
+    setPosStep('menu');
+    setCart([]);
+    setOrderNotes('');
+    setDiscountValue(0);
+    setDiscountType('amount');
+    setIsQuickPayOpen(false);
+    setIsPayModalOpen(false);
+
+    const isOccupied = table.status === 'Đang phục vụ' && table.table_name !== 'Khách mang về';
+    if (isOccupied) {
+      setLoadingExistingOrder(true);
+      try {
+        const res = await db.getUnpaidOrderByTableId(table.id);
+        if (res) {
+          setExistingOrder(res.order);
+          setExistingOrderItems(res.items || []);
+        } else {
+          setExistingOrder(null);
+          setExistingOrderItems([]);
+        }
+      } catch (e) {
+        console.error('Lỗi khi tải đơn đang phục vụ của bàn:', e);
+        setExistingOrder(null);
+        setExistingOrderItems([]);
+      } finally {
+        setLoadingExistingOrder(false);
+      }
+    } else {
+      setExistingOrder(null);
+      setExistingOrderItems([]);
+    }
+  };
+
+  // Hủy hóa đơn đang phục vụ từ POS
+  const handleCancelExistingOrder = async () => {
+    if (!existingOrder) return;
+    const confirmCancel = window.confirm(`Bạn có chắc chắn muốn hủy và xóa hoàn toàn hóa đơn của ${selectedTable?.table_name || 'bàn này'} không?`);
+    if (!confirmCancel) return;
+
+    try {
+      const success = await db.cancelOrder(existingOrder.id);
+      if (success) {
+        toast.success(`Đã hủy hóa đơn của ${selectedTable?.table_name || 'bàn'} thành công!`);
+        setIsQuickPayOpen(false);
+        setExistingOrder(null);
+        setExistingOrderItems([]);
+        clearCart();
+        setSelectedTable(null);
+        setPosStep('table');
+        await refreshTables();
+      } else {
+        toast.error("Không thể hủy hóa đơn này.");
+      }
+    } catch (err) {
+      console.error("Lỗi khi hủy hóa đơn tại POS:", err);
+      toast.error("Gặp lỗi khi hủy hóa đơn.");
+    }
+  };
+
+  // Xử lý thanh toán nhanh trực tiếp trong POS
+  const handlePayInPos = async (method: 'Tiền mặt' | 'Chuyển khoản') => {
+    if (submittingPayment) return;
+    setSubmittingPayment(true);
+
+    try {
+      let orderIdToPay = existingOrder?.id;
+
+      // 1. Nếu có món mới đang chọn trong giỏ -> Lưu cộng dồn vào hóa đơn trước
+      if (cart.length > 0) {
+        const savedOrder = await db.createOrder({
+          table_id: selectedTable?.id || 'tb_mangve',
+          staff_id: currentUser?.id || 'admin',
+          total_amount: finalTotalAmount,
+          discount: discountAmount,
+          notes: orderNotes.trim(),
+          items: cart
+        });
+        if (savedOrder?.id) {
+          orderIdToPay = savedOrder.id;
+        }
+      }
+
+      if (!orderIdToPay) {
+        toast.error('Không tìm thấy mã hóa đơn để thanh toán!');
+        return;
+      }
+
+      // 2. Tiến hành thanh toán
+      await db.payOrder(orderIdToPay, method);
+
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        colors: ['#4A3525', '#FFE4C4', '#FFFDD0', '#8C6A5C']
+      });
+
+      toast.success(`Thanh toán thành công ${selectedTable?.table_name} qua ${method}!`);
+      setIsPayModalOpen(false);
+      setIsQuickPayOpen(false);
+      clearCart();
+      setExistingOrder(null);
+      setExistingOrderItems([]);
+      setSelectedTable(null);
+      setPosStep('table');
+      await refreshTables();
+    } catch (e) {
+      console.error('Lỗi thanh toán tại POS:', e);
+      toast.error('Gặp lỗi khi xử lý thanh toán.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   // --- LÓGIC CONFIRM & SUBMIT ORDER ---
   const handleConfirmOrder = async () => {
     if (isSavingRef.current) return;
@@ -235,7 +373,7 @@ export default function PosPage() {
     }
 
     try {
-      const newOrder = await db.createOrder({
+      await db.createOrder({
         table_id: selectedTable?.id || 'tb_mangve',
         staff_id: currentUser?.id || 'admin',
         total_amount: finalTotalAmount,
@@ -246,6 +384,8 @@ export default function PosPage() {
 
       toast.success(`Đặt món thành công cho ${selectedTable?.table_name || 'bàn'}!`);
       clearCart();
+      setExistingOrder(null);
+      setExistingOrderItems([]);
       
       // Reload bàn chính thức
       const updatedTables = await db.getTables();
@@ -323,6 +463,9 @@ export default function PosPage() {
                 if (posStep === 'menu') {
                   setPosStep('table');
                   setSelectedTable(null);
+                  setExistingOrder(null);
+                  setExistingOrderItems([]);
+                  clearCart();
                 } else if (posStep === 'summary') {
                   setPosStep('menu');
                 }
@@ -332,23 +475,59 @@ export default function PosPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <span className="text-xs font-semibold text-coffee-medium uppercase tracking-wider">Đang phục vụ</span>
+              <span className="text-xs font-semibold text-coffee-medium uppercase tracking-wider">
+                {selectedTable?.status === 'Đang phục vụ' ? 'Đang phục vụ' : 'Bàn mới'}
+              </span>
               <h2 className="font-extrabold text-xl text-coffee-primary leading-tight">{selectedTable?.table_name || ''}</h2>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-xs text-coffee-medium">Giỏ hàng</p>
-              <p className="font-bold text-coffee-dark">{cart.length} món - {totalCartAmount.toLocaleString('vi-VN')}đ</p>
-            </div>
-            <div className="p-3 bg-coffee-accent rounded-xl text-coffee-dark relative">
-              <ShoppingCart className="w-5 h-5" />
-              {cart.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)}
-                </span>
-              )}
-            </div>
+
+          <div className="flex items-center space-x-3">
+            {existingOrder ? (
+              <button
+                onClick={() => setIsQuickPayOpen(true)}
+                className="flex items-center space-x-3 p-2 px-3 rounded-2xl bg-amber-50 hover:bg-amber-100/90 border border-amber-200 text-left transition group shadow-xs cursor-pointer"
+                title="Bấm để xem hóa đơn chi tiết & thanh toán"
+              >
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center justify-end space-x-1">
+                    <span>Hóa đơn bàn</span>
+                    <span className="text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">Thanh toán</span>
+                  </p>
+                  <p className="font-black text-coffee-dark text-sm">
+                    {displayTotalItems} món - {displayTotalAmount.toLocaleString('vi-VN')}đ
+                  </p>
+                </div>
+                <div className="p-2.5 bg-coffee-primary text-white rounded-xl relative shadow-sm group-hover:scale-105 transition-transform">
+                  <CreditCard className="w-4 h-4 text-coffee-accent" />
+                  {displayTotalItems > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">
+                      {displayTotalItems}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ) : (
+              <div 
+                onClick={() => {
+                  if (cart.length > 0) setIsMobileCartOpen(true);
+                }}
+                className="flex items-center space-x-3 cursor-pointer"
+              >
+                <div className="text-right">
+                  <p className="text-xs text-coffee-medium">Giỏ hàng</p>
+                  <p className="font-bold text-coffee-dark">{cart.length} món - {totalCartAmount.toLocaleString('vi-VN')}đ</p>
+                </div>
+                <div className="p-3 bg-coffee-accent rounded-xl text-coffee-dark relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">
+                      {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -362,7 +541,7 @@ export default function PosPage() {
               <span>Bước 1: Chọn Bàn / Hình thức bán hàng</span>
             </h3>
             <p className="text-xs text-coffee-medium">
-              Vui lòng chọn bàn trống để mở thực đơn, hoặc chọn bàn có trạng thái <strong>Đang phục vụ</strong> để chỉnh sửa/thêm món mới.
+              Vui lòng chọn bàn trống để mở thực đơn, hoặc chọn bàn có trạng thái <strong>Đang phục vụ</strong> để xem hóa đơn / thanh toán / thêm món mới.
             </p>
           </div>
 
@@ -378,11 +557,7 @@ export default function PosPage() {
               return (
                 <button
                   key={table.id}
-                  onClick={() => {
-                    setSelectedTable(table);
-                    setPosStep('menu');
-                    setCart([]); // Xóa giỏ tạm khi chọn bàn mới
-                  }}
+                  onClick={() => handleSelectTable(table)}
                   className={`relative p-5 rounded-3xl border text-left flex flex-col justify-between h-40 transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
                     isOccupied
                       ? 'bg-amber-50/50 border-amber-300 shadow-inner'
@@ -406,7 +581,7 @@ export default function PosPage() {
                   <div className="space-y-1 mt-4">
                     <h4 className="font-extrabold text-lg text-coffee-dark tracking-tight">{table.table_name}</h4>
                     <p className="text-xs text-coffee-medium">
-                      {isOccupied ? 'Bấm để thêm món/chỉnh sửa' : 'Bàn trống - Bán mới'}
+                      {isOccupied ? 'Đang có khách • Bấm để xem / bán' : 'Bàn trống • Bán mới'}
                     </p>
                   </div>
 
@@ -1004,6 +1179,237 @@ export default function PosPage() {
                 <span>Gửi Nhà Bếp / Xác Nhận</span>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* DRAWER / MODAL HÓA ĐƠN & THANH TOÁN TRỰC TIẾP TRONG POS */}
+      {isQuickPayOpen && existingOrder && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-coffee-light overflow-hidden animate-scale-up">
+            {/* Header */}
+            <div className="p-5 bg-[#FAF6F0] border-b border-coffee-light flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-coffee-primary text-white rounded-xl shadow-xs">
+                  <CreditCard className="w-5 h-5 text-coffee-accent" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-extrabold text-base text-coffee-dark">Hóa đơn {selectedTable?.table_name}</h3>
+                    <span className="text-[9px] px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold uppercase tracking-wider">
+                      Đang phục vụ
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-coffee-medium">Mã HĐ: #{existingOrder.id.substring(0, 8).toUpperCase()}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsQuickPayOpen(false)}
+                className="p-2 text-coffee-medium hover:text-coffee-dark hover:bg-coffee-light/60 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Meta info & Notes */}
+              <div className="bg-[#FAF6F0]/60 p-3.5 rounded-2xl border border-coffee-light/60 space-y-1.5 text-xs text-coffee-medium">
+                <div className="flex justify-between">
+                  <span>Thời gian đặt:</span>
+                  <strong className="text-coffee-dark">{new Date(existingOrder.created_at).toLocaleString('vi-VN')}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Nhân viên lập đơn:</span>
+                  <strong className="text-coffee-dark">{existingOrder.users?.full_name || 'Admin'}</strong>
+                </div>
+                {(existingOrder.notes || orderNotes) && (
+                  <div className="mt-2 pt-2 border-t border-coffee-light/60 flex items-start space-x-1.5 text-amber-900 bg-amber-50/80 p-2 rounded-xl border border-amber-200/60">
+                    <FileText className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-[10px] uppercase block">Ghi chú:</span>
+                      <span className="text-xs font-semibold">
+                        {existingOrder.notes}{orderNotes ? (existingOrder.notes ? ` • ${orderNotes}` : orderNotes) : ''}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Danh sách món đã gọi */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-xs text-coffee-dark uppercase tracking-wider flex items-center justify-between">
+                  <span>Món đang phục vụ ({existingOrderItems.length})</span>
+                  <span className="text-[10px] text-coffee-medium font-normal">Đã gửi bếp</span>
+                </h4>
+                {loadingExistingOrder ? (
+                  <div className="py-4 flex justify-center">
+                    <Loader2 className="w-5 h-5 text-coffee-primary animate-spin" />
+                  </div>
+                ) : existingOrderItems.length === 0 ? (
+                  <p className="text-xs text-coffee-medium italic py-2">Không có món ăn trong đơn.</p>
+                ) : (
+                  <div className="border border-coffee-light bg-white rounded-2xl overflow-hidden divide-y divide-coffee-light/50">
+                    {existingOrderItems.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn'}</p>
+                          <p className="text-[10px] text-coffee-medium">
+                            Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ
+                          </p>
+                          {item.ghi_chu && item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim() && (
+                            <p className="text-[10px] text-amber-700 italic font-medium">
+                              📝 {item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim()}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="font-bold text-coffee-medium text-xs">x {item.quantity}</span>
+                          <span className="font-extrabold text-coffee-dark w-16 text-right">
+                            {Number(item.subtotal || 0).toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Danh sách món mới đang chọn thêm trong giỏ (nếu có) */}
+              {cart.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <h4 className="font-extrabold text-xs text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+                    <span>Món mới chọn thêm (+{cart.length})</span>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Chưa gửi bếp</span>
+                  </h4>
+                  <div className="border border-emerald-200 bg-emerald-50/30 rounded-2xl overflow-hidden divide-y divide-emerald-100">
+                    {cart.map((item) => (
+                      <div key={item.product_id} className="flex justify-between items-center p-3 text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-emerald-950">{item.name}</p>
+                          <p className="text-[10px] text-emerald-700">Đơn giá: {item.price.toLocaleString('vi-VN')}đ</p>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="font-bold text-emerald-800 text-xs">x {item.quantity}</span>
+                          <span className="font-extrabold text-emerald-950 w-16 text-right">
+                            {item.subtotal.toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Chi tiết phân rã giá tiền */}
+              <div className="bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light space-y-2 text-xs">
+                <div className="flex justify-between text-coffee-medium">
+                  <span>Hóa đơn bàn hiện tại:</span>
+                  <span className="font-semibold">{existingOrderTotal.toLocaleString('vi-VN')}đ</span>
+                </div>
+                {cart.length > 0 && (
+                  <div className="flex justify-between text-emerald-800 font-medium">
+                    <span>Món mới chọn thêm:</span>
+                    <span className="font-bold">+{finalTotalAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                {existingOrder.discount > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Giảm giá trước đó:</span>
+                    <span className="font-bold">-{Number(existingOrder.discount).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-coffee-light/60 pt-2 text-sm">
+                  <span className="font-extrabold text-coffee-dark">Tổng tiền cần thu:</span>
+                  <span className="font-black text-lg text-coffee-primary font-mono">
+                    {displayTotalAmount.toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 bg-white border-t border-coffee-light flex items-center justify-between gap-3 shrink-0">
+              <button
+                onClick={handleCancelExistingOrder}
+                className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition flex items-center space-x-1.5 text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hủy đơn</span>
+              </button>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsQuickPayOpen(false)}
+                  className="px-3.5 py-2.5 bg-[#FAF6F0] hover:bg-coffee-light text-coffee-dark rounded-xl transition text-xs font-bold cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => setIsPayModalOpen(true)}
+                  className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white rounded-xl transition flex items-center space-x-2 text-xs font-black shadow-md shadow-coffee-primary/20 cursor-pointer"
+                >
+                  <DollarSign className="w-4 h-4 text-coffee-accent" />
+                  <span>Thanh toán ({displayTotalAmount.toLocaleString('vi-VN')}đ)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CHỌN PHƯƠNG THỨC THANH TOÁN TRONG POS */}
+      {isPayModalOpen && (
+        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 border border-coffee-accent/40 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
+              <h3 className="font-extrabold text-lg text-coffee-dark">Xác nhận thanh toán</h3>
+              <button 
+                onClick={() => setIsPayModalOpen(false)}
+                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm text-coffee-medium">
+                Bạn đang thực hiện thanh toán cho bàn: <strong className="text-coffee-dark">{selectedTable?.table_name}</strong>
+              </p>
+              
+              <div className="flex justify-between items-center bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light">
+                <span className="text-sm font-semibold text-coffee-dark">Tổng tiền cần thu:</span>
+                <span className="text-xl font-black text-coffee-primary font-mono">
+                  {displayTotalAmount.toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider">Chọn phương thức thanh toán</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handlePayInPos('Tiền mặt')}
+                  disabled={submittingPayment}
+                  className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm disabled:opacity-50 cursor-pointer"
+                >
+                  <DollarSign className="w-8 h-8 text-coffee-primary" />
+                  <span>Tiền mặt</span>
+                </button>
+                <button
+                  onClick={() => handlePayInPos('Chuyển khoản')}
+                  disabled={submittingPayment}
+                  className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm disabled:opacity-50 cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-8 h-8 text-coffee-primary" />
+                  <span>Chuyển khoản</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 text-center text-[10px] text-coffee-medium/70">
+              Nhân viên thực hiện: {currentUser?.full_name || 'Admin'}
+            </div>
           </div>
         </div>
       )}

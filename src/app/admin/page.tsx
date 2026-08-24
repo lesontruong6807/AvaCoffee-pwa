@@ -200,6 +200,78 @@ export default function AdminPage() {
   });
   const [repEndDate, setRepEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
 
+  // Phân trang & xem chi tiết hóa đơn trong Báo cáo Doanh thu (Feature 2)
+  const [repCurrentPage, setRepCurrentPage] = useState<number>(1);
+  const [repExpandedOrderId, setRepExpandedOrderId] = useState<string | null>(null);
+  const [repExpandedOrderItems, setRepExpandedOrderItems] = useState<any[]>([]);
+  const [repLoadingExpandedItems, setRepLoadingExpandedItems] = useState<boolean>(false);
+
+  // Sửa giá nhập kho sau khi đã duyệt (Feature 3)
+  const [editingRestockLog, setEditingRestockLog] = useState<any | null>(null);
+  const [newRestockCost, setNewRestockCost] = useState<string>('');
+  const [isEditRestockModalOpen, setIsEditRestockModalOpen] = useState(false);
+  const [submittingRestockCost, setSubmittingRestockCost] = useState(false);
+
+  useEffect(() => {
+    if (!repExpandedOrderId) {
+      setRepExpandedOrderItems([]);
+      return;
+    }
+    async function fetchExpandedItems() {
+      const orderId = repExpandedOrderId;
+      if (!orderId) return;
+      setRepLoadingExpandedItems(true);
+      try {
+        const items = await db.getOrderItems(orderId);
+        setRepExpandedOrderItems(items || []);
+      } catch (e) {
+        console.error('Lỗi khi tải chi tiết đơn hàng trong Admin:', e);
+        toast.error('Không thể tải chi tiết sản phẩm.');
+      } finally {
+        setRepLoadingExpandedItems(false);
+      }
+    }
+    fetchExpandedItems();
+  }, [repExpandedOrderId]);
+
+  // Reset page when report date changes
+  useEffect(() => {
+    setRepCurrentPage(1);
+    setRepExpandedOrderId(null);
+  }, [repStartDate, repEndDate]);
+
+  // Handler mở modal sửa giá nhập kho
+  const handleOpenEditRestockModal = (log: any) => {
+    setEditingRestockLog(log);
+    setNewRestockCost(String(log.cost || 0));
+    setIsEditRestockModalOpen(true);
+  };
+
+  // Handler lưu cập nhật giá nhập kho
+  const handleSaveRestockCost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRestockLog) return;
+    const costNum = Number(newRestockCost);
+    if (isNaN(costNum) || costNum < 0) {
+      toast.error('Vui lòng nhập chi phí nhập kho hợp lệ (≥ 0)!');
+      return;
+    }
+    setSubmittingRestockCost(true);
+    try {
+      await db.updateRestockCost(editingRestockLog.id, costNum);
+      toast.success(`Đã cập nhật giá nhập kho cho ${editingRestockLog.ingredient_name || 'nguyên liệu'} và tính lại giá vốn!`);
+      setIsEditRestockModalOpen(false);
+      setEditingRestockLog(null);
+      setNewRestockCost('');
+      await loadAllData();
+    } catch (err) {
+      console.error('Lỗi cập nhật giá nhập kho:', err);
+      toast.error('Không thể cập nhật giá nhập kho.');
+    } finally {
+      setSubmittingRestockCost(false);
+    }
+  };
+
   // Bộ lọc ngày & tìm kiếm cho Báo cáo kho (Tab 'inventory')
   const [invStartDate, setInvStartDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [invEndDate, setInvEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
@@ -982,7 +1054,11 @@ export default function AdminPage() {
                       Món: {log.ingredient_name}
                     </p>
                     <p className="text-coffee-medium">
-                      Số lượng thay đổi: <strong className="text-coffee-dark">{log.change_amount > 0 ? `+${log.change_amount}` : log.change_amount} {log.ingredient_unit}</strong>
+                      Số lượng thay đổi: <strong className="text-coffee-dark">
+                        {log.type === 'Nhập kho'
+                          ? formatIngredientRefill(log.change_amount, log.ingredient_unit, ingredients.find(i => i.id === log.ingredient_id)?.quy_cach)
+                          : `${log.change_amount > 0 ? `+${log.change_amount}` : log.change_amount} ${log.ingredient_unit}`}
+                      </strong>
                     </p>
                     {log.cost > 0 && (
                       <p className="text-coffee-medium">
@@ -1193,6 +1269,7 @@ export default function AdminPage() {
                     <th className="py-2">Nguyên liệu</th>
                     <th className="py-2">Ghi chú/Lý do</th>
                     <th className="py-2 text-right">Chi phí</th>
+                    <th className="py-2 text-center w-24">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-coffee-light/50">
@@ -1208,13 +1285,23 @@ export default function AdminPage() {
                         {log.note || 'Nhập kho'}
                       </td>
                       <td className="py-2.5 text-right font-extrabold text-red-600">
-                        -{log.cost.toLocaleString('vi-VN')}đ
+                        -{Number(log.cost || 0).toLocaleString('vi-VN')}đ
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <button
+                          onClick={() => handleOpenEditRestockModal(log)}
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold border border-amber-200 transition flex items-center space-x-1 mx-auto cursor-pointer"
+                          title="Sửa giá nhập kho cho phiếu này"
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span>Sửa giá</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
                   {rangeRestockLogs.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center text-coffee-medium/60 italic">
+                      <td colSpan={5} className="py-6 text-center text-coffee-medium/60 italic">
                         Không phát sinh chi phí nhập kho nào trong khoảng thời gian này.
                       </td>
                     </tr>
@@ -1226,43 +1313,164 @@ export default function AdminPage() {
 
           {/* Danh sách giao dịch bán hàng đã thanh toán */}
           <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
-            <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch gần đây</h4>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-coffee-light text-coffee-medium font-bold">
-                    <th className="py-2">Mã đơn</th>
-                    <th className="py-2">Ngày</th>
-                    <th className="py-2">Bàn</th>
-                    <th className="py-2">Thanh toán</th>
-                    <th className="py-2 text-right">Tổng tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-coffee-light/50">
-                  {paidOrders.slice(0, 10).map((order) => (
-                    <tr key={order.id}>
-                      <td className="py-2.5 font-mono text-[10px] text-coffee-medium">{order.id.substring(0, 8).toUpperCase()}</td>
-                      <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
-                      <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
-                      <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
-                          order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {order.payment_method}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right font-bold text-coffee-primary">{order.total_amount.toLocaleString('vi-VN')}đ</td>
-                    </tr>
-                  ))}
-                  {paidOrders.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-coffee-medium/60">Chưa có giao dịch thanh toán nào hôm nay.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch gần đây</h4>
+              <span className="text-xs text-coffee-medium">Tổng số: <strong>{paidOrders.length}</strong> đơn</span>
             </div>
+            
+            {(() => {
+              const repItemsPerPage = 10;
+              const totalPaidOrders = paidOrders.length;
+              const repTotalPages = Math.ceil(totalPaidOrders / repItemsPerPage);
+              const repStartIndex = (repCurrentPage - 1) * repItemsPerPage;
+              const repDisplayedOrders = paidOrders.slice(repStartIndex, repStartIndex + repItemsPerPage);
+
+              return (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-coffee-light text-coffee-medium font-bold">
+                          <th className="py-2">Mã đơn</th>
+                          <th className="py-2">Ngày</th>
+                          <th className="py-2">Bàn</th>
+                          <th className="py-2">Thanh toán</th>
+                          <th className="py-2 text-right">Tổng tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-coffee-light/50">
+                        {repDisplayedOrders.map((order) => {
+                          const isExpanded = repExpandedOrderId === order.id;
+                          return (
+                            <React.Fragment key={order.id}>
+                              <tr 
+                                onClick={() => setRepExpandedOrderId(isExpanded ? null : order.id)}
+                                className="hover:bg-[#FAF6F0]/70 cursor-pointer transition select-none"
+                              >
+                                <td className="py-2.5 font-mono text-[10px] text-coffee-medium font-bold">
+                                  #{order.id.substring(0, 8).toUpperCase()}
+                                  <span className="text-[9px] text-coffee-primary ml-1.5 font-normal">
+                                    {isExpanded ? '▲' : '▼'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleString('vi-VN')}</td>
+                                <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
+                                <td className="py-2.5">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                    order.payment_method === 'Tiền mặt' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {order.payment_method}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 text-right font-extrabold text-coffee-primary font-mono">{Number(order.total_amount || 0).toLocaleString('vi-VN')}đ</td>
+                              </tr>
+
+                              {/* Hàng mở rộng chi tiết món ăn */}
+                              {isExpanded && (
+                                <tr>
+                                  <td colSpan={5} className="p-0 border-b border-coffee-light bg-[#FAF6F0]/30">
+                                    <div className="p-4 m-2 rounded-2xl bg-white border border-coffee-light/60 space-y-3 shadow-xs">
+                                      <div className="flex justify-between items-center text-xs border-b border-coffee-light/40 pb-2">
+                                        <span className="font-bold text-coffee-dark uppercase tracking-wider text-[10px]">
+                                          Chi tiết món ăn (#{order.id.substring(0, 8).toUpperCase()})
+                                        </span>
+                                        <span className="text-coffee-medium text-[11px]">
+                                          Bàn: <strong>{order.tables?.table_name || 'Mang về'}</strong> • Thu ngân: <strong>{order.users?.full_name || 'Admin'}</strong>
+                                        </span>
+                                      </div>
+
+                                      {repLoadingExpandedItems ? (
+                                        <div className="py-3 flex justify-center">
+                                          <Loader2 className="w-5 h-5 text-coffee-primary animate-spin" />
+                                        </div>
+                                      ) : repExpandedOrderItems.length === 0 ? (
+                                        <p className="text-xs text-coffee-medium italic py-1">Không có chi tiết sản phẩm.</p>
+                                      ) : (
+                                        <div className="space-y-2 divide-y divide-coffee-light/30">
+                                          {repExpandedOrderItems.map((item, idx) => (
+                                            <div key={item.id || idx} className="flex justify-between items-center text-xs pt-2 first:pt-0">
+                                              <div className="space-y-0.5">
+                                                <span className="text-coffee-dark font-medium">
+                                                  {item.products?.name || item.ten_san_pham || 'Sản phẩm'} <span className="text-coffee-medium font-bold">x{item.quantity}</span>
+                                                </span>
+                                                {item.ghi_chu && item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim() && (
+                                                  <p className="text-[10px] text-amber-700 italic">
+                                                    📝 {item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim()}
+                                                  </p>
+                                                )}
+                                              </div>
+                                              <span className="font-bold text-coffee-dark">
+                                                {Number(item.subtotal || (item.quantity * (item.unit_price || item.products?.price || 0))).toLocaleString('vi-VN')}đ
+                                              </span>
+                                            </div>
+                                          ))}
+
+                                          <div className="flex justify-between items-center font-extrabold text-coffee-primary pt-2.5 text-xs">
+                                            <span>Tổng tiền thanh toán:</span>
+                                            <span className="font-mono text-sm">{Number(order.total_amount || 0).toLocaleString('vi-VN')}đ</span>
+                                          </div>
+                                          {order.discount > 0 && (
+                                            <div className="flex justify-between items-center text-red-600 font-bold text-xs pt-1">
+                                              <span>Giảm giá:</span>
+                                              <span>-{Number(order.discount).toLocaleString('vi-VN')}đ</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+
+                        {paidOrders.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-6 text-center text-coffee-medium/60 italic">
+                              Chưa có giao dịch thanh toán nào trong khoảng thời gian này.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Điều khiển phân trang */}
+                  {repTotalPages > 1 && (
+                    <div className="flex items-center justify-center space-x-1.5 pt-3 border-t border-coffee-light/40">
+                      <button
+                        onClick={() => setRepCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={repCurrentPage === 1}
+                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        Trước
+                      </button>
+                      {Array.from({ length: repTotalPages }, (_, idx) => idx + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setRepCurrentPage(page)}
+                          className={`w-7 h-7 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                            repCurrentPage === page
+                              ? 'bg-coffee-primary text-white shadow-sm font-black'
+                              : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setRepCurrentPage(prev => Math.min(repTotalPages, prev + 1))}
+                        disabled={repCurrentPage === repTotalPages}
+                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1491,69 +1699,71 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Bảng Excel-style */}
-          <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
-                <thead>
-                  <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
-                    <th className="p-3.5 w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
-                      Tên nguyên liệu
-                    </th>
-                    <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
-                      Tồn đầu kỳ
-                    </th>
-                    <th className="p-3.5 w-32 font-bold text-green-700 border-r border-coffee-light/60">
-                      SL nhập (+)
-                    </th>
-                    <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
-                      SL bán (-)
-                    </th>
-                    <th className="p-3.5 w-40 font-black text-coffee-primary">
-                      Tồn thực tế cuối kỳ
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-coffee-light/50">
-                  {ingredients
-                    .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
-                    .map((ing) => {
-                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
-                      const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
-                      const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
-                      const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
-                      const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
+          {/* Danh sách Card Nguyên Liệu Kho (gọn gàng, hiện đại) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ingredients
+              .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
+              .map((ing) => {
+                const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
+                const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
+                const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
+                const isLowStock = ing.min_stock !== null && endingStock <= Number(ing.min_stock);
 
-                      return (
-                        <tr key={ing.id} className="hover:bg-coffee-light/20 transition-all">
-                          {/* Sticky First Column */}
-                          <td className="p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-52 whitespace-normal break-words bg-white">
-                            <div className="flex flex-col">
-                              <span className="whitespace-normal break-words leading-tight">{ing.name}</span>
-                              <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-1">
-                                ({ing.unit}{ing.quy_cach ? `, ${ing.quy_cach}` : ''})
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold">
-                            {formattedOpening}
-                          </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-green-700 font-extrabold">
-                            {formatRefill}
-                          </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-red-600 font-extrabold">
-                            {formatSold}
-                          </td>
-                          <td className="p-3 text-coffee-primary font-black">
-                            {formattedEnding}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
+                return (
+                  <div
+                    key={ing.id}
+                    className="bg-white rounded-3xl p-5 border border-coffee-light shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  >
+                    {/* Header Card */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-sm text-coffee-dark leading-tight">{ing.name}</h4>
+                        <span className="inline-block text-[10px] text-coffee-medium bg-[#FAF6F0] px-2 py-0.5 rounded-md font-medium border border-coffee-light/40">
+                          {ing.unit}{ing.quy_cach ? ` • ${ing.quy_cach}` : ''}
+                        </span>
+                      </div>
+                      {isLowStock && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-full shrink-0 uppercase tracking-wider">
+                          ⚠️ Cần nhập
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 3 Chỉ số Đầu kỳ - Nhập - Bán */}
+                    <div className="grid grid-cols-3 gap-2 bg-[#FAF6F0]/60 p-3 rounded-2xl border border-coffee-light/50 text-center">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-coffee-medium font-bold uppercase block">Đầu kỳ</span>
+                        <span className="text-xs font-semibold text-coffee-dark block">{formattedOpening}</span>
+                      </div>
+                      <div className="space-y-0.5 border-l border-coffee-light/60">
+                        <span className="text-[9px] text-green-700 font-bold uppercase block">Nhập (+)</span>
+                        <span className="text-xs font-extrabold text-green-700 block">{formatRefill}</span>
+                      </div>
+                      <div className="space-y-0.5 border-l border-coffee-light/60">
+                        <span className="text-[9px] text-red-600 font-bold uppercase block">Bán (-)</span>
+                        <span className="text-xs font-extrabold text-red-600 block">{formatSold}</span>
+                      </div>
+                    </div>
+
+                    {/* Highlight Tồn Thực Tế Cuối Kỳ */}
+                    <div className="flex items-center justify-between pt-2 border-t border-coffee-light/40">
+                      <span className="text-xs font-bold text-coffee-medium">Tồn cuối kỳ:</span>
+                      <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-coffee-primary'}`}>
+                        {formattedEnding}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
+
+          {ingredients.filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase())).length === 0 && (
+            <div className="bg-white rounded-3xl p-12 text-center text-coffee-medium border border-coffee-light">
+              <p className="font-bold text-sm">Không tìm thấy nguyên liệu nào phù hợp.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -2558,6 +2768,92 @@ export default function AdminPage() {
               >
                 Lưu nhân viên
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SỬA GIÁ NHẬP KHO (FEATURE 3) */}
+      {isEditRestockModalOpen && editingRestockLog && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 border border-coffee-accent/40 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-coffee-light pb-3.5">
+              <h3 className="font-extrabold text-base text-coffee-dark flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-coffee-primary" />
+                <span>Cập nhật giá nhập kho</span>
+              </h3>
+              <button
+                onClick={() => setIsEditRestockModalOpen(false)}
+                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRestockCost} className="space-y-4 text-xs">
+              <div className="bg-[#FAF6F0] p-3.5 rounded-2xl border border-coffee-light/60 space-y-1.5 text-coffee-medium">
+                <div className="flex justify-between">
+                  <span>Nguyên liệu:</span>
+                  <strong className="text-coffee-dark">{editingRestockLog.ingredient_name || 'Khác'}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Ngày nhập:</span>
+                  <strong className="text-coffee-dark">{new Date(editingRestockLog.created_at).toLocaleDateString('vi-VN')}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Số lượng:</span>
+                  <strong className="text-coffee-dark">
+                    +{formatIngredientRefill(editingRestockLog.change_amount, editingRestockLog.ingredient_unit || '', '')}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Chi phí cũ:</span>
+                  <strong className="text-red-600">-{Number(editingRestockLog.cost || 0).toLocaleString('vi-VN')}đ</strong>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-coffee-dark uppercase text-[10px] tracking-wider block">
+                  Tổng chi phí nhập mới (VNĐ) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Nhập tổng số tiền thực tế..."
+                  value={newRestockCost}
+                  onChange={(e) => setNewRestockCost(e.target.value)}
+                  className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-sm font-bold border-none focus:ring-2 focus:ring-coffee-primary text-coffee-dark outline-none"
+                />
+                <p className="text-[10px] text-coffee-medium italic">
+                  💡 Hệ thống sẽ tự động cập nhật lại báo cáo tài chính ngày {new Date(editingRestockLog.created_at).toLocaleDateString('vi-VN')} và tính lại giá vốn trung bình cho nguyên liệu.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-coffee-light/60">
+                <button
+                  type="button"
+                  onClick={() => setIsEditRestockModalOpen(false)}
+                  disabled={submittingRestockCost}
+                  className="px-4 py-2.5 bg-[#FAF6F0] hover:bg-coffee-light text-coffee-dark font-bold rounded-xl transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingRestockCost}
+                  className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold rounded-xl transition shadow shadow-coffee-primary/20 flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {submittingRestockCost ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <span>Lưu giá mới</span>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>

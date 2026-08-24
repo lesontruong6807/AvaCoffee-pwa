@@ -712,7 +712,7 @@ export default function InventoryPage() {
                     />
                     {pkg.multiplier > 1 && (
                       <p className="text-[11px] text-amber-900 font-extrabold bg-amber-50 p-2.5 rounded-xl border border-amber-200/60">
-                        💡 Bạn nhập {restockQty || 1} {pkg.inputUnit} → Hệ thống tự động quy đổi +{((Number(restockQty) || 1) * pkg.multiplier)}g vào kho.
+                        💡 Bạn nhập {restockQty || 1} {pkg.inputUnit} → Hệ thống tự động quy đổi +{((Number(restockQty) || 1) * pkg.multiplier)}{selectedRestockIngredient?.unit || ''} vào kho.
                       </p>
                     )}
                   </div>
