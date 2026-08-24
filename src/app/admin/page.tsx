@@ -1742,7 +1742,7 @@ export default function AdminPage() {
 
           {/* Bảng Excel-style Thống Kê Kho (Đồng bộ chuẩn giao diện Kho, tối ưu màn hình điện thoại) */}
           <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-none overscroll-x-none overscroll-y-none select-none">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-x-contain">
               <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px] bg-white">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
@@ -2306,7 +2306,7 @@ export default function AdminPage() {
             {/* Render các bảng dữ liệu */}
             {attendanceSubTab === 'summary' && (
               <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-                <div className="overflow-x-auto overscroll-none overscroll-x-none select-none">
+                <div className="overflow-x-auto overscroll-x-contain">
                   <table className="w-full text-left text-xs sm:text-sm bg-white">
                     <thead>
                       <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
@@ -2365,7 +2365,7 @@ export default function AdminPage() {
                 />
               ) : (
                 <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden animate-fade-in">
-                  <div className="overflow-x-auto overscroll-none overscroll-x-none select-none">
+                  <div className="overflow-x-auto overscroll-x-contain">
                     <table className="w-full text-left text-xs sm:text-sm bg-white">
                       <thead>
                         <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">
@@ -2419,7 +2419,7 @@ export default function AdminPage() {
                 />
               ) : (
                 <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden animate-fade-in">
-                  <div className="overflow-x-auto overscroll-none overscroll-x-none select-none">
+                  <div className="overflow-x-auto overscroll-x-contain">
                     <table className="w-full text-left text-xs sm:text-sm bg-white">
                       <thead>
                         <tr className="bg-[#FAF6F0] border-b border-coffee-light text-coffee-medium font-bold text-xs uppercase">

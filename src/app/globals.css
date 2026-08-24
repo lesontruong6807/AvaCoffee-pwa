@@ -24,18 +24,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html,
 body {
   background-color: var(--background);
   color: var(--foreground);
   min-height: 100vh;
-  touch-action: manipulation;
   overflow-x: hidden;
-  overscroll-behavior: none !important;
-  overscroll-behavior-y: none !important;
-  overscroll-behavior-x: none !important;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 input, textarea {
@@ -58,16 +54,10 @@ input, textarea {
   background: var(--coffee-dark);
 }
 
-/* Khóa hoàn toàn hiệu ứng nảy (rubber-band / bounce overscroll) cả chiều ngang lẫn chiều dọc */
-html,
-body,
+/* Ngăn giật nảy khi vuốt ngang tới mép bảng mà không làm khóa cuộn dọc của trang */
 .overflow-x-auto,
-.overflow-y-auto,
-.table-scroll,
-table {
-  overscroll-behavior: none !important;
-  overscroll-behavior-x: none !important;
-  overscroll-behavior-y: none !important;
+.table-scroll {
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
 
