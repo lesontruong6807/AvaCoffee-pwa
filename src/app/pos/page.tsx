@@ -61,6 +61,7 @@ export default function PosPage() {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Trạng thái đơn đang phục vụ & Thanh toán nhanh tại POS
+  const [unpaidOrders, setUnpaidOrders] = useState<any[]>([]);
   const [existingOrder, setExistingOrder] = useState<any>(null);
   const [existingOrderItems, setExistingOrderItems] = useState<any[]>([]);
   const [loadingExistingOrder, setLoadingExistingOrder] = useState(false);
@@ -74,10 +75,15 @@ export default function PosPage() {
 
   const refreshTables = async () => {
     try {
-      const tablesData = await db.getTables();
+      const [tablesData, unpaidData] = await Promise.all([
+        db.getTables(),
+        db.getUnpaidOrders()
+      ]);
       setTables(tablesData);
+      setUnpaidOrders(unpaidData);
       try {
         localStorage.setItem('ava_pos_cache_tables', JSON.stringify(tablesData));
+        localStorage.setItem('ava_pos_cache_unpaid', JSON.stringify(unpaidData));
       } catch (_) {}
     } catch (e) {
       console.error('Lỗi làm mới danh sách bàn POS:', e);
@@ -86,24 +92,28 @@ export default function PosPage() {
 
   useEffect(() => {
     async function loadData() {
-      // 1. Đọc dữ liệu từ cache trước để hiển thị ngay lập tức (Offline-first / Fast Load)
+      // 1. Đọc dữ liệu từ cache trước để hiển thị ngay lập tức (Offline-first / Fast Load 0ms)
       let cachedTables = null;
       let cachedCategories = null;
       let cachedProducts = null;
+      let cachedUnpaid = null;
       
       try {
         const storedTables = localStorage.getItem('ava_pos_cache_tables');
         const storedCategories = localStorage.getItem('ava_pos_cache_categories');
         const storedProducts = localStorage.getItem('ava_pos_cache_products');
+        const storedUnpaid = localStorage.getItem('ava_pos_cache_unpaid');
         
         if (storedTables) cachedTables = JSON.parse(storedTables);
         if (storedCategories) cachedCategories = JSON.parse(storedCategories);
         if (storedProducts) cachedProducts = JSON.parse(storedProducts);
+        if (storedUnpaid) cachedUnpaid = JSON.parse(storedUnpaid);
         
         if (cachedTables && cachedCategories && cachedProducts) {
           setTables(cachedTables);
           setCategories(cachedCategories);
           setProducts(cachedProducts);
+          if (cachedUnpaid) setUnpaidOrders(cachedUnpaid);
           setLoading(false); // Hiển thị UI ngay lập tức
         }
       } catch (cacheErr) {
@@ -111,23 +121,26 @@ export default function PosPage() {
       }
 
       try {
-        const [tablesData, categoriesData, productsData, yestSalesData] = await Promise.all([
+        const [tablesData, categoriesData, productsData, yestSalesData, unpaidData] = await Promise.all([
           db.getTables(),
           db.getCategories(),
           db.getProducts(),
-          db.getYesterdayProductSales()
+          db.getYesterdayProductSales(),
+          db.getUnpaidOrders()
         ]);
         
         setTables(tablesData);
         setCategories(categoriesData);
         setProducts(productsData);
         setYesterdaySales(yestSalesData);
+        setUnpaidOrders(unpaidData);
         
         // Lưu lại cache mới nhất
         try {
           localStorage.setItem('ava_pos_cache_tables', JSON.stringify(tablesData));
           localStorage.setItem('ava_pos_cache_categories', JSON.stringify(categoriesData));
           localStorage.setItem('ava_pos_cache_products', JSON.stringify(productsData));
+          localStorage.setItem('ava_pos_cache_unpaid', JSON.stringify(unpaidData));
         } catch (saveErr) {
           console.warn('Lỗi lưu cache POS:', saveErr);
         }
@@ -240,7 +253,7 @@ export default function PosPage() {
   const existingOrderTotal = existingOrder ? Number(existingOrder.total_amount || 0) : 0;
   const displayTotalAmount = (existingOrder ? existingOrderTotal : 0) + finalTotalAmount;
 
-  // Chọn bàn
+  // Chọn bàn (Phản hồi tức thì 0ms)
   const handleSelectTable = async (table: any) => {
     setSelectedTable(table);
     setPosStep('menu');
@@ -253,20 +266,29 @@ export default function PosPage() {
 
     const isOccupied = table.status === 'Đang phục vụ' && table.table_name !== 'Khách mang về';
     if (isOccupied) {
+      // 1. Phản hồi TỨC THÌ từ dữ liệu đã prefetch (0ms không cần chờ mạng)
+      const cachedMatch = unpaidOrders.find(o => o.table_id === table.id);
+      if (cachedMatch) {
+        setExistingOrder(cachedMatch);
+      }
+
       setLoadingExistingOrder(true);
       try {
-        const res = await db.getUnpaidOrderByTableId(table.id);
-        if (res) {
-          setExistingOrder(res.order);
-          setExistingOrderItems(res.items || []);
+        if (cachedMatch?.id) {
+          const items = await db.getOrderItems(cachedMatch.id);
+          setExistingOrderItems(items || []);
         } else {
-          setExistingOrder(null);
-          setExistingOrderItems([]);
+          const res = await db.getUnpaidOrderByTableId(table.id);
+          if (res) {
+            setExistingOrder(res.order);
+            setExistingOrderItems(res.items || []);
+          } else {
+            setExistingOrder(null);
+            setExistingOrderItems([]);
+          }
         }
       } catch (e) {
         console.error('Lỗi khi tải đơn đang phục vụ của bàn:', e);
-        setExistingOrder(null);
-        setExistingOrderItems([]);
       } finally {
         setLoadingExistingOrder(false);
       }

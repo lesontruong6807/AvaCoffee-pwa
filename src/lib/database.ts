@@ -1133,6 +1133,37 @@ export const db = {
   },
 
   // --- ORDERS & ORDER ITEMS (hoadon & hoadondetail) ---
+  // Tải nhanh danh sách hóa đơn CHƯA THANH TOÁN (tối ưu hóa tốc độ cực nhanh cho POS & Thanh toán)
+  async getUnpaidOrders() {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('hoadon')
+        .select(`
+          *,
+          danhsachban (ten_ban),
+          nguoidung (ho_ten),
+          hoadondetail (id, ghi_chu)
+        `)
+        .eq('trang_thai_thanh_toan', 'Chưa thanh toán')
+        .order('ngay_tao', { ascending: false });
+
+      if (!error && data) {
+        return data.map(mapOrderToClient).filter(Boolean) as any[];
+      }
+    }
+    const orders = mockDb.getOrders();
+    const tables = mockDb.getTables();
+    const users = mockDb.getUsers();
+    return orders
+      .filter(o => o.payment_status === 'Chưa thanh toán')
+      .map(order => ({
+        ...order,
+        tables: tables.find(t => t.id === order.table_id) || null,
+        users: users.find(u => u.id === order.staff_id) || null
+      }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
   async getOrders() {
     if (isSupabaseConfigured && supabase) {
       let allOrders: any[] = [];

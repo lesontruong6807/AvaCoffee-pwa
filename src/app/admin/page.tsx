@@ -1436,36 +1436,77 @@ export default function AdminPage() {
                     </table>
                   </div>
 
-                  {/* Điều khiển phân trang */}
+                  {/* Điều khiển phân trang thông minh (rút gọn nếu nhiều trang) */}
                   {repTotalPages > 1 && (
-                    <div className="flex items-center justify-center space-x-1.5 pt-3 border-t border-coffee-light/40">
+                    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 border-t border-coffee-light/40">
                       <button
                         onClick={() => setRepCurrentPage(prev => Math.max(1, prev - 1))}
                         disabled={repCurrentPage === 1}
-                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-40 text-[10px] font-bold transition cursor-pointer"
                       >
                         Trước
                       </button>
-                      {Array.from({ length: repTotalPages }, (_, idx) => idx + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setRepCurrentPage(page)}
-                          className={`w-7 h-7 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                            repCurrentPage === page
-                              ? 'bg-coffee-primary text-white shadow-sm font-black'
-                              : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
+
+                      {(() => {
+                        const getPageItems = () => {
+                          if (repTotalPages <= 7) {
+                            return Array.from({ length: repTotalPages }, (_, i) => i + 1);
+                          }
+                          const items: (number | string)[] = [];
+                          if (repCurrentPage <= 4) {
+                            items.push(1, 2, 3, 4, 5, '...', repTotalPages);
+                          } else if (repCurrentPage >= repTotalPages - 3) {
+                            items.push(1, '...', repTotalPages - 4, repTotalPages - 3, repTotalPages - 2, repTotalPages - 1, repTotalPages);
+                          } else {
+                            items.push(1, '...', repCurrentPage - 1, repCurrentPage, repCurrentPage + 1, '...', repTotalPages);
+                          }
+                          return items;
+                        };
+
+                        return getPageItems().map((p, idx) => {
+                          if (p === '...') {
+                            return (
+                              <span key={`ellipsis-${idx}`} className="px-1 text-coffee-medium text-xs font-bold select-none">
+                                ...
+                              </span>
+                            );
+                          }
+                          const pageNum = Number(p);
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setRepCurrentPage(pageNum)}
+                              className={`min-w-[28px] h-7 px-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                                repCurrentPage === pageNum
+                                  ? 'bg-coffee-primary text-white shadow-sm font-black'
+                                  : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        });
+                      })()}
+
                       <button
                         onClick={() => setRepCurrentPage(prev => Math.min(repTotalPages, prev + 1))}
                         disabled={repCurrentPage === repTotalPages}
-                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-40 text-[10px] font-bold transition cursor-pointer"
                       >
                         Sau
                       </button>
+
+                      {repTotalPages > 7 && (
+                        <select
+                          value={repCurrentPage}
+                          onChange={(e) => setRepCurrentPage(Number(e.target.value))}
+                          className="h-7 px-1.5 bg-[#FAF6F0] border border-coffee-light text-coffee-dark text-[10px] font-bold rounded-lg ml-1 focus:ring-1 focus:ring-coffee-primary outline-none"
+                        >
+                          {Array.from({ length: repTotalPages }, (_, i) => i + 1).map(p => (
+                            <option key={p} value={p}>Trang {p}/{repTotalPages}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1699,71 +1740,94 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Danh sách Card Nguyên Liệu Kho (gọn gàng, hiện đại) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ingredients
-              .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
-              .map((ing) => {
-                const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
-                const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
-                const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
-                const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
-                const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
-                const isLowStock = ing.min_stock !== null && endingStock <= Number(ing.min_stock);
+          {/* Bảng Excel-style Thống Kê Kho (Đồng bộ chuẩn giao diện Kho, tối ưu màn hình điện thoại) */}
+          <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
+                <thead>
+                  <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
+                    <th className="p-3.5 w-24 sm:w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
+                      Tên nguyên liệu
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
+                      Tồn đầu kỳ
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-green-700 border-r border-coffee-light/60">
+                      SL nhập (+)
+                    </th>
+                    <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
+                      SL bán (-)
+                    </th>
+                    <th className="p-3.5 w-40 font-black text-coffee-primary">
+                      Tồn thực tế cuối kỳ
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-coffee-light/50">
+                  {ingredients
+                    .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
+                    .map((ing) => {
+                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                      const isLowStock = ing.min_stock !== null && endingStock <= Number(ing.min_stock);
+                      const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
+                      const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
+                      const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                      const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
 
-                return (
-                  <div
-                    key={ing.id}
-                    className="bg-white rounded-3xl p-5 border border-coffee-light shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                  >
-                    {/* Header Card */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <h4 className="font-extrabold text-sm text-coffee-dark leading-tight">{ing.name}</h4>
-                        <span className="inline-block text-[10px] text-coffee-medium bg-[#FAF6F0] px-2 py-0.5 rounded-md font-medium border border-coffee-light/40">
-                          {ing.unit}{ing.quy_cach ? ` • ${ing.quy_cach}` : ''}
-                        </span>
-                      </div>
-                      {isLowStock && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-full shrink-0 uppercase tracking-wider">
-                          ⚠️ Cần nhập
-                        </span>
-                      )}
-                    </div>
+                      return (
+                        <tr 
+                          key={ing.id} 
+                          className={`hover:bg-coffee-light/20 transition-all ${
+                            isLowStock ? 'bg-red-50/20' : ''
+                          }`}
+                        >
+                          {/* Sticky First Column (w-24 trên điện thoại, sm:w-52 trên desktop) */}
+                          <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-24 sm:w-52 whitespace-normal break-words ${
+                            isLowStock ? 'bg-red-50/95' : 'bg-white'
+                          }`}>
+                            <div className="flex flex-col">
+                              <span className="whitespace-normal break-words leading-tight">{ing.name}</span>
+                              <span className="text-[10px] text-coffee-medium font-normal leading-tight mt-1">
+                                ({ing.unit}{ing.quy_cach ? `, ${ing.quy_cach}` : ''})
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold">
+                            {formattedOpening}
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-green-700 font-extrabold">
+                            {formatRefill}
+                          </td>
+                          <td className="p-3 border-r border-coffee-light/60 text-red-600 font-extrabold">
+                            {formatSold}
+                          </td>
+                          <td className="p-3 text-coffee-primary font-black">
+                            <div className="flex items-center space-x-1.5">
+                              <span className={isLowStock ? 'text-red-600' : 'text-coffee-primary'}>
+                                {formattedEnding}
+                              </span>
+                              {isLowStock && (
+                                <span className="text-[8px] font-black bg-red-500 text-white px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                  Sắp hết
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
 
-                    {/* 3 Chỉ số Đầu kỳ - Nhập - Bán */}
-                    <div className="grid grid-cols-3 gap-2 bg-[#FAF6F0]/60 p-3 rounded-2xl border border-coffee-light/50 text-center">
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] text-coffee-medium font-bold uppercase block">Đầu kỳ</span>
-                        <span className="text-xs font-semibold text-coffee-dark block">{formattedOpening}</span>
-                      </div>
-                      <div className="space-y-0.5 border-l border-coffee-light/60">
-                        <span className="text-[9px] text-green-700 font-bold uppercase block">Nhập (+)</span>
-                        <span className="text-xs font-extrabold text-green-700 block">{formatRefill}</span>
-                      </div>
-                      <div className="space-y-0.5 border-l border-coffee-light/60">
-                        <span className="text-[9px] text-red-600 font-bold uppercase block">Bán (-)</span>
-                        <span className="text-xs font-extrabold text-red-600 block">{formatSold}</span>
-                      </div>
-                    </div>
-
-                    {/* Highlight Tồn Thực Tế Cuối Kỳ */}
-                    <div className="flex items-center justify-between pt-2 border-t border-coffee-light/40">
-                      <span className="text-xs font-bold text-coffee-medium">Tồn cuối kỳ:</span>
-                      <span className={`text-sm font-black ${isLowStock ? 'text-red-600' : 'text-coffee-primary'}`}>
-                        {formattedEnding}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-
-          {ingredients.filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase())).length === 0 && (
-            <div className="bg-white rounded-3xl p-12 text-center text-coffee-medium border border-coffee-light">
-              <p className="font-bold text-sm">Không tìm thấy nguyên liệu nào phù hợp.</p>
+                  {ingredients.filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase())).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-coffee-medium italic">
+                        Không tìm thấy nguyên liệu nào phù hợp với từ khóa tìm kiếm.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </div>
       )}
 

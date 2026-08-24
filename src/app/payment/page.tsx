@@ -73,12 +73,14 @@ export default function PaymentPage() {
   }, [selectedOrder]);
 
   const loadOrders = async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
+    if (!isBackground && orders.length === 0) setLoading(true);
     try {
-      const allOrders = await db.getOrders();
-      // Chỉ lấy hóa đơn "Chưa thanh toán"
-      const unpaid = allOrders.filter(o => o.payment_status === 'Chưa thanh toán');
+      // Chỉ lấy trực tiếp hóa đơn "Chưa thanh toán" (tối ưu siêu tốc độ)
+      const unpaid = await db.getUnpaidOrders();
       setOrders(unpaid);
+      try {
+        localStorage.setItem('ava_payment_cache_unpaid', JSON.stringify(unpaid));
+      } catch (_) {}
       
       // Nếu có hóa đơn được chọn trước đó, kiểm tra xem còn tồn tại chưa thanh toán không
       const currentSelected = selectedOrderRef.current;
@@ -104,6 +106,19 @@ export default function PaymentPage() {
 
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
+    
+    // 0. Đọc dữ liệu từ cache trước để hiển thị tức thì (0ms)
+    try {
+      const cached = localStorage.getItem('ava_payment_cache_unpaid');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setOrders(parsed);
+          setLoading(false);
+        }
+      }
+    } catch (_) {}
+
     loadOrders();
 
     // 1. Realtime listener cho hóa đơn & chi tiết hóa đơn

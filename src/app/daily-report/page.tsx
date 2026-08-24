@@ -638,36 +638,77 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
                       );
                     })}
 
-                    {/* Điều khiển phân trang */}
+                    {/* Điều khiển phân trang thông minh */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-center space-x-1.5 pt-4 border-t border-coffee-light/40">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4 border-t border-coffee-light/40">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
-                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition"
+                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-40 text-[10px] font-bold transition cursor-pointer"
                         >
                           Trước
                         </button>
-                        {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(page => (
-                          <button
-                            key={page}
-                            onClick={() => setCurrentPage(page)}
-                            className={`w-7 h-7 rounded-lg text-[10px] font-bold transition ${
-                              currentPage === page
-                                ? 'bg-coffee-primary text-white shadow-sm font-black'
-                                : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ))}
+
+                        {(() => {
+                          const getPageItems = () => {
+                            if (totalPages <= 7) {
+                              return Array.from({ length: totalPages }, (_, i) => i + 1);
+                            }
+                            const items: (number | string)[] = [];
+                            if (currentPage <= 4) {
+                              items.push(1, 2, 3, 4, 5, '...', totalPages);
+                            } else if (currentPage >= totalPages - 3) {
+                              items.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                            } else {
+                              items.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                            }
+                            return items;
+                          };
+
+                          return getPageItems().map((p, idx) => {
+                            if (p === '...') {
+                              return (
+                                <span key={`ellipsis-${idx}`} className="px-1 text-coffee-medium text-xs font-bold select-none">
+                                  ...
+                                </span>
+                              );
+                            }
+                            const pageNum = Number(p);
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`min-w-[28px] h-7 px-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                                  currentPage === pageNum
+                                    ? 'bg-coffee-primary text-white shadow-sm font-black'
+                                    : 'border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0]'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          });
+                        })()}
+
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                           disabled={currentPage === totalPages}
-                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-50 text-[10px] font-bold transition"
+                          className="px-2.5 py-1.5 rounded-lg border border-coffee-light text-coffee-medium hover:bg-[#FAF6F0] disabled:opacity-40 text-[10px] font-bold transition cursor-pointer"
                         >
                           Sau
                         </button>
+
+                        {totalPages > 7 && (
+                          <select
+                            value={currentPage}
+                            onChange={(e) => setCurrentPage(Number(e.target.value))}
+                            className="h-7 px-1.5 bg-[#FAF6F0] border border-coffee-light text-coffee-dark text-[10px] font-bold rounded-lg ml-1 focus:ring-1 focus:ring-coffee-primary outline-none cursor-pointer"
+                          >
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                              <option key={p} value={p}>Trang {p}/{totalPages}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     )}
                   </>
