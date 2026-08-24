@@ -448,8 +448,8 @@ export default function InventoryPage() {
 
           {/* Bảng Excel-style */}
           <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px]">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-none overscroll-x-none select-none">
+              <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px] bg-white">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
                     <th className="p-3.5 w-24 sm:w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">

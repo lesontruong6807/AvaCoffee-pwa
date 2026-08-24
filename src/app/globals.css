@@ -54,4 +54,15 @@ input, textarea {
   background: var(--coffee-dark);
 }
 
+/* Khóa hiệu ứng nảy (rubber-band / bounce overscroll) khi lướt tới rìa giới hạn của bảng */
+.overflow-x-auto,
+.overflow-y-auto,
+.table-scroll,
+table {
+  overscroll-behavior: contain !important;
+  overscroll-behavior-x: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+
 
