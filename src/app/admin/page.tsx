@@ -1742,7 +1742,7 @@ export default function AdminPage() {
 
           {/* Bảng Excel-style Thống Kê Kho (Đồng bộ chuẩn giao diện Kho, tối ưu màn hình điện thoại) */}
           <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-none overscroll-x-none select-none">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-none overscroll-x-none overscroll-y-none select-none">
               <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px] bg-white">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
