@@ -223,7 +223,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_tra',
     name: 'Trà dâu',
     price: 25000,
-    cost_price: 7470,
+    cost_price: 5919,
     image_url: '/products/T002.png',
     status: 'Còn hàng' as const
   },
@@ -232,7 +232,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_tra',
     name: 'Trà đào',
     price: 25000,
-    cost_price: 7428,
+    cost_price: 5878,
     image_url: '/products/T003.png',
     status: 'Còn hàng' as const
   },
@@ -241,7 +241,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_tra',
     name: 'Trà vải',
     price: 25000,
-    cost_price: 7346,
+    cost_price: 5795,
     image_url: '/products/T004.png',
     status: 'Còn hàng' as const
   },
