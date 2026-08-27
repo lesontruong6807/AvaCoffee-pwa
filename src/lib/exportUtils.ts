@@ -138,6 +138,24 @@ interface RevenueData {
   totalCOGS?: number;
   netProfit?: number;
   totalExpenses?: number;
+  shifts?: {
+    morning: {
+      ordersCount: number;
+      actualRevenue: number;
+      cash: number;
+      transfer: number;
+      restockCost: number;
+      netCash: number;
+    };
+    afternoon: {
+      ordersCount: number;
+      actualRevenue: number;
+      cash: number;
+      transfer: number;
+      restockCost: number;
+      netCash: number;
+    };
+  };
   paidOrders: Array<{
     id: string;
     created_at: string;
@@ -173,7 +191,7 @@ export function exportRevenueToExcel(
     ['BÁO CÁO DOANH THU - AVA COFFEE'],
     [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
     [],
-    ['TỔNG QUAN'],
+    ['TỔNG QUAN TÀI CHÍNH'],
     ['Doanh thu thuần (Thực nhận)', fmtVND(data.grossRevenue - data.totalDiscount)],
     ['Tổng giá vốn (COGS)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
     ['Lợi nhuận gộp', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
@@ -187,6 +205,26 @@ export function exportRevenueToExcel(
     ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
     ['Thanh toán chuyển khoản', fmtVND(data.totalTransfer)]
   ];
+
+  if (data.shifts) {
+    wsData.push([]);
+    wsData.push(['PHÂN BỔ THEO CA LÀM VIỆC (DÒNG TIỀN)']);
+    wsData.push(['CA SÁNG (05:30 - 15:30)']);
+    wsData.push(['Số lượng đơn hàng ca sáng', `${data.shifts.morning.ordersCount} đơn`]);
+    wsData.push(['Doanh thu thực thu ca sáng', fmtVND(data.shifts.morning.actualRevenue)]);
+    wsData.push(['Tiền mặt thu được (Ca sáng)', fmtVND(data.shifts.morning.cash)]);
+    wsData.push(['Chuyển khoản thu được (Ca sáng)', fmtVND(data.shifts.morning.transfer)]);
+    wsData.push(['Chi phí nhập kho trong ca sáng', `-${fmtVND(data.shifts.morning.restockCost)}`]);
+    wsData.push(['Tiền mặt thực thu trong két (Ca sáng)', fmtVND(data.shifts.morning.netCash)]);
+    wsData.push([]);
+    wsData.push(['CA CHIỀU (15:30 - 23:59)']);
+    wsData.push(['Số lượng đơn hàng ca chiều', `${data.shifts.afternoon.ordersCount} đơn`]);
+    wsData.push(['Doanh thu thực thu ca chiều', fmtVND(data.shifts.afternoon.actualRevenue)]);
+    wsData.push(['Tiền mặt thu được (Ca chiều)', fmtVND(data.shifts.afternoon.cash)]);
+    wsData.push(['Chuyển khoản thu được (Ca chiều)', fmtVND(data.shifts.afternoon.transfer)]);
+    wsData.push(['Chi phí nhập kho trong ca chiều', `-${fmtVND(data.shifts.afternoon.restockCost)}`]);
+    wsData.push(['Tiền mặt thực thu trong két (Ca chiều)', fmtVND(data.shifts.afternoon.netCash)]);
+  }
 
   if (data.restockLogs && data.restockLogs.length > 0) {
     wsData.push([]);
@@ -227,13 +265,18 @@ export function exportRevenueToExcel(
 
   wsData.push([]);
   wsData.push(['CHI TIẾT GIAO DỊCH']);
-  wsData.push(['STT', 'Mã đơn', 'Ngày', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']);
+  wsData.push(['STT', 'Mã đơn', 'Ngày giờ', 'Ca làm', 'Bàn', 'Hình thức', 'Tổng tiền', 'Giảm giá', 'Thực nhận']);
   data.paidOrders.forEach((order, idx) => {
     const disc = Number(order.discount || 0);
+    const d = new Date(order.created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    const shiftName = mins < (15 * 60 + 30) ? 'Ca Sáng' : 'Ca Chiều';
+
     wsData.push([
       idx + 1,
       order.id.substring(0, 8).toUpperCase(),
-      new Date(order.created_at).toLocaleDateString('vi-VN'),
+      new Date(order.created_at).toLocaleString('vi-VN'),
+      shiftName,
       order.tables?.table_name || 'Mang về',
       order.payment_method,
       Number(order.total_amount) + disc,
@@ -328,6 +371,35 @@ export function exportRevenueToPDF(
     margin: { left: 14, right: 14 },
     theme: 'grid',
   });
+
+  if (data.shifts) {
+    const shiftStartY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 8 : 120;
+    doc.setFontSize(11);
+    doc.setFont('TimesNewRoman', 'bold');
+    doc.text('DÒNG TIỀN THEO CA LÀM VIỆC', 14, shiftStartY);
+
+    autoTable(doc, {
+      startY: shiftStartY + 4,
+      head: [['Chỉ tiêu', '☀️ Ca Sáng (05:30 - 15:30)', '🌙 Ca Chiều (15:30 - 23:59)']],
+      body: [
+        ['Số lượng đơn hàng', `${data.shifts.morning.ordersCount} đơn`, `${data.shifts.afternoon.ordersCount} đơn`],
+        ['Doanh thu thực thu', fmtVND(data.shifts.morning.actualRevenue), fmtVND(data.shifts.afternoon.actualRevenue)],
+        ['Tiền mặt', fmtVND(data.shifts.morning.cash), fmtVND(data.shifts.afternoon.cash)],
+        ['Chuyển khoản', fmtVND(data.shifts.morning.transfer), fmtVND(data.shifts.afternoon.transfer)],
+        ['Chi phí nhập kho', `-${fmtVND(data.shifts.morning.restockCost)}`, `-${fmtVND(data.shifts.afternoon.restockCost)}`],
+        ['Tiền mặt thực tế trong két', fmtVND(data.shifts.morning.netCash), fmtVND(data.shifts.afternoon.netCash)],
+      ],
+      styles: { font: 'TimesNewRoman', fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 60, halign: 'right' },
+        2: { cellWidth: 60, halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+      theme: 'grid',
+    });
+  }
 
   if (data.restockLogs && data.restockLogs.length > 0) {
     doc.addPage();

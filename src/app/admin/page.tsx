@@ -206,6 +206,11 @@ export default function AdminPage() {
   const [repExpandedOrderItems, setRepExpandedOrderItems] = useState<any[]>([]);
   const [repLoadingExpandedItems, setRepLoadingExpandedItems] = useState<boolean>(false);
 
+  // Bộ lọc Ca làm việc & Phương thức thanh toán trong Báo cáo Doanh thu
+  const [repShiftFilter, setRepShiftFilter] = useState<'all' | 'morning' | 'afternoon'>('all');
+  const [repPayFilter, setRepPayFilter] = useState<'all' | 'Tiền mặt' | 'Chuyển khoản'>('all');
+  const [showDailyBreakdown, setShowDailyBreakdown] = useState<boolean>(true);
+
   // Sửa giá nhập kho sau khi đã duyệt (Feature 3)
   const [editingRestockLog, setEditingRestockLog] = useState<any | null>(null);
   const [newRestockCost, setNewRestockCost] = useState<string>('');
@@ -234,11 +239,11 @@ export default function AdminPage() {
     fetchExpandedItems();
   }, [repExpandedOrderId]);
 
-  // Reset page when report date changes
+  // Reset page when report date or filters change
   useEffect(() => {
     setRepCurrentPage(1);
     setRepExpandedOrderId(null);
-  }, [repStartDate, repEndDate]);
+  }, [repStartDate, repEndDate, repShiftFilter, repPayFilter]);
 
   // Handler mở modal sửa giá nhập kho
   const handleOpenEditRestockModal = (log: any) => {
@@ -576,6 +581,124 @@ export default function AdminPage() {
   const totalRestockExpenses = totalRestockCosts + totalDiscount; // Chi phí nhập / giảm giá
   const netMonthRevenue = grossRevenue - totalRestockExpenses;
   const totalRevenue = grossRevenue;
+
+  // --- LÓGIC PHÂN ĐỊNH CA LÀM VIỆC (05:30 - 15:30 là Ca Sáng, từ 15:30 trở đi là Ca Chiều) ---
+  const isMorningOrder = (created_at: string) => {
+    const d = new Date(created_at);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    return mins < (15 * 60 + 30);
+  };
+
+  const morningPaidOrders = paidOrders.filter(o => isMorningOrder(o.created_at));
+  const afternoonPaidOrders = paidOrders.filter(o => !isMorningOrder(o.created_at));
+  const morningRestockLogs = rangeRestockLogs.filter(l => isMorningOrder(l.created_at));
+  const afternoonRestockLogs = rangeRestockLogs.filter(l => !isMorningOrder(l.created_at));
+
+  const morningDiscount = morningPaidOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
+  const morningGross = morningPaidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + morningDiscount;
+  const morningActual = morningPaidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const morningCash = morningPaidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const morningTransfer = morningPaidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const morningRestockCost = morningRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+  const morningNetCash = Math.max(0, morningCash - morningRestockCost);
+
+  const afternoonDiscount = afternoonPaidOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
+  const afternoonGross = afternoonPaidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + afternoonDiscount;
+  const afternoonActual = afternoonPaidOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const afternoonCash = afternoonPaidOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const afternoonTransfer = afternoonPaidOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const afternoonRestockCost = afternoonRestockLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
+  const afternoonNetCash = Math.max(0, afternoonCash - afternoonRestockCost);
+
+  // Thống kê đối chiếu dòng tiền theo từng ngày (Daily Cashflow Breakdown by Shift)
+  interface DailyReportEntry {
+    date: string;
+    morningCount: number;
+    morningCash: number;
+    morningTransfer: number;
+    morningRestock: number;
+    morningActual: number;
+    morningNetCash: number;
+    afternoonCount: number;
+    afternoonCash: number;
+    afternoonTransfer: number;
+    afternoonRestock: number;
+    afternoonActual: number;
+    afternoonNetCash: number;
+    totalRevenue: number;
+    totalCash: number;
+    totalTransfer: number;
+    totalRestock: number;
+    totalNetCash: number;
+  }
+
+  const dailyReportDict: { [dateStr: string]: DailyReportEntry } = {};
+
+  paidOrders.forEach(o => {
+    const dStr = new Date(o.created_at).toLocaleDateString('en-CA');
+    if (!dailyReportDict[dStr]) {
+      dailyReportDict[dStr] = {
+        date: dStr,
+        morningCount: 0, morningCash: 0, morningTransfer: 0, morningRestock: 0, morningActual: 0, morningNetCash: 0,
+        afternoonCount: 0, afternoonCash: 0, afternoonTransfer: 0, afternoonRestock: 0, afternoonActual: 0, afternoonNetCash: 0,
+        totalRevenue: 0, totalCash: 0, totalTransfer: 0, totalRestock: 0, totalNetCash: 0
+      };
+    }
+    const day = dailyReportDict[dStr];
+    const amt = Number(o.total_amount || 0);
+    const isMorn = isMorningOrder(o.created_at);
+    const isCash = o.payment_method === 'Tiền mặt';
+
+    if (isMorn) {
+      day.morningCount += 1;
+      day.morningActual += amt;
+      if (isCash) day.morningCash += amt;
+      else day.morningTransfer += amt;
+    } else {
+      day.afternoonCount += 1;
+      day.afternoonActual += amt;
+      if (isCash) day.afternoonCash += amt;
+      else day.afternoonTransfer += amt;
+    }
+    day.totalRevenue += amt;
+    if (isCash) day.totalCash += amt;
+    else day.totalTransfer += amt;
+  });
+
+  rangeRestockLogs.forEach(l => {
+    const dStr = new Date(l.created_at).toLocaleDateString('en-CA');
+    if (!dailyReportDict[dStr]) {
+      dailyReportDict[dStr] = {
+        date: dStr,
+        morningCount: 0, morningCash: 0, morningTransfer: 0, morningRestock: 0, morningActual: 0, morningNetCash: 0,
+        afternoonCount: 0, afternoonCash: 0, afternoonTransfer: 0, afternoonRestock: 0, afternoonActual: 0, afternoonNetCash: 0,
+        totalRevenue: 0, totalCash: 0, totalTransfer: 0, totalRestock: 0, totalNetCash: 0
+      };
+    }
+    const day = dailyReportDict[dStr];
+    const cost = Number(l.cost || 0);
+    const isMorn = isMorningOrder(l.created_at);
+    if (isMorn) day.morningRestock += cost;
+    else day.afternoonRestock += cost;
+    day.totalRestock += cost;
+  });
+
+  const dailyReportRows = Object.values(dailyReportDict)
+    .map(d => ({
+      ...d,
+      morningNetCash: Math.max(0, d.morningCash - d.morningRestock),
+      afternoonNetCash: Math.max(0, d.afternoonCash - d.afternoonRestock),
+      totalNetCash: Math.max(0, d.totalCash - d.totalRestock)
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // Danh sách đơn hàng đã lọc theo Ca và Phương thức thanh toán
+  const filteredPaidOrders = paidOrders.filter(o => {
+    if (repShiftFilter === 'morning' && !isMorningOrder(o.created_at)) return false;
+    if (repShiftFilter === 'afternoon' && isMorningOrder(o.created_at)) return false;
+    if (repPayFilter !== 'all' && o.payment_method !== repPayFilter) return false;
+    return true;
+  });
 
   // --- Tính toán thống kê bán hàng Admin ---
   const rangeOrderItems = allOrderItems.filter(item => paidOrders.some(o => o.id === item.order_id));
@@ -1105,8 +1228,8 @@ export default function AdminPage() {
       {/* 2. TAB BÁO CÁO DOANH THU */}
       {adminTab === 'reports' && (
         <div className="space-y-6">
-          {/* Bộ lọc khoảng ngày */}
-          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          {/* Bộ lọc khoảng ngày & Bộ lọc Ca làm việc */}
+          <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-3.5 text-xs">
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-coffee-medium">Từ ngày:</span>
@@ -1127,23 +1250,89 @@ export default function AdminPage() {
                 />
               </div>
             </div>
-            <div className="text-xs text-coffee-medium">
-              Tìm thấy <strong>{paidOrders.length}</strong> hóa đơn trong khoảng chọn.
+
+            {/* Shift Quick Filter */}
+            <div className="flex flex-wrap items-center gap-2 bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light/60">
+              <button
+                onClick={() => setRepShiftFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center space-x-1.5 ${
+                  repShiftFilter === 'all'
+                    ? 'bg-coffee-primary text-white shadow-sm'
+                    : 'text-coffee-medium hover:text-coffee-dark hover:bg-white/60'
+                }`}
+              >
+                <span>🌟 Tất cả ca</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  repShiftFilter === 'all' ? 'bg-white/20 text-white' : 'bg-coffee-light/40 text-coffee-dark'
+                }`}>
+                  {paidOrders.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRepShiftFilter('morning')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center space-x-1.5 ${
+                  repShiftFilter === 'morning'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-amber-800 hover:bg-amber-100/60'
+                }`}
+              >
+                <span>☀️ Ca Sáng (05:30-15:30)</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  repShiftFilter === 'morning' ? 'bg-white/20 text-white' : 'bg-amber-200/70 text-amber-900'
+                }`}>
+                  {morningPaidOrders.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRepShiftFilter('afternoon')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center space-x-1.5 ${
+                  repShiftFilter === 'afternoon'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-indigo-800 hover:bg-indigo-100/60'
+                }`}
+              >
+                <span>🌙 Ca Chiều (15:30-23:59)</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  repShiftFilter === 'afternoon' ? 'bg-white/20 text-white' : 'bg-indigo-200/70 text-indigo-900'
+                }`}>
+                  {afternoonPaidOrders.length}
+                </span>
+              </button>
             </div>
           </div>
 
           {/* Header Báo Cáo Doanh Thu */}
           <div className="bg-white p-5 rounded-3xl border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
             <div>
-              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">💰 Báo cáo Doanh thu & Tài chính</h3>
-              <p className="text-xs text-coffee-medium mt-1">Tổng hợp và báo cáo kết quả tài chính từ ngày <strong>{new Date(repStartDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{new Date(repEndDate).toLocaleDateString('vi-VN')}</strong>.</p>
+              <h3 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">💰 Báo cáo Doanh thu & Quản lý Dòng tiền</h3>
+              <p className="text-xs text-coffee-medium mt-1">Tổng hợp và báo cáo tài chính từ ngày <strong>{new Date(repStartDate).toLocaleDateString('vi-VN')}</strong> đến ngày <strong>{new Date(repEndDate).toLocaleDateString('vi-VN')}</strong>.</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => exportRevenueToExcel({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses,
+                  shifts: {
+                    morning: {
+                      ordersCount: morningPaidOrders.length,
+                      actualRevenue: morningActual,
+                      cash: morningCash,
+                      transfer: morningTransfer,
+                      restockCost: morningRestockCost,
+                      netCash: morningNetCash
+                    },
+                    afternoon: {
+                      ordersCount: afternoonPaidOrders.length,
+                      actualRevenue: afternoonActual,
+                      cash: afternoonCash,
+                      transfer: afternoonTransfer,
+                      restockCost: afternoonRestockCost,
+                      netCash: afternoonNetCash
+                    }
+                  }
                 }, repStartDate, repEndDate)}
                 className="px-3.5 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold rounded-xl transition border border-green-200 flex items-center space-x-1.5 shadow-sm"
               >
@@ -1153,7 +1342,25 @@ export default function AdminPage() {
                 onClick={() => exportRevenueToPDF({
                   grossRevenue, totalDiscount, totalRestockCosts, totalRestockExpenses,
                   netRevenue: netMonthRevenue, totalCash, totalTransfer, paidOrders,
-                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses
+                  restockLogs: rangeRestockLogs, totalCOGS, netProfit, totalExpenses,
+                  shifts: {
+                    morning: {
+                      ordersCount: morningPaidOrders.length,
+                      actualRevenue: morningActual,
+                      cash: morningCash,
+                      transfer: morningTransfer,
+                      restockCost: morningRestockCost,
+                      netCash: morningNetCash
+                    },
+                    afternoon: {
+                      ordersCount: afternoonPaidOrders.length,
+                      actualRevenue: afternoonActual,
+                      cash: afternoonCash,
+                      transfer: afternoonTransfer,
+                      restockCost: afternoonRestockCost,
+                      netCash: afternoonNetCash
+                    }
+                  }
                 }, repStartDate, repEndDate)}
                 className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition border border-red-200 flex items-center space-x-1.5 shadow-sm"
               >
@@ -1162,7 +1369,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Dashboard Metrics */}
+          {/* Dashboard Metrics (Tài chính tổng quan) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-coffee-light flex items-center justify-between shadow-sm">
               <div className="space-y-1.5">
@@ -1217,41 +1424,320 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Biểu đồ phân bổ hình thức thanh toán vẽ bằng CSS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
-              <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Phân bổ Hình Thức Thanh Toán</h4>
-              
-              <div className="space-y-4 pt-2">
-                {/* Tiền mặt */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-coffee-dark">Tiền mặt</span>
-                    <span className="text-coffee-primary">{totalCash.toLocaleString('vi-VN')}đ ({totalRevenue > 0 ? Math.round((totalCash/totalRevenue)*100) : 0}%)</span>
+          {/* ⭐ PHÂN TÍCH & ĐỐI SOÁT DÒNG TIỀN THEO 2 CA (☀️ CA SÁNG vs 🌙 CA CHIỀU) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-black text-sm text-coffee-dark uppercase tracking-wider flex items-center gap-2">
+                <span>⏱️ Đối Soát Doanh Thu & Dòng Tiền Theo Ca</span>
+              </h4>
+              <span className="text-xs text-coffee-medium">
+                Ca sáng: <strong>05:30 - 15:30</strong> • Ca chiều: <strong>15:30 - 23:59</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* THẺ CA SÁNG */}
+              <div className={`bg-gradient-to-br from-amber-50/40 via-white to-amber-50/20 p-6 rounded-3xl border shadow-sm space-y-5 transition ${
+                repShiftFilter === 'morning' ? 'border-amber-500 ring-2 ring-amber-400/30' : 'border-amber-200/80'
+              }`}>
+                <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg font-bold shadow-xs">
+                      ☀️
+                    </div>
+                    <div>
+                      <h4 className="font-black text-base text-amber-950">CA SÁNG</h4>
+                      <span className="text-[11px] font-bold text-amber-700/80">Khung giờ: 05:30 - 15:30</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-[#FAF6F0] h-3.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-coffee-primary h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${totalRevenue > 0 ? (totalCash / totalRevenue) * 100 : 0}%` }}
-                    />
+                  <div className="text-right">
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-900">
+                      {morningPaidOrders.length} đơn hàng
+                    </span>
                   </div>
                 </div>
 
-                {/* Chuyển khoản */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-coffee-dark">Chuyển khoản (Ngân hàng/Ví điện tử)</span>
-                    <span className="text-coffee-primary">{totalTransfer.toLocaleString('vi-VN')}đ ({totalRevenue > 0 ? Math.round((totalTransfer/totalRevenue)*100) : 0}%)</span>
+                {/* Doanh thu thực thu ca sáng */}
+                <div className="flex items-baseline justify-between bg-white p-4 rounded-2xl border border-amber-200/60 shadow-xs">
+                  <span className="text-xs font-bold text-coffee-medium">Doanh thu thực thu:</span>
+                  <span className="font-black text-2xl text-amber-900 font-mono">
+                    {morningActual.toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+
+                {/* Phân bổ Tiền mặt vs Chuyển khoản */}
+                <div className="space-y-3 bg-white/80 p-4 rounded-2xl border border-amber-100">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-coffee-dark flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600 inline-block"></span>
+                      💵 Tiền mặt thu:
+                    </span>
+                    <span className="font-extrabold text-amber-900">
+                      {morningCash.toLocaleString('vi-VN')}đ ({morningActual > 0 ? Math.round((morningCash / morningActual) * 100) : 0}%)
+                    </span>
                   </div>
-                  <div className="w-full bg-[#FAF6F0] h-3.5 rounded-full overflow-hidden">
+
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-coffee-dark flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+                      💳 Chuyển khoản (QR):
+                    </span>
+                    <span className="font-extrabold text-blue-900">
+                      {morningTransfer.toLocaleString('vi-VN')}đ ({morningActual > 0 ? Math.round((morningTransfer / morningActual) * 100) : 0}%)
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Phân Bổ */}
+                  <div className="w-full bg-amber-100/60 h-2.5 rounded-full overflow-hidden flex">
                     <div 
-                      className="bg-coffee-accent h-full rounded-full border border-coffee-primary/20 transition-all duration-500" 
-                      style={{ width: `${totalRevenue > 0 ? (totalTransfer / totalRevenue) * 100 : 0}%` }}
+                      className="bg-amber-600 h-full transition-all duration-500" 
+                      style={{ width: `${morningActual > 0 ? (morningCash / morningActual) * 100 : 0}%` }}
+                      title="Tiền mặt"
+                    />
+                    <div 
+                      className="bg-blue-500 h-full transition-all duration-500" 
+                      style={{ width: `${morningActual > 0 ? (morningTransfer / morningActual) * 100 : 0}%` }}
+                      title="Chuyển khoản"
                     />
                   </div>
+
+                  {/* Chi phí nhập kho trong ca */}
+                  <div className="pt-2 border-t border-amber-100 flex justify-between items-center text-xs">
+                    <span className="text-coffee-medium font-semibold">📦 Chi phí nhập kho ca sáng:</span>
+                    <span className="font-extrabold text-red-600">
+                      -{morningRestockCost.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                </div>
+
+                {/* KHUNG TIỀN MẶT BÀN GIAO KÉT CA SÁNG */}
+                <div className="p-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl shadow-sm flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-100 block">
+                      Tiền mặt thực tế bàn giao (Két Ca Sáng)
+                    </span>
+                    <span className="text-[11px] text-amber-100/80 font-medium">
+                      (= Tiền mặt thu - Chi phí nhập)
+                    </span>
+                  </div>
+                  <span className="text-xl font-black font-mono">
+                    {morningNetCash.toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+              </div>
+
+              {/* THẺ CA CHIỀU */}
+              <div className={`bg-gradient-to-br from-indigo-50/40 via-white to-indigo-50/20 p-6 rounded-3xl border shadow-sm space-y-5 transition ${
+                repShiftFilter === 'afternoon' ? 'border-indigo-500 ring-2 ring-indigo-400/30' : 'border-indigo-200/80'
+              }`}>
+                <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-800 flex items-center justify-center text-lg font-bold shadow-xs">
+                      🌙
+                    </div>
+                    <div>
+                      <h4 className="font-black text-base text-indigo-950">CA CHIỀU</h4>
+                      <span className="text-[11px] font-bold text-indigo-700/80">Khung giờ: 15:30 - 23:59</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-900">
+                      {afternoonPaidOrders.length} đơn hàng
+                    </span>
+                  </div>
+                </div>
+
+                {/* Doanh thu thực thu ca chiều */}
+                <div className="flex items-baseline justify-between bg-white p-4 rounded-2xl border border-indigo-200/60 shadow-xs">
+                  <span className="text-xs font-bold text-coffee-medium">Doanh thu thực thu:</span>
+                  <span className="font-black text-2xl text-indigo-900 font-mono">
+                    {afternoonActual.toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+
+                {/* Phân bổ Tiền mặt vs Chuyển khoản */}
+                <div className="space-y-3 bg-white/80 p-4 rounded-2xl border border-indigo-100">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-coffee-dark flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block"></span>
+                      💵 Tiền mặt thu:
+                    </span>
+                    <span className="font-extrabold text-indigo-900">
+                      {afternoonCash.toLocaleString('vi-VN')}đ ({afternoonActual > 0 ? Math.round((afternoonCash / afternoonActual) * 100) : 0}%)
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-coffee-dark flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+                      💳 Chuyển khoản (QR):
+                    </span>
+                    <span className="font-extrabold text-blue-900">
+                      {afternoonTransfer.toLocaleString('vi-VN')}đ ({afternoonActual > 0 ? Math.round((afternoonTransfer / afternoonActual) * 100) : 0}%)
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Phân Bổ */}
+                  <div className="w-full bg-indigo-100/60 h-2.5 rounded-full overflow-hidden flex">
+                    <div 
+                      className="bg-indigo-600 h-full transition-all duration-500" 
+                      style={{ width: `${afternoonActual > 0 ? (afternoonCash / afternoonActual) * 100 : 0}%` }}
+                      title="Tiền mặt"
+                    />
+                    <div 
+                      className="bg-blue-500 h-full transition-all duration-500" 
+                      style={{ width: `${afternoonActual > 0 ? (afternoonTransfer / afternoonActual) * 100 : 0}%` }}
+                      title="Chuyển khoản"
+                    />
+                  </div>
+
+                  {/* Chi phí nhập kho trong ca */}
+                  <div className="pt-2 border-t border-indigo-100 flex justify-between items-center text-xs">
+                    <span className="text-coffee-medium font-semibold">📦 Chi phí nhập kho ca chiều:</span>
+                    <span className="font-extrabold text-red-600">
+                      -{afternoonRestockCost.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                </div>
+
+                {/* KHUNG TIỀN MẶT BÀN GIAO KÉT CA CHIỀU */}
+                <div className="p-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-2xl shadow-sm flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-100 block">
+                      Tiền mặt thực tế bàn giao (Két Ca Chiều)
+                    </span>
+                    <span className="text-[11px] text-indigo-100/80 font-medium">
+                      (= Tiền mặt thu - Chi phí nhập)
+                    </span>
+                  </div>
+                  <span className="text-xl font-black font-mono">
+                    {afternoonNetCash.toLocaleString('vi-VN')}đ
+                  </span>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* ⭐ BẢNG ĐỐI CHIẾU DÒNG TIỀN TỪNG NGÀY THEO CA */}
+          <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-coffee-light/60 pb-3">
+              <div>
+                <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider flex items-center gap-2">
+                  <span>🗓️ Bảng Đối Chiếu Dòng Tiền Từng Ngày Theo Ca</span>
+                </h4>
+                <p className="text-xs text-coffee-medium mt-0.5">
+                  Chi tiết doanh thu, tiền mặt, chuyển khoản và chi phí theo từng ngày để dễ dàng đối soát với nhân viên.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDailyBreakdown(!showDailyBreakdown)}
+                className="px-3 py-1.5 bg-[#FAF6F0] hover:bg-coffee-light/30 text-coffee-dark text-xs font-bold rounded-xl transition border border-coffee-light flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
+              >
+                <span>{showDailyBreakdown ? 'Thu gọn bảng' : 'Xem chi tiết bảng'}</span>
+                <span>{showDailyBreakdown ? '▲' : '▼'}</span>
+              </button>
+            </div>
+
+            {showDailyBreakdown && (
+              <div className="overflow-x-auto overscroll-x-contain">
+                <table className="w-full text-xs text-left min-w-[750px]">
+                  <thead>
+                    <tr className="border-b border-coffee-light text-coffee-medium font-bold uppercase bg-[#FAF6F0]/60">
+                      <th className="py-2.5 px-3 rounded-l-xl">Ngày</th>
+                      <th className="py-2.5 px-3 text-center bg-amber-50/70 text-amber-900 border-l border-amber-200/50" colSpan={3}>
+                        ☀️ CA SÁNG (05:30-15:30)
+                      </th>
+                      <th className="py-2.5 px-3 text-center bg-indigo-50/70 text-indigo-900 border-l border-indigo-200/50" colSpan={3}>
+                        🌙 CA CHIỀU (15:30-23:59)
+                      </th>
+                      <th className="py-2.5 px-3 text-right border-l border-coffee-light rounded-r-xl bg-green-50/50 text-green-900" colSpan={2}>
+                        TỔNG NGÀY
+                      </th>
+                    </tr>
+                    <tr className="border-b border-coffee-light/80 text-[10px] font-bold text-coffee-medium uppercase bg-[#FAF6F0]/30">
+                      <th className="py-2 px-3"></th>
+                      {/* Ca Sáng */}
+                      <th className="py-2 px-2 text-right bg-amber-50/30 text-amber-800">Doanh thu</th>
+                      <th className="py-2 px-2 text-right bg-amber-50/30 text-amber-800">Tiền mặt</th>
+                      <th className="py-2 px-2 text-right bg-amber-50/30 text-blue-700">Chuyển khoản</th>
+                      {/* Ca Chiều */}
+                      <th className="py-2 px-2 text-right bg-indigo-50/30 text-indigo-800">Doanh thu</th>
+                      <th className="py-2 px-2 text-right bg-indigo-50/30 text-indigo-800">Tiền mặt</th>
+                      <th className="py-2 px-2 text-right bg-indigo-50/30 text-blue-700">Chuyển khoản</th>
+                      {/* Tổng ngày */}
+                      <th className="py-2 px-2 text-right bg-green-50/20 text-coffee-dark font-extrabold">Tổng DT</th>
+                      <th className="py-2 px-3 text-right bg-green-50/20 text-emerald-800 font-extrabold">TM Két Ngày</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-coffee-light/50">
+                    {dailyReportRows.map((row) => (
+                      <tr key={row.date} className="hover:bg-coffee-light/15 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-coffee-dark font-mono">
+                          {new Date(row.date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                        </td>
+                        {/* Ca sáng */}
+                        <td className="py-2.5 px-2 text-right font-semibold text-amber-950 font-mono">
+                          {row.morningActual > 0 ? `${row.morningActual.toLocaleString('vi-VN')}đ` : '-'}
+                          {row.morningCount > 0 && <span className="text-[9px] text-coffee-medium ml-1 font-normal">({row.morningCount})</span>}
+                        </td>
+                        <td className="py-2.5 px-2 text-right font-medium text-amber-800 font-mono">
+                          {row.morningCash > 0 ? `${row.morningCash.toLocaleString('vi-VN')}đ` : '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-right font-medium text-blue-600 font-mono">
+                          {row.morningTransfer > 0 ? `${row.morningTransfer.toLocaleString('vi-VN')}đ` : '-'}
+                        </td>
+                        {/* Ca chiều */}
+                        <td className="py-2.5 px-2 text-right font-semibold text-indigo-950 font-mono">
+                          {row.afternoonActual > 0 ? `${row.afternoonActual.toLocaleString('vi-VN')}đ` : '-'}
+                          {row.afternoonCount > 0 && <span className="text-[9px] text-coffee-medium ml-1 font-normal">({row.afternoonCount})</span>}
+                        </td>
+                        <td className="py-2.5 px-2 text-right font-medium text-indigo-800 font-mono">
+                          {row.afternoonCash > 0 ? `${row.afternoonCash.toLocaleString('vi-VN')}đ` : '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-right font-medium text-blue-600 font-mono">
+                          {row.afternoonTransfer > 0 ? `${row.afternoonTransfer.toLocaleString('vi-VN')}đ` : '-'}
+                        </td>
+                        {/* Tổng ngày */}
+                        <td className="py-2.5 px-2 text-right font-black text-coffee-primary font-mono bg-green-50/20">
+                          {row.totalRevenue.toLocaleString('vi-VN')}đ
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-black text-emerald-700 font-mono bg-green-50/20">
+                          {row.totalNetCash.toLocaleString('vi-VN')}đ
+                        </td>
+                      </tr>
+                    ))}
+
+                    {dailyReportRows.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="py-6 text-center text-coffee-medium/60 italic">
+                          Không có dữ liệu giao dịch trong khoảng thời gian này.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {dailyReportRows.length > 0 && (
+                    <tfoot>
+                      <tr className="border-t-2 border-coffee-primary/30 font-black text-xs bg-[#FAF6F0]">
+                        <td className="py-3 px-3 uppercase text-coffee-dark">TỔNG CỘNG</td>
+                        {/* Tổng Sáng */}
+                        <td className="py-3 px-2 text-right text-amber-950 font-mono">{morningActual.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3 px-2 text-right text-amber-800 font-mono">{morningCash.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3 px-2 text-right text-blue-700 font-mono">{morningTransfer.toLocaleString('vi-VN')}đ</td>
+                        {/* Tổng Chiều */}
+                        <td className="py-3 px-2 text-right text-indigo-950 font-mono">{afternoonActual.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3 px-2 text-right text-indigo-800 font-mono">{afternoonCash.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3 px-2 text-right text-blue-700 font-mono">{afternoonTransfer.toLocaleString('vi-VN')}đ</td>
+                        {/* Tổng Ngày */}
+                        <td className="py-3 px-2 text-right text-coffee-primary font-mono">{actualRevenue.toLocaleString('vi-VN')}đ</td>
+                        <td className="py-3 px-3 text-right text-emerald-800 font-mono">
+                          {Math.max(0, totalCash - totalRestockCosts).toLocaleString('vi-VN')}đ
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Chi tiết chi phí nhập kho */}
@@ -1266,6 +1752,7 @@ export default function AdminPage() {
                 <thead>
                   <tr className="border-b border-coffee-light text-coffee-medium font-bold uppercase">
                     <th className="py-2">Ngày</th>
+                    <th className="py-2">Ca</th>
                     <th className="py-2">Nguyên liệu</th>
                     <th className="py-2">Ghi chú/Lý do</th>
                     <th className="py-2 text-right">Chi phí</th>
@@ -1273,35 +1760,45 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-coffee-light/50">
-                  {rangeRestockLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-coffee-light/10 transition-colors">
-                      <td className="py-2.5 text-coffee-medium font-medium">
-                        {new Date(log.created_at).toLocaleDateString('vi-VN')}
-                      </td>
-                      <td className="py-2.5 font-bold text-coffee-dark">
-                        {log.ingredient_name}
-                      </td>
-                      <td className="py-2.5 text-coffee-medium italic">
-                        {log.note || 'Nhập kho'}
-                      </td>
-                      <td className="py-2.5 text-right font-extrabold text-red-600">
-                        -{Number(log.cost || 0).toLocaleString('vi-VN')}đ
-                      </td>
-                      <td className="py-2.5 text-center">
-                        <button
-                          onClick={() => handleOpenEditRestockModal(log)}
-                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold border border-amber-200 transition flex items-center space-x-1 mx-auto cursor-pointer"
-                          title="Sửa giá nhập kho cho phiếu này"
-                        >
-                          <Edit className="w-3 h-3" />
-                          <span>Sửa giá</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {rangeRestockLogs.map((log) => {
+                    const isMorn = isMorningOrder(log.created_at);
+                    return (
+                      <tr key={log.id} className="hover:bg-coffee-light/10 transition-colors">
+                        <td className="py-2.5 text-coffee-medium font-medium">
+                          {new Date(log.created_at).toLocaleDateString('vi-VN')}
+                        </td>
+                        <td className="py-2.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            isMorn ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                          }`}>
+                            {isMorn ? '☀️ Sáng' : '🌙 Chiều'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 font-bold text-coffee-dark">
+                          {log.ingredient_name}
+                        </td>
+                        <td className="py-2.5 text-coffee-medium italic">
+                          {log.note || 'Nhập kho'}
+                        </td>
+                        <td className="py-2.5 text-right font-extrabold text-red-600 font-mono">
+                          -{Number(log.cost || 0).toLocaleString('vi-VN')}đ
+                        </td>
+                        <td className="py-2.5 text-center">
+                          <button
+                            onClick={() => handleOpenEditRestockModal(log)}
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold border border-amber-200 transition flex items-center space-x-1 mx-auto cursor-pointer"
+                            title="Sửa giá nhập kho cho phiếu này"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Sửa giá</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {rangeRestockLogs.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-coffee-medium/60 italic">
+                      <td colSpan={6} className="py-6 text-center text-coffee-medium/60 italic">
                         Không phát sinh chi phí nhập kho nào trong khoảng thời gian này.
                       </td>
                     </tr>
@@ -1313,17 +1810,51 @@ export default function AdminPage() {
 
           {/* Danh sách giao dịch bán hàng đã thanh toán */}
           <div className="bg-white p-6 rounded-3xl border border-coffee-light shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch gần đây</h4>
-              <span className="text-xs text-coffee-medium">Tổng số: <strong>{paidOrders.length}</strong> đơn</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-coffee-light/60 pb-3">
+              <div>
+                <h4 className="font-bold text-sm text-coffee-dark uppercase tracking-wider">Lịch sử giao dịch bán hàng</h4>
+                <span className="text-xs text-coffee-medium">
+                  Hiển thị <strong>{filteredPaidOrders.length}</strong> / {paidOrders.length} đơn
+                  {repShiftFilter !== 'all' && ` (Đang lọc: ${repShiftFilter === 'morning' ? '☀️ Ca Sáng' : '🌙 Ca Chiều'})`}
+                  {repPayFilter !== 'all' && ` • Hình thức: ${repPayFilter}`}
+                </span>
+              </div>
+
+              {/* Lọc nhanh theo Hình thức thanh toán */}
+              <div className="flex items-center gap-1.5 bg-[#FAF6F0] p-1 rounded-xl border border-coffee-light/60 text-xs">
+                <button
+                  onClick={() => setRepPayFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                    repPayFilter === 'all' ? 'bg-coffee-primary text-white' : 'text-coffee-medium hover:text-coffee-dark'
+                  }`}
+                >
+                  Tất cả
+                </button>
+                <button
+                  onClick={() => setRepPayFilter('Tiền mặt')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                    repPayFilter === 'Tiền mặt' ? 'bg-amber-600 text-white' : 'text-amber-800 hover:bg-amber-100/50'
+                  }`}
+                >
+                  💵 Tiền mặt
+                </button>
+                <button
+                  onClick={() => setRepPayFilter('Chuyển khoản')}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                    repPayFilter === 'Chuyển khoản' ? 'bg-blue-600 text-white' : 'text-blue-800 hover:bg-blue-100/50'
+                  }`}
+                >
+                  💳 Chuyển khoản
+                </button>
+              </div>
             </div>
             
             {(() => {
               const repItemsPerPage = 10;
-              const totalPaidOrders = paidOrders.length;
-              const repTotalPages = Math.ceil(totalPaidOrders / repItemsPerPage);
+              const totalDisplayCount = filteredPaidOrders.length;
+              const repTotalPages = Math.ceil(totalDisplayCount / repItemsPerPage);
               const repStartIndex = (repCurrentPage - 1) * repItemsPerPage;
-              const repDisplayedOrders = paidOrders.slice(repStartIndex, repStartIndex + repItemsPerPage);
+              const repDisplayedOrders = filteredPaidOrders.slice(repStartIndex, repStartIndex + repItemsPerPage);
 
               return (
                 <div className="space-y-4">
@@ -1332,7 +1863,7 @@ export default function AdminPage() {
                       <thead>
                         <tr className="border-b border-coffee-light text-coffee-medium font-bold">
                           <th className="py-2">Mã đơn</th>
-                          <th className="py-2">Ngày</th>
+                          <th className="py-2">Thời gian & Ca</th>
                           <th className="py-2">Bàn</th>
                           <th className="py-2">Thanh toán</th>
                           <th className="py-2 text-right">Tổng tiền</th>
@@ -1341,6 +1872,11 @@ export default function AdminPage() {
                       <tbody className="divide-y divide-coffee-light/50">
                         {repDisplayedOrders.map((order) => {
                           const isExpanded = repExpandedOrderId === order.id;
+                          const isMorn = isMorningOrder(order.created_at);
+                          const d = new Date(order.created_at);
+                          const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                          const dateStr = d.toLocaleDateString('vi-VN');
+
                           return (
                             <React.Fragment key={order.id}>
                               <tr 
@@ -1353,7 +1889,16 @@ export default function AdminPage() {
                                     {isExpanded ? '▲' : '▼'}
                                   </span>
                                 </td>
-                                <td className="py-2.5 text-coffee-medium font-medium">{new Date(order.created_at).toLocaleString('vi-VN')}</td>
+                                <td className="py-2.5 text-coffee-medium font-medium">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                                      isMorn ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                                    }`}>
+                                      {isMorn ? '☀️ Sáng' : '🌙 Chiều'}
+                                    </span>
+                                    <span>{dateStr} <strong className="text-coffee-dark font-mono">{timeStr}</strong></span>
+                                  </div>
+                                </td>
                                 <td className="py-2.5 font-semibold text-coffee-dark">{order.tables?.table_name || 'Mang về'}</td>
                                 <td className="py-2.5">
                                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
@@ -1425,10 +1970,10 @@ export default function AdminPage() {
                           );
                         })}
 
-                        {paidOrders.length === 0 && (
+                        {filteredPaidOrders.length === 0 && (
                           <tr>
                             <td colSpan={5} className="py-6 text-center text-coffee-medium/60 italic">
-                              Chưa có giao dịch thanh toán nào trong khoảng thời gian này.
+                              Không tìm thấy đơn hàng nào phù hợp với bộ lọc hiện tại.
                             </td>
                           </tr>
                         )}
