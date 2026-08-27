@@ -582,11 +582,11 @@ export default function AdminPage() {
   const netMonthRevenue = grossRevenue - totalRestockExpenses;
   const totalRevenue = grossRevenue;
 
-  // --- LÓGIC PHÂN ĐỊNH CA LÀM VIỆC (05:30 - 15:30 là Ca Sáng, từ 15:30 trở đi là Ca Chiều) ---
+  // --- LÓGIC PHÂN ĐỊNH CA LÀM VIỆC (Ca Sáng: 05:30 - 12:00, Ca Chiều: 16:00 - 21:00) ---
   const isMorningOrder = (created_at: string) => {
     const d = new Date(created_at);
     const mins = d.getHours() * 60 + d.getMinutes();
-    return mins < (15 * 60 + 30);
+    return mins < (14 * 60); // Đơn trước 14:00 tính vào Ca Sáng, từ 14:00 trở đi tính vào Ca Chiều
   };
 
   const morningPaidOrders = paidOrders.filter(o => isMorningOrder(o.created_at));
@@ -1277,7 +1277,7 @@ export default function AdminPage() {
                     : 'text-amber-800 hover:bg-amber-100/60'
                 }`}
               >
-                <span>☀️ Ca Sáng (05:30-15:30)</span>
+                <span>☀️ Ca Sáng (05:30-12:00)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                   repShiftFilter === 'morning' ? 'bg-white/20 text-white' : 'bg-amber-200/70 text-amber-900'
                 }`}>
@@ -1293,7 +1293,7 @@ export default function AdminPage() {
                     : 'text-indigo-800 hover:bg-indigo-100/60'
                 }`}
               >
-                <span>🌙 Ca Chiều (15:30-23:59)</span>
+                <span>🌙 Ca Chiều (16:00-21:00)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                   repShiftFilter === 'afternoon' ? 'bg-white/20 text-white' : 'bg-indigo-200/70 text-indigo-900'
                 }`}>
@@ -1431,7 +1431,7 @@ export default function AdminPage() {
                 <span>⏱️ Đối Soát Doanh Thu & Dòng Tiền Theo Ca</span>
               </h4>
               <span className="text-xs text-coffee-medium">
-                Ca sáng: <strong>05:30 - 15:30</strong> • Ca chiều: <strong>15:30 - 23:59</strong>
+                Ca sáng: <strong>05:30 - 12:00</strong> • Ca chiều: <strong>16:00 - 21:00</strong>
               </span>
             </div>
 
@@ -1447,7 +1447,7 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-base text-amber-950">CA SÁNG</h4>
-                      <span className="text-[11px] font-bold text-amber-700/80">Khung giờ: 05:30 - 15:30</span>
+                      <span className="text-[11px] font-bold text-amber-700/80">Khung giờ: 05:30 - 12:00</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1537,7 +1537,7 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-base text-indigo-950">CA CHIỀU</h4>
-                      <span className="text-[11px] font-bold text-indigo-700/80">Khung giờ: 15:30 - 23:59</span>
+                      <span className="text-[11px] font-bold text-indigo-700/80">Khung giờ: 16:00 - 21:00</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1645,10 +1645,10 @@ export default function AdminPage() {
                     <tr className="border-b border-coffee-light text-coffee-medium font-bold uppercase bg-[#FAF6F0]/60">
                       <th className="py-2.5 px-3 rounded-l-xl">Ngày</th>
                       <th className="py-2.5 px-3 text-center bg-amber-50/70 text-amber-900 border-l border-amber-200/50" colSpan={3}>
-                        ☀️ CA SÁNG (05:30-15:30)
+                        ☀️ CA SÁNG (05:30-12:00)
                       </th>
                       <th className="py-2.5 px-3 text-center bg-indigo-50/70 text-indigo-900 border-l border-indigo-200/50" colSpan={3}>
-                        🌙 CA CHIỀU (15:30-23:59)
+                        🌙 CA CHIỀU (16:00-21:00)
                       </th>
                       <th className="py-2.5 px-3 text-right border-l border-coffee-light rounded-r-xl bg-green-50/50 text-green-900" colSpan={2}>
                         TỔNG NGÀY

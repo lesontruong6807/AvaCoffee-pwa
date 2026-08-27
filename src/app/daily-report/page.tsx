@@ -81,28 +81,28 @@ export default function DailyReportPage() {
   });
 
   // 2. Phân loại theo Ca làm việc
-  // Ca sáng: 0h00 - 15h30 (tất cả order/chi phí từ 00:00 đến 15:29:59)
+  // Ca sáng: 05:30 - 12:00 (Tính các order/chi phí tạo trước 14:00)
   const morningOrders = todayOrders.filter(o => {
     const d = new Date(o.created_at);
     const mins = d.getHours() * 60 + d.getMinutes();
-    return mins < (15 * 60 + 30);
+    return mins < (14 * 60);
   });
   const morningLogs = todayLogs.filter(l => {
     const d = new Date(l.created_at);
     const mins = d.getHours() * 60 + d.getMinutes();
-    return mins < (15 * 60 + 30);
+    return mins < (14 * 60);
   });
 
-  // Ca chiều: 15h30 - 23h59 (tất cả order/chi phí từ 15:30 trở đi)
+  // Ca chiều: 16:00 - 21:00 (Tính các order/chi phí tạo từ 14:00 trở đi)
   const afternoonOrders = todayOrders.filter(o => {
     const d = new Date(o.created_at);
     const mins = d.getHours() * 60 + d.getMinutes();
-    return mins >= (15 * 60 + 30);
+    return mins >= (14 * 60);
   });
   const afternoonLogs = todayLogs.filter(l => {
     const d = new Date(l.created_at);
     const mins = d.getHours() * 60 + d.getMinutes();
-    return mins >= (15 * 60 + 30);
+    return mins >= (14 * 60);
   });
 
   // 3. Hàm tính toán các chỉ số cho từng ca
@@ -250,7 +250,7 @@ export default function DailyReportPage() {
               : 'text-coffee-medium hover:bg-coffee-light'
           }`}
         >
-          Ca Sáng (5h30 - 12h)
+          Ca Sáng (05:30 - 12:00)
         </button>
         <button
           onClick={() => setActiveShiftFilter('afternoon')}
@@ -260,7 +260,7 @@ export default function DailyReportPage() {
               : 'text-coffee-medium hover:bg-coffee-light'
           }`}
         >
-          Ca Chiều (16h - 21h30)
+          Ca Chiều (16:00 - 21:00)
         </button>
       </div>
 
@@ -282,7 +282,7 @@ export default function DailyReportPage() {
           <div className="bg-coffee-primary text-white p-5 rounded-3xl shadow flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-lg">Ca Sáng</h3>
-              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 05:30 - 12:00 (Ghi nhận đơn: 00:00 - 15:30)</p>
+              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 05:30 - 12:00 (Ghi nhận đơn: trước 14:00)</p>
             </div>
             <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
               {morning.orders.length} Đơn hàng
@@ -295,7 +295,7 @@ export default function DailyReportPage() {
           <div className="bg-coffee-dark text-white p-5 rounded-3xl shadow flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-lg">Ca Chiều</h3>
-              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 16:00 - 21:00 (Ghi nhận đơn: 15:30 - 23:59)</p>
+              <p className="text-xs text-coffee-accent/80 font-medium">Ca làm: 16:00 - 21:00 (Ghi nhận đơn: từ 14:00)</p>
             </div>
             <span className="text-xs font-bold px-3 py-1 bg-white/20 rounded-full">
               {afternoon.orders.length} Đơn hàng
