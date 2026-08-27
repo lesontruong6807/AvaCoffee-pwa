@@ -191,19 +191,17 @@ export function exportRevenueToExcel(
     ['BÁO CÁO DOANH THU - AVA COFFEE'],
     [`Từ ngày: ${fromStr}  —  Đến ngày: ${toStr}`],
     [],
-    ['TỔNG QUAN TÀI CHÍNH'],
+    ['TỔNG QUAN KẾT QUẢ KINH DOANH (P&L)'],
     ['Doanh thu thuần (Thực nhận)', fmtVND(data.grossRevenue - data.totalDiscount)],
-    ['Tổng giá vốn (COGS)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
-    ['Lợi nhuận gộp', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
-    ['Chi phí vận hành', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
-    ['Lợi nhuận ròng', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
-    ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
-    ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
-    ['Hiệu số Doanh thu - Chi phí', fmtVND(data.netRevenue)],
+    ['Tổng giá vốn nguyên liệu (COGS tính theo ly)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+    ['LỢI NHUẬN GỘP', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
+    ['Chi phí vận hành / Chi phí khác', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
+    ['LỢI NHUẬN RÒNG (LÃI THỰC TẾ)', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
     [],
+    ['TỔNG HỢP HÌNH THỨC THANH TOÁN'],
     ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
     ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
-    ['Thanh toán chuyển khoản', fmtVND(data.totalTransfer)]
+    ['Thanh toán chuyển khoản (QR)', fmtVND(data.totalTransfer)]
   ];
 
   if (data.shifts) {
@@ -347,20 +345,17 @@ export function exportRevenueToPDF(
 
   autoTable(doc, {
     startY: 42,
-    head: [['Chỉ tiêu', 'Giá trị']],
+    head: [['Chỉ tiêu tài chính', 'Giá trị']],
     body: [
       ['Doanh thu thuần (Thực nhận)', fmtVND(data.grossRevenue - data.totalDiscount)],
-      ['Tổng giá vốn (COGS)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
+      ['Tổng giá vốn nguyên liệu (COGS theo ly)', data.totalCOGS !== undefined ? fmtVND(data.totalCOGS) : '-'],
       ['LỢI NHUẬN GỘP', data.totalCOGS !== undefined ? fmtVND((data.grossRevenue - data.totalDiscount) - data.totalCOGS) : '-'],
-      ['Chi phí vận hành', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
-      ['LỢI NHUẬN RÒNG', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
-      ['Chi phí nhập kho', `-${fmtVND(data.totalRestockCosts)}`],
-      ['Tổng chi phí nhập / giảm giá', `-${fmtVND(data.totalRestockExpenses)}`],
-      ['Hiệu số Doanh thu - Chi phí', fmtVND(data.netRevenue)],
+      ['Chi phí vận hành / Khác', data.totalExpenses !== undefined ? `-${fmtVND(data.totalExpenses)}` : '-'],
+      ['LỢI NHUẬN RÒNG (LÃI THỰC TẾ)', data.netProfit !== undefined ? fmtVND(data.netProfit) : '-'],
       ['', ''],
       ['Tổng số hóa đơn', `${data.paidOrders.length} đơn`],
-      ['Tiền mặt', fmtVND(data.totalCash)],
-      ['Chuyển khoản', fmtVND(data.totalTransfer)],
+      ['Thanh toán tiền mặt', fmtVND(data.totalCash)],
+      ['Thanh toán chuyển khoản (QR)', fmtVND(data.totalTransfer)],
     ],
     styles: { font: 'TimesNewRoman', fontSize: 9, cellPadding: 2.5 },
     headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold' },
