@@ -1261,7 +1261,7 @@ export default function AdminPage() {
               <span className="text-xs text-coffee-medium">Tổng tiền nhập: <strong className="text-red-600">-{totalRestockCosts.toLocaleString('vi-VN')}đ</strong></span>
             </div>
 
-            <div className="overflow-x-auto max-h-[300px]">
+            <div className="overflow-x-auto overscroll-x-contain">
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-coffee-light text-coffee-medium font-bold uppercase">
@@ -1742,7 +1742,7 @@ export default function AdminPage() {
 
           {/* Bảng Excel-style Thống Kê Kho (Đồng bộ chuẩn giao diện Kho, tối ưu màn hình điện thoại) */}
           <div className="bg-white rounded-3xl border border-coffee-light shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto overscroll-x-contain">
+            <div className="overflow-x-auto overscroll-x-contain">
               <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px] bg-white">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
