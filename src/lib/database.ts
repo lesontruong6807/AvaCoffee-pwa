@@ -326,7 +326,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_sualac',
     name: 'Sữa lắc',
     price: 20000,
-    cost_price: 3970,
+    cost_price: 3756,
     image_url: '/products/SL001.png',
     status: 'Còn hàng' as const
   },
@@ -335,7 +335,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_sualac',
     name: 'Sữa lắc dâu',
     price: 25000,
-    cost_price: 6710,
+    cost_price: 6496,
     image_url: '/products/SL002.png',
     status: 'Còn hàng' as const
   },
@@ -344,7 +344,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_sualac',
     name: 'Sữa lắc việt quất',
     price: 25000,
-    cost_price: 7635,
+    cost_price: 7421,
     image_url: '/products/SL003.png',
     status: 'Còn hàng' as const
   },
@@ -353,7 +353,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_sualac',
     name: 'Sữa lắc đào',
     price: 25000,
-    cost_price: 6850,
+    cost_price: 6636,
     image_url: '/products/SL004.png',
     status: 'Còn hàng' as const
   },
@@ -619,24 +619,24 @@ export const MOCK_RECIPES = [
 
   // 22. Sữa lắc
   { id: 'rec_sl1_1', product_id: 'SL001', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
-  { id: 'rec_sl1_2', product_id: 'SL001', ingredient_id: 'ing_suadac', quantity_needed: 26, unit: 'g' },
+  { id: 'rec_sl1_2', product_id: 'SL001', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
   { id: 'rec_sl1_3', product_id: 'SL001', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 23. Sữa lắc dâu
   { id: 'rec_sl2_1', product_id: 'SL002', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
-  { id: 'rec_sl2_2', product_id: 'SL002', ingredient_id: 'ing_suadac', quantity_needed: 26, unit: 'g' },
+  { id: 'rec_sl2_2', product_id: 'SL002', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
   { id: 'rec_sl2_3', product_id: 'SL002', ingredient_id: 'ing_mutdau', quantity_needed: 30, unit: 'ml' },
   { id: 'rec_sl2_4', product_id: 'SL002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 24. Sữa lắc việt quất
   { id: 'rec_sl3_1', product_id: 'SL003', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
-  { id: 'rec_sl3_2', product_id: 'SL003', ingredient_id: 'ing_suadac', quantity_needed: 26, unit: 'g' },
+  { id: 'rec_sl3_2', product_id: 'SL003', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
   { id: 'rec_sl3_3', product_id: 'SL003', ingredient_id: 'ing_mutvietquat', quantity_needed: 30, unit: 'ml' },
   { id: 'rec_sl3_4', product_id: 'SL003', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 25. Sữa lắc đào
   { id: 'rec_sl4_1', product_id: 'SL004', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
-  { id: 'rec_sl4_2', product_id: 'SL004', ingredient_id: 'ing_suadac', quantity_needed: 26, unit: 'g' },
+  { id: 'rec_sl4_2', product_id: 'SL004', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
   { id: 'rec_sl4_3', product_id: 'SL004', ingredient_id: 'ing_mutdao', quantity_needed: 30, unit: 'ml' },
   { id: 'rec_sl4_4', product_id: 'SL004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
   { id: 'rec_n1', product_id: 'N001', ingredient_id: 'ing_n001', quantity_needed: 1, unit: 'lon' },
