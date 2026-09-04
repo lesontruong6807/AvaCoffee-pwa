@@ -132,7 +132,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê đá',
     price: 15000,
-    cost_price: 6347,
+    cost_price: 6432,
     image_url: '/products/CP001.png',
     status: 'Còn hàng' as const
   },
@@ -141,7 +141,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê sữa',
     price: 17000,
-    cost_price: 7355,
+    cost_price: 7421,
     image_url: '/products/CP002.png',
     status: 'Còn hàng' as const
   },
@@ -150,7 +150,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê sữa tươi',
     price: 22000,
-    cost_price: 9649,
+    cost_price: 9715,
     image_url: '/products/CP003.png',
     status: 'Còn hàng' as const
   },
@@ -159,7 +159,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Cà phê muối',
     price: 22000,
-    cost_price: 9621,
+    cost_price: 9691,
     image_url: '/products/CP004.png',
     status: 'Còn hàng' as const
   },
@@ -168,7 +168,7 @@ const MOCK_PRODUCTS = [
     category_id: 'c_caphe',
     name: 'Bạc xỉu',
     price: 22000,
-    cost_price: 9082,
+    cost_price: 9148,
     image_url: '/products/CP005.png',
     status: 'Còn hàng' as const
   },
@@ -485,23 +485,23 @@ export const MOCK_INGREDIENTS = [
 
 export const MOCK_RECIPES = [
   // 1. Cà phê đá
-  { id: 'rec_cp1_1', product_id: 'CP001', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
+  { id: 'rec_cp1_1', product_id: 'CP001', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
   { id: 'rec_cp1_duong', product_id: 'CP001', ingredient_id: 'ing_duong', quantity_needed: 8.33, unit: 'g' },
   { id: 'rec_cp1_3', product_id: 'CP001', ingredient_id: 'ing_lyden', quantity_needed: 1, unit: 'cái' },
 
   // 2. Cà phê sữa
-  { id: 'rec_cp2_1', product_id: 'CP002', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
+  { id: 'rec_cp2_1', product_id: 'CP002', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
   { id: 'rec_cp2_2', product_id: 'CP002', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_cp2_3', product_id: 'CP002', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 3. Cà phê sữa tươi
-  { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
+  { id: 'rec_cp3_1', product_id: 'CP003', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
   { id: 'rec_cp3_2', product_id: 'CP003', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_cp3_3', product_id: 'CP003', ingredient_id: 'ing_suatuoi', quantity_needed: 80, unit: 'ml' },
   { id: 'rec_cp3_4', product_id: 'CP003', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
   // 4. Cà phê muối
-  { id: 'rec_cp4_1', product_id: 'CP004', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
+  { id: 'rec_cp4_1', product_id: 'CP004', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
   { id: 'rec_cp4_2', product_id: 'CP004', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_cp4_kembeo', product_id: 'CP004', ingredient_id: 'ing_kembeo', quantity_needed: 0.0667, unit: 'hộp' },
   { id: 'rec_cp4_suadac_km', product_id: 'CP004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
@@ -509,7 +509,7 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp4_4', product_id: 'CP004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 5. Bạc xỉu
-  { id: 'rec_cp5_1', product_id: 'CP005', ingredient_id: 'ing_caphe', quantity_needed: 18, unit: 'g' },
+  { id: 'rec_cp5_1', product_id: 'CP005', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
   { id: 'rec_cp5_2', product_id: 'CP005', ingredient_id: 'ing_suadac', quantity_needed: 40, unit: 'g' },
   { id: 'rec_cp5_3', product_id: 'CP005', ingredient_id: 'ing_suatuoi', quantity_needed: 50, unit: 'ml' },
   { id: 'rec_cp5_4', product_id: 'CP005', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
