@@ -246,6 +246,15 @@ const MOCK_PRODUCTS = [
     image_url: '/products/T004.png',
     status: 'Còn hàng' as const
   },
+  {
+    id: 'T005',
+    category_id: 'c_tra',
+    name: 'Trà chanh dây',
+    price: 25000,
+    cost_price: 5874,
+    image_url: '/products/T005.png',
+    status: 'Còn hàng' as const
+  },
   // Yaourt (Y)
   {
     id: 'Y001',
@@ -281,6 +290,15 @@ const MOCK_PRODUCTS = [
     price: 25000,
     cost_price: 10350,
     image_url: '/products/Y004.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'Y005',
+    category_id: 'c_yaourt',
+    name: 'Yaourt chanh dây',
+    price: 25000,
+    cost_price: 11149,
+    image_url: '/products/Y005.png',
     status: 'Còn hàng' as const
   },
   // Soda (S)
@@ -320,6 +338,15 @@ const MOCK_PRODUCTS = [
     image_url: '/products/S004.png',
     status: 'Còn hàng' as const
   },
+  {
+    id: 'S005',
+    category_id: 'c_soda',
+    name: 'Soda chanh dây',
+    price: 25000,
+    cost_price: 7454,
+    image_url: '/products/S005.png',
+    status: 'Còn hàng' as const
+  },
   // Sữa lắc (SL)
   {
     id: 'SL001',
@@ -355,6 +382,15 @@ const MOCK_PRODUCTS = [
     price: 25000,
     cost_price: 6636,
     image_url: '/products/SL004.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'SL005',
+    category_id: 'c_sualac',
+    name: 'Sữa lắc chanh dây',
+    price: 25000,
+    cost_price: 6606,
+    image_url: '/products/SL005.png',
     status: 'Còn hàng' as const
   },
   {
@@ -467,6 +503,7 @@ export const MOCK_INGREDIENTS = [
   { id: 'ing_mutdau', name: 'Mứt dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_mutvietquat', name: 'Mứt việt quất', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_mutdao', name: 'Mứt đào', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
+  { id: 'ing_mutchanhday', name: 'Mứt chanh dây', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: '1000ml' },
   { id: 'ing_sirodau', name: 'Siro dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_sirodao', name: 'Siro đào', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
   { id: 'ing_sirovai', name: 'Siro vải', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
@@ -568,6 +605,12 @@ export const MOCK_RECIPES = [
   { id: 'rec_t4_duong', product_id: 'T004', ingredient_id: 'ing_duong', quantity_needed: 12.5, unit: 'g' },
   { id: 'rec_t4_ly', product_id: 'T004', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
+  // 14. Trà chanh dây
+  { id: 'rec_t5_hongtra', product_id: 'T005', ingredient_id: 'ing_hongtra', quantity_needed: 2.8125, unit: 'g' },
+  { id: 'rec_t5_mut', product_id: 'T005', ingredient_id: 'ing_mutchanhday', quantity_needed: 40, unit: 'ml' },
+  { id: 'rec_t5_duong', product_id: 'T005', ingredient_id: 'ing_duong', quantity_needed: 8.33, unit: 'g' },
+  { id: 'rec_t5_ly', product_id: 'T005', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+
   // 14. Yaourt đá
   { id: 'rec_y1_1', product_id: 'Y001', ingredient_id: 'ing_suachua', quantity_needed: 1, unit: 'hộp' },
   { id: 'rec_y1_2', product_id: 'Y001', ingredient_id: 'ing_suadac', quantity_needed: 40, unit: 'g' },
@@ -590,6 +633,11 @@ export const MOCK_RECIPES = [
   { id: 'rec_y4_2', product_id: 'Y004', ingredient_id: 'ing_suadac', quantity_needed: 30, unit: 'g' },
   { id: 'rec_y4_3', product_id: 'Y004', ingredient_id: 'ing_mutdao', quantity_needed: 30, unit: 'ml' },
   { id: 'rec_y4_4', product_id: 'Y004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
+
+  // 18. Yaourt chanh dây
+  { id: 'rec_y5_suachua', product_id: 'Y005', ingredient_id: 'ing_suachua', quantity_needed: 1, unit: 'hộp' },
+  { id: 'rec_y5_mut', product_id: 'Y005', ingredient_id: 'ing_mutchanhday', quantity_needed: 50, unit: 'ml' },
+  { id: 'rec_y5_ly', product_id: 'Y005', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 18. Soda dâu
   { id: 'rec_s1_1', product_id: 'S001', ingredient_id: 'ing_7up', quantity_needed: 195, unit: 'ml' },
@@ -617,6 +665,12 @@ export const MOCK_RECIPES = [
   { id: 'rec_s4_3', product_id: 'S004', ingredient_id: 'ing_duong', quantity_needed: 8.33, unit: 'g' },
   { id: 'rec_s4_4', product_id: 'S004', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
 
+  // 22. Soda chanh dây
+  { id: 'rec_s5_7up', product_id: 'S005', ingredient_id: 'ing_7up', quantity_needed: 195, unit: 'ml' },
+  { id: 'rec_s5_mut', product_id: 'S005', ingredient_id: 'ing_mutchanhday', quantity_needed: 30, unit: 'ml' },
+  { id: 'rec_s5_duong', product_id: 'S005', ingredient_id: 'ing_duong', quantity_needed: 8.33, unit: 'g' },
+  { id: 'rec_s5_ly', product_id: 'S005', ingredient_id: 'ing_lyhoavan', quantity_needed: 1, unit: 'cái' },
+
   // 22. Sữa lắc
   { id: 'rec_sl1_1', product_id: 'SL001', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
   { id: 'rec_sl1_2', product_id: 'SL001', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
@@ -639,6 +693,12 @@ export const MOCK_RECIPES = [
   { id: 'rec_sl4_2', product_id: 'SL004', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
   { id: 'rec_sl4_3', product_id: 'SL004', ingredient_id: 'ing_mutdao', quantity_needed: 30, unit: 'ml' },
   { id: 'rec_sl4_4', product_id: 'SL004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
+
+  // 26. Sữa lắc chanh dây
+  { id: 'rec_sl5_suatuoi', product_id: 'SL005', ingredient_id: 'ing_suatuoi', quantity_needed: 60, unit: 'ml' },
+  { id: 'rec_sl5_suadac', product_id: 'SL005', ingredient_id: 'ing_suadac', quantity_needed: 20, unit: 'g' },
+  { id: 'rec_sl5_mut', product_id: 'SL005', ingredient_id: 'ing_mutchanhday', quantity_needed: 30, unit: 'ml' },
+  { id: 'rec_sl5_ly', product_id: 'SL005', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
   { id: 'rec_n1', product_id: 'N001', ingredient_id: 'ing_n001', quantity_needed: 1, unit: 'lon' },
   { id: 'rec_n2', product_id: 'N002', ingredient_id: 'ing_n002', quantity_needed: 1, unit: 'lon' },
   { id: 'rec_n3', product_id: 'N003', ingredient_id: 'ing_n003', quantity_needed: 1, unit: 'lon' },

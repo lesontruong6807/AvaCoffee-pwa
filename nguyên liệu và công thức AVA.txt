@@ -17,15 +17,19 @@ Công thức pha nước:
 11. Trà dâu: 150ml nước cốt hồng trà, 10ml siro dâu, 30ml mứt dâu, 10ml nước đường, 1 trái tắc, 1 vá trân châu tươi, 1 Ly trắng hoa văn AVA
 12. Trà đào: 150ml nước cốt hồng trà, 10ml siro đào, 30ml mứt đào, 10ml nước đường, 1 trái tắc, 1 vá trân châu tươi, 1 Ly trắng hoa văn AVA
 13. Trà vải: 150ml nước cốt hồng trà, 30ml siro vải, 15ml nước đường, 1 trái tắc, 1 vá trân châu tươi, 1 Ly trắng hoa văn AVA
-14. Yaourt đá: 1 hộp sữa chua, 40g sữa đặc, 20ml cốt chanh (½ quả), 1 Ly trắng AVA
-15. Yaourt dâu: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt dâu, 15ml cốt chanh, 1 Ly trắng AVA
-16. Yaourt việt quất: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt việt quất, 15ml cốt chanh, 1 Ly trắng AVA
-17. Yaourt đào: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt đào, 15ml cốt chanh, 1 Ly trắng AVA
-18. Soda dâu: 195ml 7-Up (chai), 30ml siro dâu, 10ml mứt dâu, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-19. Soda đào: 195ml 7-Up (chai), 30ml siro đào, 10ml mứt đào, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-20. Soda việt quất: 195ml 7-Up (chai), 30ml mứt việt quất, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-21. Soda vải: 195ml 7-Up (chai), 40ml siro vải, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
-22. Sữa lắc: 60ml sữa tươi, 20g sữa đặc, 1 Ly trắng AVA
-23. Sữa lắc dâu: 60ml sữa tươi, 20g sữa đặc, 30ml mứt dâu, 1 Ly trắng AVA
-24. Sữa lắc việt quất: 60ml sữa tươi, 20g sữa đặc, 30ml mứt việt quất, 1 Ly trắng AVA
-25. Sữa lắc đào: 60ml sữa tươi, 20g sữa đặc, 30ml mứt đào, 1 Ly trắng AVA
+14. Trà chanh dây: 150ml nước cốt hồng trà, 40ml mứt chanh dây, 10ml nước đường, 1 trái tắc, 1 vá trân châu tươi, 1 Ly trắng hoa văn AVA
+15. Yaourt đá: 1 hộp sữa chua, 40g sữa đặc, 20ml cốt chanh (½ quả), 1 Ly trắng AVA
+16. Yaourt dâu: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt dâu, 15ml cốt chanh, 1 Ly trắng AVA
+17. Yaourt việt quất: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt việt quất, 15ml cốt chanh, 1 Ly trắng AVA
+18. Yaourt đào: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt đào, 15ml cốt chanh, 1 Ly trắng AVA
+19. Yaourt chanh dây: 1 hộp sữa chua, 30g sữa đặc, 30ml mứt chanh dây, 15ml cốt chanh, 1 Ly trắng AVA
+20. Soda dâu: 195ml 7-Up (chai), 30ml siro dâu, 10ml mứt dâu, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+21. Soda đào: 195ml 7-Up (chai), 30ml siro đào, 10ml mứt đào, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+22. Soda việt quất: 195ml 7-Up (chai), 30ml mứt việt quất, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+23. Soda chanh dây: 195ml 7-Up (chai), 30ml mứt chanh dây, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+24. Soda vải: 195ml 7-Up (chai), 40ml siro vải, 10ml nước đường, 1 trái chanh, 1 Ly trắng hoa văn AVA
+25. Sữa lắc: 60ml sữa tươi, 20g sữa đặc, 1 Ly trắng AVA
+26. Sữa lắc dâu: 60ml sữa tươi, 20g sữa đặc, 30ml mứt dâu, 1 Ly trắng AVA
+27. Sữa lắc việt quất: 60ml sữa tươi, 20g sữa đặc, 30ml mứt việt quất, 1 Ly trắng AVA
+28. Sữa lắc đào: 60ml sữa tươi, 20g sữa đặc, 30ml mứt đào, 1 Ly trắng AVA
+29. Sữa lắc chanh dây: 60ml sữa tươi, 20g sữa đặc, 30ml mứt chanh dây, 1 Ly trắng AVA
