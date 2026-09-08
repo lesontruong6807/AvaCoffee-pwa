@@ -191,6 +191,18 @@ export default function AdminPage() {
     } else {
       setLoading(false);
     }
+
+    const unsubInv = db.subscribeToInventoryChanges(() => {
+      loadAllData();
+    });
+    const unsubReport = db.subscribeToReportChanges(() => {
+      loadAllData();
+    });
+
+    return () => {
+      unsubInv();
+      unsubReport();
+    };
   }, []);
 
   // Bộ lọc ngày cho Báo cáo doanh thu (Tab 'reports')
@@ -748,6 +760,28 @@ export default function AdminPage() {
   const totalLy = lyDen + lyTrang + lyHoaVan + lyTraTac;
 
 
+  // Helper: Trích xuất lý do/ghi chú thực tế do nhân viên nhập
+  const extractCleanNote = (rawNote?: string | null): string => {
+    if (!rawNote) return '';
+    let text = rawNote.trim();
+    const match = text.match(/Kiểm kho thực tế:\s*[\d.]+\s*\(Hệ thống:\s*[\d.]+\)\.?\s*(.*)/i);
+    if (match) {
+      const custom = match[1]?.trim();
+      return custom || '';
+    }
+    return text;
+  };
+
+  const formatLogTime = (dateStr?: string): string => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
   // --- LÓGIC BÁO CÁO KHO THEO KHOẢNG NGÀY ---
   const getHistoricalIngStats = (ing: any) => {
     const startT = new Date(invStartDate + 'T00:00:00').getTime();
@@ -784,13 +818,83 @@ export default function AdminPage() {
       )
       .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
 
+    const salesOnly = logsInRange
+      .filter(l => l.type === 'Bán hàng')
+      .reduce((sum, l) => sum + Math.abs(Number(l.change_amount || 0)), 0);
+
+    // Chi tiết hao hụt / kiểm kho giảm (kèm lý do ghi chú)
+    const lossLogs = logsInRange
+      .filter(l => 
+        ((l.type === 'Hao hụt/Cân lại' && l.change_amount < 0) ||
+         (l.type === 'Khác' && l.change_amount < 0)) &&
+        l.status !== 'Từ chối'
+      )
+      .map(l => ({
+        id: l.id,
+        amount: Math.abs(Number(l.change_amount || 0)),
+        type: l.type,
+        rawNote: l.note || '',
+        cleanNote: extractCleanNote(l.note),
+        time: formatLogTime(l.created_at)
+      }));
+
+    // Chi tiết hoàn kho do hủy đơn
+    const refundLogs = logsInRange
+      .filter(l => 
+        l.change_amount > 0 &&
+        l.status !== 'Từ chối' &&
+        (l.type === 'Khác' || (l.note && l.note.toLowerCase().includes('hủy đơn')))
+      )
+      .map(l => ({
+        id: l.id,
+        amount: Number(l.change_amount || 0),
+        rawNote: l.note || '',
+        cleanNote: extractCleanNote(l.note),
+        time: formatLogTime(l.created_at)
+      }));
+
+    // Chi tiết nhập hàng mới
+    const restockLogs = logsInRange
+      .filter(l => 
+        l.type === 'Nhập kho' &&
+        l.status !== 'Từ chối' &&
+        !(l.note && l.note.toLowerCase().includes('hủy đơn'))
+      )
+      .map(l => ({
+        id: l.id,
+        amount: Number(l.change_amount || 0),
+        rawNote: l.note || '',
+        cleanNote: extractCleanNote(l.note),
+        time: formatLogTime(l.created_at)
+      }));
+
+    // Chi tiết kiểm kho dôi dư (tăng)
+    const stocktakeGainLogs = logsInRange
+      .filter(l => 
+        l.type === 'Hao hụt/Cân lại' &&
+        l.change_amount > 0 &&
+        l.status !== 'Từ chối'
+      )
+      .map(l => ({
+        id: l.id,
+        amount: Number(l.change_amount || 0),
+        rawNote: l.note || '',
+        cleanNote: extractCleanNote(l.note),
+        time: formatLogTime(l.created_at)
+      }));
+
     const openingStock = Math.max(0, endingStockVal - refilled + sold);
 
     return {
       openingStock,
       endingStock: endingStockVal,
       refilled,
-      sold
+      sold,
+      salesOnly,
+      lossLogs,
+      refundLogs,
+      restockLogs,
+      stocktakeGainLogs
     };
   };
 
@@ -2291,19 +2395,19 @@ export default function AdminPage() {
               <table className="w-full border-collapse text-left text-xs font-sans table-fixed min-w-[700px] bg-white">
                 <thead>
                   <tr className="bg-[#FAF6F0] sticky top-0 z-20 border-b border-coffee-light">
-                    <th className="p-3.5 w-24 sm:w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
+                    <th className="p-3.5 w-28 sm:w-52 font-black text-coffee-dark bg-[#FAF6F0] sticky left-0 z-30 border-r border-coffee-light/60">
                       Tên nguyên liệu
                     </th>
-                    <th className="p-3.5 w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
+                    <th className="p-3.5 w-24 sm:w-32 font-bold text-coffee-medium border-r border-coffee-light/60">
                       Tồn đầu kỳ
                     </th>
-                    <th className="p-3.5 w-32 font-bold text-green-700 border-r border-coffee-light/60">
+                    <th className="p-3.5 min-w-[140px] sm:w-48 font-bold text-green-700 border-r border-coffee-light/60">
                       SL nhập (+)
                     </th>
-                    <th className="p-3.5 w-32 font-bold text-red-600 border-r border-coffee-light/60">
-                      SL bán (-)
+                    <th className="p-3.5 min-w-[160px] sm:w-56 font-bold text-red-600 border-r border-coffee-light/60">
+                      SL xuất (-)
                     </th>
-                    <th className="p-3.5 w-40 font-black text-coffee-primary">
+                    <th className="p-3.5 w-28 sm:w-40 font-black text-coffee-primary">
                       Tồn thực tế cuối kỳ
                     </th>
                   </tr>
@@ -2312,11 +2416,21 @@ export default function AdminPage() {
                   {ingredients
                     .filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase()))
                     .map((ing) => {
-                      const { openingStock, endingStock, refilled, sold } = getHistoricalIngStats(ing);
+                      const { 
+                        openingStock, 
+                        endingStock, 
+                        refilled, 
+                        sold,
+                        salesOnly,
+                        lossLogs,
+                        refundLogs,
+                        restockLogs,
+                        stocktakeGainLogs
+                      } = getHistoricalIngStats(ing);
                       const isLowStock = ing.min_stock !== null && endingStock <= Number(ing.min_stock);
                       const formattedOpening = formatIngredientStock(openingStock, ing.unit, ing.quy_cach);
                       const formattedEnding = formatIngredientStock(endingStock, ing.unit, ing.quy_cach);
-                      const formatRefill = refilled > 0 ? `+${formatIngredientStock(refilled, ing.unit, ing.quy_cach)}` : '-';
+                      const formatRefill = refilled > 0 ? formatIngredientRefill(refilled, ing.unit, ing.quy_cach) : '-';
                       const formatSold = sold > 0 ? `-${formatIngredientStock(sold, ing.unit, ing.quy_cach)}` : '-';
 
                       return (
@@ -2326,8 +2440,8 @@ export default function AdminPage() {
                             isLowStock ? 'bg-red-50/20' : ''
                           }`}
                         >
-                          {/* Sticky First Column (w-24 trên điện thoại, sm:w-52 trên desktop) */}
-                          <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-24 sm:w-52 whitespace-normal break-words ${
+                          {/* Sticky First Column (w-28 trên điện thoại, sm:w-52 trên desktop) */}
+                          <td className={`p-3 font-bold text-coffee-dark sticky left-0 z-10 border-r border-coffee-light/60 border-b border-coffee-light/40 w-28 sm:w-52 whitespace-normal break-words align-top ${
                             isLowStock ? 'bg-red-50/95' : 'bg-white'
                           }`}>
                             <div className="flex flex-col">
@@ -2337,16 +2451,126 @@ export default function AdminPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold">
+                          <td className="p-3 border-r border-coffee-light/60 text-coffee-medium font-semibold align-top">
                             {formattedOpening}
                           </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-green-700 font-extrabold">
-                            {formatRefill}
+                          <td className="p-3 border-r border-coffee-light/60 text-green-700 align-top">
+                            <div className="font-extrabold text-sm">{formatRefill}</div>
+
+                            <div className="flex flex-col gap-1 mt-1">
+                              {/* Hoàn đơn hủy */}
+                              {refundLogs.map((log: any) => (
+                                <div 
+                                  key={log.id} 
+                                  className="flex flex-col bg-purple-50 border border-purple-300/90 rounded-lg p-1.5 text-[10px] leading-snug shadow-sm"
+                                >
+                                  <div className="flex items-center justify-between gap-1 font-bold text-purple-900">
+                                    <span className="flex items-center gap-0.5">↩️ Hoàn đơn hủy:</span>
+                                    <span className="text-purple-700 font-black">
+                                      +{formatIngredientStock(log.amount, ing.unit, ing.quy_cach)}
+                                    </span>
+                                  </div>
+                                  <div className="text-purple-900 font-medium mt-0.5 text-[9.5px] break-words bg-purple-100/60 px-1 py-0.5 rounded">
+                                    📝 {log.cleanNote ? log.cleanNote : 'Hoàn kho do hủy đơn'}
+                                  </div>
+                                  {log.time && (
+                                    <span className="text-[8.5px] text-purple-700/80 mt-0.5 font-normal">
+                                      ⏱ {log.time}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+
+                              {/* Nhập hàng mới */}
+                              {restockLogs.map((log: any) => (
+                                <div 
+                                  key={log.id} 
+                                  className="flex flex-col bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 text-[10px] leading-snug"
+                                >
+                                  <div className="flex items-center justify-between gap-1 font-bold text-emerald-900">
+                                    <span>📦 Nhập hàng:</span>
+                                    <span className="text-emerald-700 font-black">
+                                      +{formatIngredientStock(log.amount, ing.unit, ing.quy_cach)}
+                                    </span>
+                                  </div>
+                                  {log.cleanNote && log.cleanNote !== 'Nhập kho nguyên liệu' && (
+                                    <div className="text-emerald-800 font-medium mt-0.5 text-[9.5px] break-words">
+                                      📝 {log.cleanNote}
+                                    </div>
+                                  )}
+                                  {log.time && (
+                                    <span className="text-[8.5px] text-emerald-700/80 mt-0.5 font-normal">
+                                      ⏱ {log.time}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+
+                              {/* Kiểm kho dôi dư */}
+                              {stocktakeGainLogs.map((log: any) => (
+                                <div 
+                                  key={log.id} 
+                                  className="flex flex-col bg-blue-50 border border-blue-200 rounded-lg p-1.5 text-[10px] leading-snug"
+                                >
+                                  <div className="flex items-center justify-between gap-1 font-bold text-blue-900">
+                                    <span>⚠️ Kiểm kho thừa:</span>
+                                    <span className="text-blue-700 font-black">
+                                      +{formatIngredientStock(log.amount, ing.unit, ing.quy_cach)}
+                                    </span>
+                                  </div>
+                                  <div className="text-blue-900 font-medium mt-0.5 text-[9.5px] break-words bg-blue-100/60 px-1 py-0.5 rounded">
+                                    📝 {log.cleanNote ? `"${log.cleanNote}"` : 'Cân chỉnh tồn kho'}
+                                  </div>
+                                  {log.time && (
+                                    <span className="text-[8.5px] text-blue-700/80 mt-0.5 font-normal">
+                                      ⏱ {log.time}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </td>
-                          <td className="p-3 border-r border-coffee-light/60 text-red-600 font-extrabold">
-                            {formatSold}
+
+                          <td className="p-3 border-r border-coffee-light/60 text-red-600 align-top">
+                            <div className="font-extrabold text-sm">{formatSold}</div>
+
+                            <div className="flex flex-col gap-1 mt-1">
+                              {/* Badge Bán POS */}
+                              {salesOnly > 0 && (
+                                <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-600 bg-stone-100 border border-stone-200/80 px-1.5 py-0.5 rounded-md w-fit">
+                                  <span>🛒 Bán POS:</span>
+                                  <span className="font-bold text-stone-900">-{formatIngredientStock(salesOnly, ing.unit, ing.quy_cach)}</span>
+                                </div>
+                              )}
+
+                              {/* Badges Kiểm kho / Hao hụt kèm lý do nổi bật */}
+                              {lossLogs.map((log: any) => (
+                                <div 
+                                  key={log.id} 
+                                  className="flex flex-col bg-amber-50 border border-amber-300 rounded-lg p-1.5 text-[10px] leading-snug shadow-sm"
+                                >
+                                  <div className="flex items-center justify-between gap-1 font-bold text-amber-900">
+                                    <span className="flex items-center gap-0.5">
+                                      ⚠️ {log.type === 'Hao hụt/Cân lại' ? 'Kiểm kho' : 'Hao hụt'}:
+                                    </span>
+                                    <span className="text-red-600 font-black">
+                                      -{formatIngredientStock(log.amount, ing.unit, ing.quy_cach)}
+                                    </span>
+                                  </div>
+                                  <div className="text-amber-900 font-medium mt-0.5 text-[9.5px] break-words bg-amber-100/60 px-1 py-0.5 rounded">
+                                    📝 {log.cleanNote ? `"${log.cleanNote}"` : 'Cân chỉnh tồn kho'}
+                                  </div>
+                                  {log.time && (
+                                    <span className="text-[8.5px] text-amber-700/80 mt-0.5 font-normal">
+                                      ⏱ {log.time}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </td>
-                          <td className="p-3 text-coffee-primary font-black">
+
+                          <td className="p-3 text-coffee-primary font-black align-top">
                             <div className="flex items-center space-x-1.5">
                               <span className={isLowStock ? 'text-red-600' : 'text-coffee-primary'}>
                                 {formattedEnding}

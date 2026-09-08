@@ -24,7 +24,8 @@ let sharedRealtimeChannel: any = null;
 const realtimeListeners: { [event: string]: Set<(payload: any) => void> } = {
   table_update: new Set(),
   order_update: new Set(),
-  report_update: new Set()
+  report_update: new Set(),
+  inventory_update: new Set()
 };
 
 function getSharedRealtimeChannel() {
@@ -46,6 +47,17 @@ function getSharedRealtimeChannel() {
       })
       .on('broadcast', { event: 'report_update' }, (payload: any) => {
         realtimeListeners['report_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('broadcast', { event: 'inventory_update' }, (payload: any) => {
+        realtimeListeners['inventory_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      // 2. Lắng nghe thay đổi trực tiếp từ Postgres DB (Postgres Changes)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nguyenlieu' }, (payload: any) => {
+        realtimeListeners['inventory_update']?.forEach(fn => {
           try { fn(payload); } catch (e) { console.error(e); }
         });
       })
@@ -1775,12 +1787,14 @@ export const db = {
         return mapOrderToClient(order);
       }
 
-      // 2. Trừ kho nguyên liệu chạy ngầm bất đồng bộ (Non-blocking Fast Response)
+      // 2. Trừ kho nguyên liệu (Đồng bộ đảm bảo nhất quán số liệu kho)
       if (items && items.length > 0) {
         const cartItems = items.map(item => ({ product_id: item.idsp, quantity: item.so_luong }));
-        this.deductStockFromOrder(cartItems).catch(err => {
-          console.error('Lỗi khấu trừ kho ngầm khi thanh toán:', err);
-        });
+        try {
+          await this.deductStockFromOrder(cartItems);
+        } catch (err) {
+          console.error('Lỗi khấu trừ kho khi thanh toán:', err);
+        }
       }
 
       // 3. Song song: cập nhật trạng thái thanh toán + cập nhật trạng thái bàn cùng lúc
@@ -1895,7 +1909,19 @@ export const db = {
     try {
       let items: any[] = [];
       if (isSupabaseConfigured && supabase) {
-        // 1. Lấy chi tiết hóa đơn từ Supabase
+        // 1. Kiểm tra trạng thái đơn: Chỉ hoàn kho nếu đơn thực sự ĐÃ THANH TOÁN (đã trừ kho)
+        const { data: orderData } = await supabase
+          .from('hoadon')
+          .select('trang_thai_thanh_toan')
+          .eq('id', orderId)
+          .single();
+
+        if (orderData?.trang_thai_thanh_toan !== 'Đã thanh toán') {
+          // Chưa thanh toán -> chưa từng trừ kho -> chỉ xóa hóa đơn, không hoàn kho
+          return await this.cancelOrder(orderId);
+        }
+
+        // 2. Lấy chi tiết hóa đơn từ Supabase
         const { data: dbItems } = await supabase
           .from('hoadondetail')
           .select('idsp, so_luong')
@@ -1909,6 +1935,12 @@ export const db = {
         }
       } else {
         // Mock DB
+        const orders = mockDb.getOrders();
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (targetOrder?.payment_status !== 'Đã thanh toán') {
+          return await this.cancelOrder(orderId);
+        }
+
         const mockItems = mockDb.getOrderItems().filter(item => item.order_id === orderId);
         items = mockItems.map(item => ({
           product_id: item.product_id,
@@ -1916,13 +1948,14 @@ export const db = {
         }));
       }
 
-      // 2. Hoàn lại tồn kho
+      // 3. Hoàn lại tồn kho
       if (items.length > 0) {
         await this.restoreStockFromOrder(items);
       }
 
-      // 3. Xóa hóa đơn và chi tiết
+      // 4. Xóa hóa đơn và giải phóng bàn
       const success = await this.cancelOrder(orderId);
+      broadcastRealtimeEvent('inventory_update');
       return success;
     } catch (e) {
       console.error('Lỗi khi hủy hóa đơn đã thanh toán:', e);
@@ -3137,8 +3170,10 @@ export const db = {
         if (historyLogsToInsert.length > 0) {
           await supabase.from('lichsukho').insert(historyLogsToInsert);
         }
+        broadcastRealtimeEvent('inventory_update');
       } else if (updated) {
         mockDb.setIngredients(ingredients);
+        broadcastRealtimeEvent('inventory_update');
       }
     } catch (e) {
       console.error('Lỗi khi hoàn trả tồn kho đơn hàng:', e);
@@ -3260,8 +3295,10 @@ export const db = {
         if (historyLogsToInsert.length > 0) {
           await supabase.from('lichsukho').insert(historyLogsToInsert);
         }
+        broadcastRealtimeEvent('inventory_update');
       } else if (updated) {
         mockDb.setIngredients(ingredients);
+        broadcastRealtimeEvent('inventory_update');
       }
     } catch (e) {
       console.error('Lỗi khi khấu trừ tồn kho bán hàng:', e);
@@ -3536,6 +3573,15 @@ export const db = {
     realtimeListeners['report_update'].add(callback);
     return () => {
       realtimeListeners['report_update'].delete(callback);
+    };
+  },
+
+  subscribeToInventoryChanges(callback: (payload: any) => void): () => void {
+    if (!isSupabaseConfigured || !supabase) return () => {};
+    getSharedRealtimeChannel();
+    realtimeListeners['inventory_update'].add(callback);
+    return () => {
+      realtimeListeners['inventory_update'].delete(callback);
     };
   }
 };
