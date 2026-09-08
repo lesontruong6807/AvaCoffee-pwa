@@ -2811,6 +2811,8 @@ export const db = {
       mockDb.setInventoryLogs(logs);
     }
 
+    broadcastRealtimeEvent('inventory_update');
+    broadcastRealtimeEvent('report_update');
     return newLog;
   },
 
@@ -2976,6 +2978,8 @@ export const db = {
       }
     }
 
+    broadcastRealtimeEvent('inventory_update');
+    broadcastRealtimeEvent('report_update');
     return newLog;
   },
 
@@ -3012,6 +3016,8 @@ export const db = {
       mockDb.setInventoryLogs(logs);
     }
 
+    broadcastRealtimeEvent('inventory_update');
+    broadcastRealtimeEvent('report_update');
     return targetLog;
   },
 
@@ -3044,6 +3050,8 @@ export const db = {
       ids.forEach(id => { const l = logs.find(x => x.id === id); if (l) l.status = status; });
       mockDb.setInventoryLogs(logs);
     }
+    broadcastRealtimeEvent('inventory_update');
+    broadcastRealtimeEvent('report_update');
   },
 
   async recalculateProductCostPrice(productId: string) {
@@ -3128,7 +3136,8 @@ export const db = {
         const ing = ingredients.find(i => i.id === ingId);
         if (ing) {
           const { restoreQty, productIds } = ingChanges[ingId];
-          ing.stock_quantity = Number(ing.stock_quantity) + restoreQty;
+          const currentStock = Number(ing.stock_quantity ?? (ing as any).so_luong_ton ?? 0) || 0;
+          ing.stock_quantity = currentStock + restoreQty;
           updated = true;
 
           if (isSupabaseConfigured && supabase) {
@@ -3195,8 +3204,8 @@ export const db = {
               .from('lichsukho')
               .select('*')
               .eq('loai_giao_dich', 'Bán hàng')
+              .gte('thoi_gian_tao', `${vnDateStr}T00:00:00+07:00`)
               .order('thoi_gian_tao', { ascending: false })
-              .limit(100)
           : Promise.resolve({ data: null })
       ]);
 
@@ -3232,7 +3241,8 @@ export const db = {
         const ing = ingredients.find(i => i.id === ingId);
         if (ing) {
           const { deductQty } = ingChanges[ingId];
-          ing.stock_quantity = Math.max(0, Number(ing.stock_quantity) - deductQty);
+          const currentStock = Number(ing.stock_quantity ?? (ing as any).so_luong_ton ?? 0) || 0;
+          ing.stock_quantity = Math.max(0, currentStock - deductQty);
           updated = true;
 
           if (isSupabaseConfigured && supabase) {

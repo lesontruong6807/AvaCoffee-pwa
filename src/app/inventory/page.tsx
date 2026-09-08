@@ -70,9 +70,19 @@ export default function InventoryPage() {
     }
   };
 
+  const getOfflineStocktakes = (): any[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem('ava_offline_stocktakes');
+      return data ? JSON.parse(data) : [];
+    } catch (_) {
+      return [];
+    }
+  };
+
   const syncOfflineStocktakes = async () => {
     if (typeof window === 'undefined' || !navigator.onLine) return;
-    const queue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+    const queue = getOfflineStocktakes();
     if (queue.length === 0) return;
     
     let successCount = 0;
@@ -227,7 +237,7 @@ export default function InventoryPage() {
 
     try {
       if (typeof window !== 'undefined' && !navigator.onLine) {
-        const offlineQueue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+        const offlineQueue = getOfflineStocktakes();
         offlineQueue.push(payload);
         localStorage.setItem('ava_offline_stocktakes', JSON.stringify(offlineQueue));
         
@@ -245,7 +255,7 @@ export default function InventoryPage() {
     } catch (e) {
       console.error(e);
       if (typeof window !== 'undefined') {
-        const offlineQueue = JSON.parse(localStorage.getItem('ava_offline_stocktakes') || '[]');
+        const offlineQueue = getOfflineStocktakes();
         offlineQueue.push(payload);
         localStorage.setItem('ava_offline_stocktakes', JSON.stringify(offlineQueue));
         toast.success('Lỗi kết nối. Đã lưu tạm đơn kiểm kho trên thiết bị để tự động đồng bộ!');

@@ -238,11 +238,12 @@ export default function PosPage() {
     setOrderNotes('');
   };
 
-  const totalCartAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const totalCartAmount = cart.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
 
+  const safeDiscountValue = Math.max(0, Number(discountValue) || 0);
   const discountAmount = discountType === 'amount'
-    ? Math.min(totalCartAmount, discountValue)
-    : Math.min(totalCartAmount, Math.round((totalCartAmount * discountValue) / 100));
+    ? Math.min(totalCartAmount, safeDiscountValue)
+    : Math.min(totalCartAmount, Math.round((totalCartAmount * Math.min(100, safeDiscountValue)) / 100));
 
   const finalTotalAmount = Math.max(0, totalCartAmount - discountAmount);
 

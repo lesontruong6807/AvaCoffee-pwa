@@ -67,51 +67,54 @@ export default function DailyReportPage() {
     };
   }, []);
 
-  // 1. Chỉ lấy hóa đơn đã thanh toán trong ngày hôm nay (dựa trên toDateString)
-  const todayStr = new Date().toDateString();
+  // Helper lấy chuỗi ngày chuẩn hóa theo giờ Việt Nam (YYYY-MM-DD)
+  const getVnDate = (d: string | Date = new Date()) => {
+    return new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+  };
+
+  // Helper lấy số phút trong ngày theo giờ Việt Nam
+  const getVnMins = (d: string | Date) => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(new Date(d)).split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    } catch (_) {
+      const dt = new Date(d);
+      return dt.getHours() * 60 + dt.getMinutes();
+    }
+  };
+
+  // 1. Chỉ lấy hóa đơn đã thanh toán trong ngày hôm nay (chuẩn hóa múi giờ Việt Nam)
+  const todayVn = getVnDate();
   const todayOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
-    const orderDate = new Date(o.created_at);
-    return orderDate.toDateString() === todayStr;
+    return getVnDate(o.created_at) === todayVn;
   });
 
   const todayLogs = inventoryLogs.filter(l => {
-    const logDate = new Date(l.created_at);
-    return logDate.toDateString() === todayStr && l.type === 'Nhập kho' && l.status !== 'Từ chối';
+    return getVnDate(l.created_at) === todayVn && l.type === 'Nhập kho' && l.status !== 'Từ chối';
   });
 
-  // 2. Phân loại theo Ca làm việc
-  // Ca sáng: 05:30 - 12:00 (Tính các order/chi phí tạo trước 14:00)
-  const morningOrders = todayOrders.filter(o => {
-    const d = new Date(o.created_at);
-    const mins = d.getHours() * 60 + d.getMinutes();
-    return mins < (14 * 60);
-  });
-  const morningLogs = todayLogs.filter(l => {
-    const d = new Date(l.created_at);
-    const mins = d.getHours() * 60 + d.getMinutes();
-    return mins < (14 * 60);
-  });
+  // 2. Phân loại theo Ca làm việc (theo chuẩn giờ Việt Nam)
+  // Ca sáng: 05:30 - 12:00 (Tính các order/chi phí tạo trước 14:00 VN)
+  const morningOrders = todayOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
+  const morningLogs = todayLogs.filter(l => getVnMins(l.created_at) < (14 * 60));
 
-  // Ca chiều: 16:00 - 21:00 (Tính các order/chi phí tạo từ 14:00 trở đi)
-  const afternoonOrders = todayOrders.filter(o => {
-    const d = new Date(o.created_at);
-    const mins = d.getHours() * 60 + d.getMinutes();
-    return mins >= (14 * 60);
-  });
-  const afternoonLogs = todayLogs.filter(l => {
-    const d = new Date(l.created_at);
-    const mins = d.getHours() * 60 + d.getMinutes();
-    return mins >= (14 * 60);
-  });
+  // Ca chiều: 16:00 - 21:00 (Tính các order/chi phí tạo từ 14:00 VN trở đi)
+  const afternoonOrders = todayOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
+  const afternoonLogs = todayLogs.filter(l => getVnMins(l.created_at) >= (14 * 60));
 
   // 3. Hàm tính toán các chỉ số cho từng ca
   const calculateMetrics = (shiftOrders: any[], shiftLogs: any[]) => {
     const totalDiscount = shiftOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
-    const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0) + totalDiscount;
-    const actualRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-    const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount), 0);
-    const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) + totalDiscount;
+    const actualRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalCash = shiftOrders.filter(o => o.payment_method === 'Tiền mặt').reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalTransfer = shiftOrders.filter(o => o.payment_method === 'Chuyển khoản').reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     
     // Chi phí nhập kho / chi trả tiền mặt trong ca
     const restockCosts = shiftLogs.reduce((sum, l) => sum + Number(l.cost || 0), 0);
