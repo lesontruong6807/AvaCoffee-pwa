@@ -256,23 +256,15 @@ export default function TimeLogPage() {
     const checkMin = parseInt(m, 10);
     const totalMinutes = checkHour * 60 + checkMin;
 
-    // 2. Kiểm tra giới hạn giờ khai báo theo ca (có biên độ linh hoạt hợp lý khi chuẩn bị mở quán hoặc dọn dẹp kết ca)
+    // 2. Kiểm tra giới hạn giờ khai báo theo ca
     if (currentShift.startsWith('Ca sáng')) {
-      const minLimit = logType === 'in' ? 300 : 330; // Vào ca: từ 05:00, Ra ca: từ 05:30
-      const maxLimit = logType === 'in' ? 720 : 780; // Vào ca: đến 12:00, Ra ca: đến 13:00 (cho dọn dẹp, giao ca)
-      if (totalMinutes < minLimit || totalMinutes > maxLimit) {
-        const minStr = `${String(Math.floor(minLimit / 60)).padStart(2, '0')}:${String(minLimit % 60).padStart(2, '0')}`;
-        const maxStr = `${String(Math.floor(maxLimit / 60)).padStart(2, '0')}:${String(maxLimit % 60).padStart(2, '0')}`;
-        toast.error(`Giờ khai báo Ca sáng (${logType === 'in' ? 'Vào ca' : 'Ra ca'}) chỉ được từ ${minStr} đến ${maxStr}!`);
+      if (totalMinutes < 330 || totalMinutes > 720) {
+        toast.error('Giờ khai báo Ca sáng chỉ được trong khoảng từ 05:30 đến 12:00!');
         return;
       }
     } else if (currentShift.startsWith('Ca chiều')) {
-      const minLimit = logType === 'in' ? 15 * 60 + 30 : 16 * 60; // Vào ca: từ 15:30, Ra ca: từ 16:00
-      const maxLimit = logType === 'in' ? 21 * 60 : 22 * 60;      // Vào ca: đến 21:00, Ra ca: đến 22:00 (cho dọn quán, chốt két)
-      if (totalMinutes < minLimit || totalMinutes > maxLimit) {
-        const minStr = `${String(Math.floor(minLimit / 60)).padStart(2, '0')}:${String(minLimit % 60).padStart(2, '0')}`;
-        const maxStr = `${String(Math.floor(maxLimit / 60)).padStart(2, '0')}:${String(maxLimit % 60).padStart(2, '0')}`;
-        toast.error(`Giờ khai báo Ca chiều (${logType === 'in' ? 'Vào ca' : 'Ra ca'}) chỉ được từ ${minStr} đến ${maxStr}!`);
+      if (totalMinutes < 16 * 60 || totalMinutes > 21 * 60) {
+        toast.error('Giờ khai báo Ca chiều chỉ được trong khoảng từ 16:00 đến 21:00!');
         return;
       }
     }
