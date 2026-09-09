@@ -134,7 +134,8 @@ const MOCK_CATEGORIES = [
   { id: 'c_yaourt', name: 'Yaourt' },
   { id: 'c_soda', name: 'Soda' },
   { id: 'c_sualac', name: 'Sữa lắc' },
-  { id: 'c_nuocngot', name: 'Nước ngọt/suối' }
+  { id: 'c_nuocngot', name: 'Nước ngọt/suối' },
+  { id: 'c_topping', name: 'Topping' }
 ];
 
 const MOCK_PRODUCTS = [
@@ -182,6 +183,15 @@ const MOCK_PRODUCTS = [
     price: 22000,
     cost_price: 9148,
     image_url: '/products/CP005.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'CP006',
+    category_id: 'c_caphe',
+    name: 'Bạc xỉu kem muối',
+    price: 27000,
+    cost_price: 11418,
+    image_url: '/products/CP006.png',
     status: 'Còn hàng' as const
   },
   // Thức uống khác (TUK)
@@ -476,6 +486,25 @@ const MOCK_PRODUCTS = [
     cost_price: 7840,
     image_url: '/products/N008.jpg',
     status: 'Còn hàng' as const
+  },
+  // Topping
+  {
+    id: 'TP001',
+    category_id: 'c_topping',
+    name: 'Kem muối',
+    price: 5000,
+    cost_price: 2270,
+    image_url: '/products/TP001.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'TP002',
+    category_id: 'c_topping',
+    name: 'Trân châu trắng',
+    price: 5000,
+    cost_price: 0,
+    image_url: '/products/TP002.png',
+    status: 'Còn hàng' as const
   }
 ];
 
@@ -562,6 +591,14 @@ export const MOCK_RECIPES = [
   { id: 'rec_cp5_2', product_id: 'CP005', ingredient_id: 'ing_suadac', quantity_needed: 40, unit: 'g' },
   { id: 'rec_cp5_3', product_id: 'CP005', ingredient_id: 'ing_suatuoi', quantity_needed: 50, unit: 'ml' },
   { id: 'rec_cp5_4', product_id: 'CP005', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
+
+  // 6. Bạc xỉu kem muối
+  { id: 'rec_cp6_1', product_id: 'CP006', ingredient_id: 'ing_caphe', quantity_needed: 20, unit: 'g' },
+  { id: 'rec_cp6_2', product_id: 'CP006', ingredient_id: 'ing_suadac', quantity_needed: 41.33, unit: 'g' },
+  { id: 'rec_cp6_3', product_id: 'CP006', ingredient_id: 'ing_suatuoi', quantity_needed: 52, unit: 'ml' },
+  { id: 'rec_cp6_kembeo', product_id: 'CP006', ingredient_id: 'ing_kembeo', quantity_needed: 30.27, unit: 'g' },
+  { id: 'rec_cp6_muoibien', product_id: 'CP006', ingredient_id: 'ing_muoibien', quantity_needed: 0.67, unit: 'g' },
+  { id: 'rec_cp6_4', product_id: 'CP006', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
 
   // 6. Cacao sữa
   { id: 'rec_tuk1_1', product_id: 'TUK001', ingredient_id: 'ing_cacao', quantity_needed: 10, unit: 'g' },
@@ -718,7 +755,13 @@ export const MOCK_RECIPES = [
   { id: 'rec_n5', product_id: 'N005', ingredient_id: 'ing_n005', quantity_needed: 1, unit: 'chai' },
   { id: 'rec_n6', product_id: 'N006', ingredient_id: 'ing_n006', quantity_needed: 1, unit: 'lon' },
   { id: 'rec_n7', product_id: 'N007', ingredient_id: 'ing_n007', quantity_needed: 1, unit: 'chai' },
-  { id: 'rec_n8', product_id: 'N008', ingredient_id: 'ing_n008', quantity_needed: 1, unit: 'lon' }
+  { id: 'rec_n8', product_id: 'N008', ingredient_id: 'ing_n008', quantity_needed: 1, unit: 'lon' },
+
+  // Topping Kem muối (trừ 60ml kem muối, không trừ ly)
+  { id: 'rec_tp1_kembeo', product_id: 'TP001', ingredient_id: 'ing_kembeo', quantity_needed: 30.27, unit: 'g' },
+  { id: 'rec_tp1_suadac', product_id: 'TP001', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
+  { id: 'rec_tp1_suatuoi', product_id: 'TP001', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
+  { id: 'rec_tp1_muoibien', product_id: 'TP001', ingredient_id: 'ing_muoibien', quantity_needed: 0.67, unit: 'g' }
 ];
 
 export function getIngredientPackageInfo(unit: string, quyCach?: string): { inputUnit: string; multiplier: number } {

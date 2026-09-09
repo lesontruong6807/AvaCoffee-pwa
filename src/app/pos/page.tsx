@@ -451,8 +451,10 @@ export default function PosPage() {
         'c_yaourt': 3,
         'c_douongkhac': 4,
         'c_soda': 5,
-        'c_nuocngot': 6,
-        'c_monan': 7
+        'c_sualac': 6,
+        'c_nuocngot': 7,
+        'c_topping': 8,
+        'c_monan': 9
       };
       const orderA = categorySortOrder[a.category_id] || 99;
       const orderB = categorySortOrder[b.category_id] || 99;
