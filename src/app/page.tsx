@@ -244,10 +244,10 @@ export default function Home() {
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-coffee-accent uppercase tracking-widest">{greeting}</span>
             <h2 className="text-xl md:text-2xl font-black tracking-tight">
-              {currentUser?.full_name || 'Nhân viên AVA Coffee'}
+              {currentUser?.full_name || 'Nhân viên AVA Coffee Hóc Môn'}
             </h2>
             <p className="text-[11px] text-coffee-light/95 max-w-md leading-normal">
-              Chào mừng bạn đến với AVA Coffee. Chọn chức năng bên dưới để bắt đầu ca làm việc của mình.
+              Chào mừng bạn đến với AVA Coffee (Chi nhánh Hóc Môn). Chọn chức năng bên dưới để bắt đầu ca làm việc của mình.
             </p>
           </div>
 

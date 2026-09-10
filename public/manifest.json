@@ -1,7 +1,7 @@
 {
-  "name": "AVA Coffee",
-  "short_name": "AVA Coffee",
-  "description": "Hệ thống POS & Quản lý nhân viên AVA Coffee",
+  "name": "AVA Coffee Hóc Môn",
+  "short_name": "AVA Hóc Môn",
+  "description": "Hệ thống POS & Quản lý nhân viên AVA Coffee Hóc Môn",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

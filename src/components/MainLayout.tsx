@@ -46,8 +46,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     setMounted(true);
-    setUser(getCurrentUser());
+    const loggedUser = getCurrentUser();
+    setUser(loggedUser);
     setAvailableUsers(mockDb.getUsers());
+
+    // Tự động kiểm tra và kick nhân viên đã nghỉ việc / bị xóa tài khoản / đổi mật khẩu
+    if (loggedUser && loggedUser.id) {
+      db.getUsers().then((users: any[]) => {
+        const validUser = users.find((u: any) => u.id === loggedUser.id);
+        if (!validUser) {
+          console.warn('Tài khoản đã bị xóa khỏi hệ thống. Đang đăng xuất...');
+          setCurrentUser(null);
+          setUser(null);
+        } else if (validUser.password && loggedUser.password && validUser.password !== loggedUser.password) {
+          console.warn('Mật khẩu tài khoản đã thay đổi. Vui lòng đăng nhập lại...');
+          setCurrentUser(null);
+          setUser(null);
+        }
+      }).catch(err => console.error('Lỗi kiểm tra phiên làm việc:', err));
+    }
 
     // Đăng ký bộ lắng nghe sự kiện Toast
     const handleShowToast = (e: Event) => {
@@ -123,6 +140,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="w-24 h-24 rounded-2xl shadow-md border-2 border-coffee-accent/40 object-cover mb-4" 
             />
             <h1 className="text-2xl font-black text-coffee-dark tracking-wider">AVA COFFEE</h1>
+            <p className="text-xs text-coffee-medium font-semibold uppercase tracking-wider mt-1">Chi nhánh Hóc Môn</p>
             <p className="text-xs text-coffee-medium font-semibold uppercase tracking-wider mt-1">POS & Quản Lý Cửa Hàng</p>
           </div>
 
@@ -239,7 +257,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
           <div>
             <h1 className="font-extrabold text-lg tracking-wide leading-tight">AVA Coffee</h1>
-            <p className="text-xs text-coffee-accent font-medium">POS & Management</p>
+            <p className="text-xs text-coffee-accent font-medium">Chi nhánh Hóc Môn</p>
           </div>
         </div>
 
@@ -293,7 +311,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="w-8 h-8 bg-black rounded-lg overflow-hidden flex items-center justify-center border border-coffee-accent/40 shadow-inner shrink-0">
             <img src="/logo.jpg" alt="AVA Coffee Logo" className="w-full h-full object-cover" />
           </div>
-          <span className="font-extrabold text-lg">AVA Coffee</span>
+          <div>
+            <span className="font-extrabold text-base leading-none block">AVA Coffee</span>
+            <span className="text-[10px] text-coffee-accent font-semibold block leading-none mt-0.5">Hóc Môn</span>
+          </div>
         </div>
         <div className="flex items-center space-x-3">
           {/* User Display Mobile */}
