@@ -10,8 +10,47 @@ export const isSupabaseConfigured =
   supabaseAnonKey && 
   supabaseAnonKey !== 'your-anon-key';
 
+// Tự động quét và dọn sạch token xác thực Supabase cũ bị lưu trong localStorage (nguyên nhân gây 401 Unauthorized trên mobile)
+if (typeof window !== 'undefined') {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('supabase.auth.token'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    // Nếu thiết bị bị dính cache kho cũ 200 ly: xóa cache để nạp số tồn thực tế từ Supabase
+    const cachedIng = localStorage.getItem('ava_ingredients');
+    if (cachedIng && cachedIng.includes('"stock_quantity":200') && cachedIng.includes('ing_lyden')) {
+      localStorage.removeItem('ava_ingredients');
+    }
+
+    // Xóa cache danh sách nhân viên cũ nếu còn dính 'Nguyễn Văn Minh' hoặc 'Trần Thị Thuỷ'
+    const cachedUsers = localStorage.getItem('ava_users');
+    if (cachedUsers && (cachedUsers.includes('Nguyễn Văn Minh') || cachedUsers.includes('Trần Thị Thuỷ'))) {
+      localStorage.removeItem('ava_users');
+    }
+
+    // Nếu current_user cũ đang là 'Nguyễn Văn Minh' hoặc 'Trần Thị Thuỷ': xóa để người dùng đăng nhập lại
+    const currentUserStr = localStorage.getItem('ava_current_user');
+    if (currentUserStr && (currentUserStr.includes('Nguyễn Văn Minh') || currentUserStr.includes('Trần Thị Thuỷ'))) {
+      localStorage.removeItem('ava_current_user');
+    }
+  } catch (e) {}
+}
+
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'ava_none'
+      }
+    })
   : null;
 
 // Cache variables for performance optimization
@@ -532,38 +571,38 @@ export const MOCK_USERS = [
 ];
 
 export const MOCK_INGREDIENTS = [
-  { id: 'ing_caphe', name: 'Cà phê hạt AVA', unit: 'g', stock_quantity: 5000, opening_stock: 5000, min_stock: 1000, quy_cach: '1kg' },
-  { id: 'ing_cacao', name: 'Cacao AVA', unit: 'g', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: '1kg' },
-  { id: 'ing_matcha', name: 'Bột Matcha', unit: 'g', stock_quantity: 500, opening_stock: 500, min_stock: 50, quy_cach: '200g' },
-  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'g', stock_quantity: 6000, opening_stock: 6000, min_stock: 1800, quy_cach: '30g' },
-  { id: 'ing_suadac', name: 'Sữa đặc', unit: 'g', stock_quantity: 6420, opening_stock: 6420, min_stock: 1284, quy_cach: '1284g' },
-  { id: 'ing_suatuoi', name: 'Sữa tươi', unit: 'ml', stock_quantity: 5000, opening_stock: 5000, min_stock: 2000, quy_cach: '1000ml' },
-  { id: 'ing_lyden', name: 'Ly đen AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
-  { id: 'ing_lytrang', name: 'Ly trắng AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
-  { id: 'ing_lyhoavan', name: 'Ly trắng hoa văn AVA', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 50, quy_cach: 'cái' },
-  { id: 'ing_muong', name: 'Muỗng', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch' },
-  { id: 'ing_tuimangdi', name: 'Túi mang đi', unit: 'kg', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: '1kg' },
-  { id: 'ing_duong', name: 'Đường', unit: 'g', stock_quantity: 5000, opening_stock: 5000, min_stock: 1000, quy_cach: '1000g' },
-  { id: 'ing_kembeo', name: "Kem RICH'S", unit: 'g', stock_quantity: 2270, opening_stock: 2270, min_stock: 454, quy_cach: '454g' },
-  { id: 'ing_suachua', name: 'Sữa chua', unit: 'hộp', stock_quantity: 20, opening_stock: 20, min_stock: 4, quy_cach: 'hộp' },
-  { id: 'ing_mutdau', name: 'Mứt dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_mutvietquat', name: 'Mứt việt quất', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_mutdao', name: 'Mứt đào', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_mutchanhday', name: 'Mứt chanh dây', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: '1000ml' },
-  { id: 'ing_sirodau', name: 'Siro dâu', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_sirodao', name: 'Siro đào', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_sirovai', name: 'Siro vải', unit: 'ml', stock_quantity: 1000, opening_stock: 1000, min_stock: 200, quy_cach: 'ml' },
-  { id: 'ing_7up', name: '7-Up', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 10, quy_cach: '390ml' },
-  { id: 'ing_n001', name: '7-Up (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
-  { id: 'ing_n002', name: 'Bò Húc (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
-  { id: 'ing_n003', name: 'Coca (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
-  { id: 'ing_n004', name: 'Number 1 (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
-  { id: 'ing_n005', name: 'Nước suối (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
-  { id: 'ing_n006', name: 'Pepsi (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
-  { id: 'ing_n007', name: 'Revive (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai' },
-  { id: 'ing_n008', name: 'Sting (lon)', unit: 'lon', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'lon' },
-  { id: 'ing_lytratac', name: 'Ly trà tắc', unit: 'cái', stock_quantity: 200, opening_stock: 200, min_stock: 2, quy_cach: 'cái' },
-  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'g', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: '500g' }
+  { id: 'ing_7up', name: '7-Up', unit: 'ml', stock_quantity: 10315, opening_stock: 10315, min_stock: 2, quy_cach: '390ml', don_gia_nhap: 13.88888888888889, gia_von_trung_binh: 14.023122033397607 },
+  { id: 'ing_cacao', name: 'Cacao AVA', unit: 'g', stock_quantity: 920, opening_stock: 920, min_stock: 200, quy_cach: '1kg', don_gia_nhap: 340, gia_von_trung_binh: 340 },
+  { id: 'ing_caphe', name: 'Cà phê hạt AVA', unit: 'g', stock_quantity: 5768, opening_stock: 5768, min_stock: 1000, quy_cach: '1kg', don_gia_nhap: 247.61904761904762, gia_von_trung_binh: 247.61904761904762 },
+  { id: 'ing_duong', name: 'Đường', unit: 'g', stock_quantity: 6059.200000000019, opening_stock: 6059.200000000019, min_stock: 1000, quy_cach: '1kg', don_gia_nhap: 23, gia_von_trung_binh: 22.51836094995933 },
+  { id: 'ing_hongtra', name: 'Hồng trà', unit: 'g', stock_quantity: 435.9375, opening_stock: 435.9375, min_stock: 60, quy_cach: '30g', don_gia_nhap: 100, gia_von_trung_binh: 114.3738719938099 },
+  { id: 'ing_kembeo', name: 'Kem RICH\'S', unit: 'g', stock_quantity: 2518.1500000000024, opening_stock: 2518.1500000000024, min_stock: 1, quy_cach: '454g', don_gia_nhap: 68.28193832599119, gia_von_trung_binh: 68.28193832599119 },
+  { id: 'ing_lyden', name: 'Ly đen AVA', unit: 'cái', stock_quantity: 78, opening_stock: 78, min_stock: 50, quy_cach: 'cái', don_gia_nhap: 1300, gia_von_trung_binh: 1292.3853157803167 },
+  { id: 'ing_lyhoavan', name: 'Ly trắng hoa văn AVA', unit: 'cái', stock_quantity: 178, opening_stock: 178, min_stock: 50, quy_cach: 'cái', don_gia_nhap: 1500, gia_von_trung_binh: 1500 },
+  { id: 'ing_lytrang', name: 'Ly trắng AVA', unit: 'cái', stock_quantity: 117, opening_stock: 117, min_stock: 50, quy_cach: 'cái', don_gia_nhap: 1400, gia_von_trung_binh: 1398.0662983425414 },
+  { id: 'ing_lytratac', name: 'Ly trà tắc', unit: 'cái', stock_quantity: 144, opening_stock: 144, min_stock: 2, quy_cach: 'cái', don_gia_nhap: 680, gia_von_trung_binh: 680 },
+  { id: 'ing_matcha', name: 'Bột Matcha', unit: 'g', stock_quantity: 354.5, opening_stock: 354.5, min_stock: 50, quy_cach: '200g', don_gia_nhap: 725, gia_von_trung_binh: 725 },
+  { id: 'ing_muoibien', name: 'Topping Muối biển', unit: 'g', stock_quantity: 304.089999999997, opening_stock: 304.089999999997, min_stock: null, quy_cach: '500g', don_gia_nhap: 150, gia_von_trung_binh: 150 },
+  { id: 'ing_muong', name: 'Muỗng', unit: 'bịch', stock_quantity: 5, opening_stock: 5, min_stock: null, quy_cach: 'bịch', don_gia_nhap: 333.3333333333333, gia_von_trung_binh: 333.3333333333333 },
+  { id: 'ing_mutchanhday', name: 'Mứt chanh dây', unit: 'ml', stock_quantity: 450, opening_stock: 450, min_stock: 200, quy_cach: '1000ml', don_gia_nhap: 95, gia_von_trung_binh: 95 },
+  { id: 'ing_mutdao', name: 'Mứt đào', unit: 'ml', stock_quantity: 1840, opening_stock: 1840, min_stock: 200, quy_cach: '1000ml', don_gia_nhap: 94, gia_von_trung_binh: 94.1651376146789 },
+  { id: 'ing_mutdau', name: 'Mứt dâu', unit: 'ml', stock_quantity: 2020, opening_stock: 2020, min_stock: 200, quy_cach: '1000ml', don_gia_nhap: 90, gia_von_trung_binh: 90.24854856960896 },
+  { id: 'ing_mutvietquat', name: 'Mứt việt quất', unit: 'ml', stock_quantity: 1980, opening_stock: 1980, min_stock: 200, quy_cach: '1000ml', don_gia_nhap: 122, gia_von_trung_binh: 122.05575842389521 },
+  { id: 'ing_n001', name: '7-Up (lon)', unit: 'lon', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: 'lon', don_gia_nhap: 7100, gia_von_trung_binh: 7100 },
+  { id: 'ing_n002', name: 'Bò Húc (lon)', unit: 'lon', stock_quantity: 16, opening_stock: 16, min_stock: 2, quy_cach: 'lon', don_gia_nhap: 12500, gia_von_trung_binh: 12294.917967186875 },
+  { id: 'ing_n003', name: 'Coca (lon)', unit: 'lon', stock_quantity: 8, opening_stock: 8, min_stock: 2, quy_cach: 'lon', don_gia_nhap: 7416.666666666667, gia_von_trung_binh: 7416.666666666667 },
+  { id: 'ing_n004', name: 'Number 1 (chai)', unit: 'chai', stock_quantity: 5, opening_stock: 5, min_stock: 2, quy_cach: 'chai', don_gia_nhap: 6750, gia_von_trung_binh: 6750 },
+  { id: 'ing_n005', name: 'Nước suối (chai)', unit: 'chai', stock_quantity: 24, opening_stock: 24, min_stock: 2, quy_cach: 'chai', don_gia_nhap: 4166.666666666667, gia_von_trung_binh: 4199.73544973545 },
+  { id: 'ing_n006', name: 'Pepsi (lon)', unit: 'lon', stock_quantity: 4, opening_stock: 4, min_stock: 2, quy_cach: 'lon', don_gia_nhap: 7100, gia_von_trung_binh: 7100 },
+  { id: 'ing_n007', name: 'Revive (chai)', unit: 'chai', stock_quantity: 22, opening_stock: 22, min_stock: 2, quy_cach: 'chai', don_gia_nhap: 7083.333333333333, gia_von_trung_binh: 7083.333333333333 },
+  { id: 'ing_n008', name: 'Sting (lon)', unit: 'lon', stock_quantity: 15, opening_stock: 15, min_stock: 2, quy_cach: 'lon', don_gia_nhap: 7500, gia_von_trung_binh: 7585 },
+  { id: 'ing_sirodao', name: 'Siro đào', unit: 'ml', stock_quantity: 1110, opening_stock: 1110, min_stock: 200, quy_cach: '730ml', don_gia_nhap: 89.04109589041096, gia_von_trung_binh: 91.09607443197126 },
+  { id: 'ing_sirodau', name: 'Siro dâu', unit: 'ml', stock_quantity: 1280, opening_stock: 1280, min_stock: 200, quy_cach: '730ml', don_gia_nhap: 89.04109589041096, gia_von_trung_binh: 89.04109589041096 },
+  { id: 'ing_sirovai', name: 'Siro vải', unit: 'ml', stock_quantity: 1180, opening_stock: 1180, min_stock: 200, quy_cach: '730ml', don_gia_nhap: 89.04109589041096, gia_von_trung_binh: 91.84889130434783 },
+  { id: 'ing_suachua', name: 'Sữa chua', unit: 'hộp', stock_quantity: 41, opening_stock: 41, min_stock: 4, quy_cach: 'hộp', don_gia_nhap: 5000, gia_von_trung_binh: 5000.012525293424 },
+  { id: 'ing_suadac', name: 'Sữa đặc', unit: 'g', stock_quantity: 25574.34999999998, opening_stock: 25574.34999999998, min_stock: 1284, quy_cach: '1284g', don_gia_nhap: 35.6957424714434, gia_von_trung_binh: 35.6957424714434 },
+  { id: 'ing_suatuoi', name: 'Sữa tươi', unit: 'ml', stock_quantity: 8140, opening_stock: 8140, min_stock: 2000, quy_cach: '1000ml', don_gia_nhap: 27.333333333333332, gia_von_trung_binh: 27.393165749348576 },
+  { id: 'ing_tuimangdi', name: 'Túi mang đi', unit: 'kg', stock_quantity: 0, opening_stock: 0, min_stock: null, quy_cach: '1kg', don_gia_nhap: 0, gia_von_trung_binh: 0 }
 ];
 
 export const MOCK_RECIPES = [
@@ -1176,7 +1215,11 @@ export const db = {
   async getUsers() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('nguoidung').select('*');
-      if (!error && data) return data.map(mapUserToClient).filter(Boolean) as any[];
+      if (!error && data) {
+        const mapped = data.map(mapUserToClient).filter(Boolean) as any[];
+        mockDb.setUsers(mapped);
+        return mapped;
+      }
     }
     return mockDb.getUsers();
   },
@@ -1291,6 +1334,7 @@ export const db = {
       const { data, error } = await supabase.from('danhmuc').select('*');
       if (!error && data) {
         cachedCategories = data.map(mapCategoryToClient).filter(Boolean).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
+        mockDb.setCategories(cachedCategories);
         return cachedCategories;
       }
     }
@@ -1328,6 +1372,7 @@ export const db = {
       const { data, error } = await supabase.from('sanpham').select('*');
       if (!error && data) {
         cachedProducts = data.map(mapProductToClient).filter(Boolean) as any[];
+        mockDb.setProducts(cachedProducts);
         return cachedProducts;
       }
     }
@@ -2664,7 +2709,7 @@ export const db = {
         let ingredients: any[] = [];
         if (isSupabaseConfigured && supabase) {
           const { data } = await supabase.from('nguyenlieu').select('*');
-          if (data) {
+          if (data && data.length > 0) {
             ingredients = data.map(ing => ({
               id: ing.id,
               name: ing.ten_nguyen_lieu,
@@ -2675,6 +2720,7 @@ export const db = {
               quy_cach: ing.quy_cach,
               don_gia_nhap: Number(ing.don_gia_nhap || 0)
             }));
+            mockDb.setIngredients(ingredients);
           }
         } else {
           ingredients = mockDb.getIngredients().map(ing => ({
@@ -2698,8 +2744,8 @@ export const db = {
         .from('nguyenlieu')
         .select('*')
         .order('ten_nguyen_lieu', { ascending: true });
-      if (!error && data) {
-        return data.map(ing => ({
+      if (!error && data && data.length > 0) {
+        const mapped = data.map(ing => ({
           id: ing.id,
           name: ing.ten_nguyen_lieu,
           unit: ing.don_vi_tinh,
@@ -2710,6 +2756,10 @@ export const db = {
           don_gia_nhap: Number(ing.don_gia_nhap || 0),
           gia_von_trung_binh: Number(ing.gia_von_trung_binh || ing.don_gia_nhap || 0)
         }));
+        mockDb.setIngredients(mapped);
+        return mapped;
+      } else if (error) {
+        console.error('Lỗi lấy nguyên liệu từ Supabase:', error.message || error);
       }
     }
     return mockDb.getIngredients().map(ing => ({
@@ -2731,6 +2781,7 @@ export const db = {
           quantity_needed: Number(rec.so_luong_can),
           unit: rec.don_vi_tinh
         }));
+        mockDb.setRecipes(cachedRecipes);
         return cachedRecipes;
       }
     }
