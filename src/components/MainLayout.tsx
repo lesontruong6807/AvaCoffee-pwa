@@ -50,20 +50,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setUser(loggedUser);
     setAvailableUsers(mockDb.getUsers());
 
-    // Tự động kiểm tra và kick nhân viên đã nghỉ việc / bị xóa tài khoản / đổi mật khẩu
-    if (loggedUser && loggedUser.id) {
-      db.getUsers().then((users: any[]) => {
-        const validUser = users.find((u: any) => u.id === loggedUser.id);
-        if (!validUser) {
-          console.warn('Tài khoản đã bị xóa khỏi hệ thống. Đang đăng xuất...');
+    // Tự động kiểm tra phiên an toàn: CHỈ KICK khi Supabase kết nối thành công và xác nhận bị xóa/đổi pass
+    // TUYỆT ĐỐI KHÔNG KICK KHI MẠNG YẾU / OFFLINE
+    if (loggedUser) {
+      db.validateUserSession(loggedUser).then((res: any) => {
+        if (!res.valid) {
+          console.warn(`Tài khoản không còn hiệu lực (${res.reason}). Đang đăng xuất...`);
           setCurrentUser(null);
           setUser(null);
-        } else if (validUser.password && loggedUser.password && validUser.password !== loggedUser.password) {
-          console.warn('Mật khẩu tài khoản đã thay đổi. Vui lòng đăng nhập lại...');
-          setCurrentUser(null);
-          setUser(null);
+          window.location.reload();
+        } else if (res.user && (res.user.id !== loggedUser.id || res.user.full_name !== loggedUser.full_name)) {
+          // Tự động sửa lại đúng thông tin (ví dụ từ Nguyễn Văn Minh sang Lê Phước Long)
+          setCurrentUser(res.user);
+          setUser(res.user);
         }
-      }).catch(err => console.error('Lỗi kiểm tra phiên làm việc:', err));
+      }).catch(err => console.warn('Lỗi kiểm tra phiên:', err));
     }
 
     // Đăng ký bộ lắng nghe sự kiện Toast

@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DATABASE SCHEMA & MASTER SEED DATA CHO AVA COFFEE - CHI NHÁNH K300
+-- DATABASE SCHEMA & MASTER SEED DATA CHO AVA COFFEE - CHI NHÁNH HÓC MÔN
 -- Phiên bản: Chuẩn hóa 100% theo hệ thống AVA Coffee (Cập nhật 09/2026)
 -- Bao gồm: Bạc xỉu kem muối, Topping Kem muối, Trân châu trắng, Sữa lắc, Trà tắc,...
 -- ==============================================================================
@@ -296,7 +296,6 @@ INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ng
 INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786145575045', 'nv001', '123456', 'long@gmail.com', 'Lê Phước Long', 'User', '2026-08-07T23:32:55.046+00:00') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786158337441', 'nv002', '123456', 'tien@gmail.com', 'Nguyễn Minh Tiến', 'User', '2026-08-08T03:05:37.443+00:00') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786317471359', 'maybanhang', '123456', 'banhang@gmail.com', 'Máy bán hàng', 'User', '2026-08-09T23:17:51.36+00:00') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786661592072', 'nv004', '123456', 'thu@gmail.com', 'Nguyễn Thị Mai Thư', 'User', '2026-08-13T22:53:12.073+00:00') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786661651607', 'nv005', '123456', 'kien@gmail.com', 'Nguyễn Trung Kiên', 'User', '2026-08-13T22:54:11.607+00:00') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.nguoidung (id, username, password, email, ho_ten, vai_tro, ngay_tao) VALUES ('u_1786767308125', 'nv006', '123456', 'thuc@gmail.com', 'Dương Thiện Thức', 'User', '2026-08-15T04:15:08.126+00:00') ON CONFLICT (id) DO NOTHING;
 

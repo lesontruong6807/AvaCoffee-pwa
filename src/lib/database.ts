@@ -520,10 +520,15 @@ const MOCK_TABLES: Array<{ id: string; table_name: string; capacity: number; sta
   { id: 'tb_mangve', table_name: 'Khách mang về', capacity: 99, status: 'Trống' }
 ];
 
-const MOCK_USERS = [
-  { id: 'admin', username: 'admin', password: '123456', email: 'admin@avacoffee.com', full_name: 'Lê Sơn (Admin)', role: 'Admin' as const, created_at: new Date().toISOString() },
-  { id: 'nv001', username: 'nv001', password: '123456', email: 'nhanvien1@avacoffee.com', full_name: 'Nguyễn Văn Minh', role: 'User' as const, created_at: new Date().toISOString() },
-  { id: 'nv002', username: 'nv002', password: '123456', email: 'nhanvien2@avacoffee.com', full_name: 'Trần Thị Thuỷ', role: 'User' as const, created_at: new Date().toISOString() }
+export const MOCK_USERS = [
+  { id: 'admin', username: 'admin', password: '123456', email: 'admin@avacoffee.com', full_name: 'Trương Lê Sơn', role: 'Admin' as const, created_at: '2026-07-30T14:42:21.179681+00:00' },
+  { id: 'nv001', username: 'admin2', password: '123456', email: 'nhanvien1@avacoffee.com', full_name: 'Lê Thị Quỳnh Châu', role: 'Admin' as const, created_at: '2026-07-30T14:42:21.179681+00:00' },
+  { id: 'nv002', username: 'admin3', password: '123456', email: 'nhanvien2@avacoffee.com', full_name: 'Trương Hoàng Minh Hải', role: 'Admin' as const, created_at: '2026-07-30T14:42:21.179681+00:00' },
+  { id: 'u_1786145575045', username: 'nv001', password: '123456', email: 'long@gmail.com', full_name: 'Lê Phước Long', role: 'User' as const, created_at: '2026-08-07T23:32:55.046+00:00' },
+  { id: 'u_1786158337441', username: 'nv002', password: '123456', email: 'tien@gmail.com', full_name: 'Nguyễn Minh Tiến', role: 'User' as const, created_at: '2026-08-08T03:05:37.443+00:00' },
+  { id: 'u_1786317471359', username: 'maybanhang', password: '123456', email: 'banhang@gmail.com', full_name: 'Máy bán hàng', role: 'User' as const, created_at: '2026-08-09T23:17:51.36+00:00' },
+  { id: 'u_1786661651607', username: 'nv005', password: '123456', email: 'kien@gmail.com', full_name: 'Nguyễn Trung Kiên', role: 'User' as const, created_at: '2026-08-13T22:54:11.607+00:00' },
+  { id: 'u_1786767308125', username: 'nv006', password: '123456', email: 'thuc@gmail.com', full_name: 'Dương Thiện Thức', role: 'User' as const, created_at: '2026-08-15T04:15:08.126+00:00' }
 ];
 
 export const MOCK_INGREDIENTS = [
@@ -1102,6 +1107,55 @@ const mapLeaveRequestToClient = (lr: any) => lr ? {
 // UNIFIED DATABASE SERVICE
 export const db = {
   // --- USERS (nguoidung) ---
+    async validateUserSession(loggedUser: any): Promise<{ valid: boolean; user?: any; reason?: string }> {
+    if (!loggedUser || (!loggedUser.id && !loggedUser.username)) return { valid: false, reason: 'no_user' };
+
+    // Tự động giải cứu nếu session dính tài khoản test cũ 'Nguyễn Văn Minh' hoặc 'Trần Thị Thuỷ'
+    if (loggedUser.full_name === 'Nguyễn Văn Minh' || loggedUser.full_name === 'Trần Thị Thuỷ') {
+      const realUser = MOCK_USERS.find(u => u.username === loggedUser.username);
+      if (realUser) {
+        return { valid: true, user: realUser };
+      }
+    }
+
+    // Nếu có Supabase: chỉ kiểm tra khi Supabase kết nối THÀNH CÔNG VÀ CÓ DỮ LIỆU
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('nguoidung').select('*');
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const remoteUsers = data.map(mapUserToClient).filter(Boolean) as any[];
+          // Cập nhật lại cache offline cho thiết bị
+          mockDb.setUsers(remoteUsers);
+
+          // Tìm user theo id hoặc username
+          const validUser = remoteUsers.find(u => 
+            u.id === loggedUser.id || (u.username === loggedUser.username && loggedUser.username !== 'admin')
+          );
+
+          if (!validUser) {
+            // Tài khoản THỰC SỰ đã bị xóa khỏi Supabase
+            return { valid: false, reason: 'deleted' };
+          }
+
+          if (validUser.password && loggedUser.password && validUser.password !== loggedUser.password) {
+            // Mật khẩu THỰC SỰ đã bị Admin đổi trên Supabase
+            return { valid: false, reason: 'password_changed' };
+          }
+
+          // Hợp lệ, trả về user mới nhất từ Supabase (nếu có thông tin mới hơn)
+          return { valid: true, user: validUser };
+        }
+        // Nếu Supabase trả về lỗi hoặc mạng chập chờn: KHÔNG KICK!
+        return { valid: true };
+      } catch (err) {
+        // Mất mạng: KHÔNG KICK!
+        return { valid: true };
+      }
+    }
+
+    return { valid: true };
+  },
+
   async login(username: string, password: string) {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
