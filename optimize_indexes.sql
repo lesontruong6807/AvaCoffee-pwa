@@ -21,10 +21,13 @@ CREATE INDEX IF NOT EXISTS idx_lichsukho_nguyenlieu ON public.lichsukho (id_nguy
 CREATE INDEX IF NOT EXISTS idx_lichsukho_trang_thai ON public.lichsukho (trang_thai);
 
 -- 4. Bảng Chấm công & Nghỉ phép (chamcong, nghiphep)
-CREATE INDEX IF NOT EXISTS idx_chamcong_ngay ON public.chamcong (ngay DESC);
-CREATE INDEX IF NOT EXISTS idx_chamcong_user_ngay ON public.chamcong (id_nhan_vien, ngay DESC);
+CREATE INDEX IF NOT EXISTS idx_chamcong_gio_vao ON public.chamcong (gio_vao DESC);
+CREATE INDEX IF NOT EXISTS idx_chamcong_user_gio_vao ON public.chamcong (id_nhan_vien, gio_vao DESC);
+CREATE INDEX IF NOT EXISTS idx_chamcong_trang_thai ON public.chamcong (trang_thai);
 CREATE INDEX IF NOT EXISTS idx_nghiphep_trang_thai ON public.nghiphep (trang_thai);
+CREATE INDEX IF NOT EXISTS idx_nghiphep_nhan_vien ON public.nghiphep (id_nhan_vien, ngay_nop DESC);
 
 -- 5. Bảng Công thức (congthuc) & Sản phẩm (sanpham)
 CREATE INDEX IF NOT EXISTS idx_congthuc_sanpham ON public.congthuc (id_san_pham);
+CREATE INDEX IF NOT EXISTS idx_congthuc_nguyenlieu ON public.congthuc (id_nguyen_lieu);
 CREATE INDEX IF NOT EXISTS idx_sanpham_danhmuc ON public.sanpham (id_danh_muc);
