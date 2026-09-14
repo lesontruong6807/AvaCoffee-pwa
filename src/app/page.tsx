@@ -61,17 +61,17 @@ export default function Home() {
       try {
         const isAdmin = user && user.role === 'Admin';
 
-        // Tải toàn bộ dữ liệu bàn, đơn, chấm công, nghỉ phép và kho hàng
-        const [tables, orders, logs, leaves, invLogs] = await Promise.all([
+        // Tải dữ liệu bàn, đơn chưa thanh toán, chấm công, nghỉ phép và kho hàng (tối ưu hóa siêu nhẹ)
+        const [tables, unpaidOrders, logs, leaves, pendingInvLogs] = await Promise.all([
           db.getTables(),
-          db.getOrders(),
+          db.getUnpaidOrders(),
           db.getTimeLogs(),
           db.getLeaveRequests(),
-          db.getInventoryLogs()
+          db.getPendingInventoryLogs()
         ]);
 
         const serving = tables.filter((t: any) => t.status === 'Đang phục vụ').length;
-        const unpaid = orders.filter((o: any) => o.payment_status === 'Chưa thanh toán').length;
+        const unpaid = (unpaidOrders || []).length;
         
         let pendingTime = 0;
         let pendingLeave = 0;
@@ -81,12 +81,12 @@ export default function Home() {
           // Admin: Xem tổng số lượng yêu cầu đang chờ phê duyệt của toàn hệ thống
           pendingTime = (logs || []).filter((l: any) => l.status === 'Chờ duyệt').length;
           pendingLeave = (leaves || []).filter((r: any) => r.status === 'Chờ duyệt').length;
-          pendingInv = (invLogs || []).filter((r: any) => r.status === 'Chờ duyệt').length;
+          pendingInv = (pendingInvLogs || []).length;
         } else if (user) {
           // Nhân viên: Chỉ đếm các đơn của MÌNH nộp đang chờ duyệt
           pendingTime = (logs || []).filter((l: any) => l.user_id === user.id && l.status === 'Chờ duyệt').length;
           pendingLeave = (leaves || []).filter((r: any) => r.user_id === user.id && r.status === 'Chờ duyệt').length;
-          pendingInv = (invLogs || []).filter((r: any) => r.staff_id === user.id && r.status === 'Chờ duyệt').length;
+          pendingInv = (pendingInvLogs || []).filter((r: any) => r.staff_id === user.id).length;
         }
 
         const newStats = {

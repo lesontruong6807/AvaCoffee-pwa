@@ -126,9 +126,13 @@ export default function PaymentPage() {
       loadOrders(true);
     });
 
-    // 2. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại
+    // 2. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại (có throttle chống spam)
+    let lastWakeup = 0;
     const handleWakeup = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastWakeup < 2500) return;
+        lastWakeup = now;
         loadOrders(true);
       }
     };

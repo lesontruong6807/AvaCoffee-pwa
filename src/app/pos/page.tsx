@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
 import { 
@@ -97,42 +97,44 @@ export default function PosPage() {
       let cachedCategories = null;
       let cachedProducts = null;
       let cachedUnpaid = null;
+      const todayDateKey = new Date().toLocaleDateString('en-CA');
       
       try {
         const storedTables = localStorage.getItem('ava_pos_cache_tables');
         const storedCategories = localStorage.getItem('ava_pos_cache_categories');
         const storedProducts = localStorage.getItem('ava_pos_cache_products');
         const storedUnpaid = localStorage.getItem('ava_pos_cache_unpaid');
+        const storedYest = localStorage.getItem(`ava_pos_yest_sales_${todayDateKey}`);
         
         if (storedTables) cachedTables = JSON.parse(storedTables);
         if (storedCategories) cachedCategories = JSON.parse(storedCategories);
         if (storedProducts) cachedProducts = JSON.parse(storedProducts);
         if (storedUnpaid) cachedUnpaid = JSON.parse(storedUnpaid);
+        if (storedYest) setYesterdaySales(JSON.parse(storedYest));
         
         if (cachedTables && cachedCategories && cachedProducts) {
           setTables(cachedTables);
           setCategories(cachedCategories);
           setProducts(cachedProducts);
           if (cachedUnpaid) setUnpaidOrders(cachedUnpaid);
-          setLoading(false); // Hiển thị UI ngay lập tức
+          setLoading(false); // Hiển thị UI ngay lập tức trong 0ms
         }
       } catch (cacheErr) {
         console.warn('Lỗi đọc cache POS:', cacheErr);
       }
 
       try {
-        const [tablesData, categoriesData, productsData, yestSalesData, unpaidData] = await Promise.all([
+        // Tải 4 thực thể chính siêu tốc (không bị nghẽn bởi truy vấn doanh số hôm qua)
+        const [tablesData, categoriesData, productsData, unpaidData] = await Promise.all([
           db.getTables(),
           db.getCategories(),
           db.getProducts(),
-          db.getYesterdayProductSales(),
           db.getUnpaidOrders()
         ]);
         
         setTables(tablesData);
         setCategories(categoriesData);
         setProducts(productsData);
-        setYesterdaySales(yestSalesData);
         setUnpaidOrders(unpaidData);
         
         // Lưu lại cache mới nhất
@@ -143,6 +145,19 @@ export default function PosPage() {
           localStorage.setItem('ava_pos_cache_unpaid', JSON.stringify(unpaidData));
         } catch (saveErr) {
           console.warn('Lỗi lưu cache POS:', saveErr);
+        }
+
+        // Tải doanh số hôm qua trong nền (không chặn UI) nếu hôm nay chưa có cache
+        const cachedYest = localStorage.getItem(`ava_pos_yest_sales_${todayDateKey}`);
+        if (!cachedYest) {
+          db.getYesterdayProductSales().then(yestSalesData => {
+            if (yestSalesData) {
+              setYesterdaySales(yestSalesData);
+              try {
+                localStorage.setItem(`ava_pos_yest_sales_${todayDateKey}`, JSON.stringify(yestSalesData));
+              } catch (_) {}
+            }
+          }).catch(err => console.warn('Lỗi tải doanh số hôm qua:', err));
         }
       } catch (error) {
         console.error('Lỗi khi tải dữ liệu POS từ server:', error);
@@ -158,9 +173,13 @@ export default function PosPage() {
       refreshTables();
     });
 
-    // 3. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại
+    // 3. Tự động kiểm tra & đồng bộ khi mở sáng màn hình / kết nối mạng lại (có throttle chống spam)
+    let lastRefresh = 0;
     const handleWakeup = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastRefresh < 2500) return;
+        lastRefresh = now;
         refreshTables();
       }
     };
@@ -429,42 +448,44 @@ export default function PosPage() {
 
   // --- RENDERS ---
 
-  // Lọc và sắp xếp sản phẩm (Ưu tiên bán chạy hôm qua -> Thứ tự nhóm món -> Tên món)
-  const filteredProducts = products
-    .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      // 1. Ưu tiên 1: Số lượng bán ra ngày hôm qua (giảm dần)
-      const salesA = yesterdaySales[a.id] || 0;
-      const salesB = yesterdaySales[b.id] || 0;
-      if (salesB !== salesA) {
-        return salesB - salesA;
-      }
+  // Lọc và sắp xếp sản phẩm (Memoized tối ưu không lag khi gõ tìm kiếm hay chọn món)
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter(product => {
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
+        return matchesSearch && matchesCategory;
+      })
+      .sort((a, b) => {
+        // 1. Ưu tiên 1: Số lượng bán ra ngày hôm qua (giảm dần)
+        const salesA = yesterdaySales[a.id] || 0;
+        const salesB = yesterdaySales[b.id] || 0;
+        if (salesB !== salesA) {
+          return salesB - salesA;
+        }
 
-      // 2. Ưu tiên 2: Thứ tự nhóm món (Cà phê -> Trà -> Yaourt -> Khác -> Soda -> Nước ngọt -> Món ăn)
-      const categorySortOrder: { [key: string]: number } = {
-        'c_caphe': 1,
-        'c_tra': 2,
-        'c_yaourt': 3,
-        'c_douongkhac': 4,
-        'c_soda': 5,
-        'c_sualac': 6,
-        'c_nuocngot': 7,
-        'c_topping': 8,
-        'c_monan': 9
-      };
-      const orderA = categorySortOrder[a.category_id] || 99;
-      const orderB = categorySortOrder[b.category_id] || 99;
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
+        // 2. Ưu tiên 2: Thứ tự nhóm món (Cà phê -> Trà -> Yaourt -> Khác -> Soda -> Nước ngọt -> Món ăn)
+        const categorySortOrder: { [key: string]: number } = {
+          'c_caphe': 1,
+          'c_tra': 2,
+          'c_yaourt': 3,
+          'c_douongkhac': 4,
+          'c_soda': 5,
+          'c_sualac': 6,
+          'c_nuocngot': 7,
+          'c_topping': 8,
+          'c_monan': 9
+        };
+        const orderA = categorySortOrder[a.category_id] || 99;
+        const orderB = categorySortOrder[b.category_id] || 99;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
 
-      // 3. Ưu tiên 3: Tên món theo bảng chữ cái tiếng Việt
-      return a.name.localeCompare(b.name, 'vi');
-    });
+        // 3. Ưu tiên 3: Tên món theo bảng chữ cái tiếng Việt
+        return a.name.localeCompare(b.name, 'vi');
+      });
+  }, [products, searchTerm, selectedCategoryId, yesterdaySales]);
 
   return (
     <div className="w-full space-y-6">
@@ -686,6 +707,8 @@ export default function PosPage() {
                         <img
                           src={prod.image_url}
                           alt={prod.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = '/logo.jpg';

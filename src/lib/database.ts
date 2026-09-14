@@ -54,6 +54,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 // Cache variables for performance optimization
+let cachedTables: any[] | null = null;
 let cachedCategories: any[] | null = null;
 let cachedProducts: any[] | null = null;
 let cachedRecipes: any[] | null = null;
@@ -75,6 +76,7 @@ function getSharedRealtimeChannel() {
     // 1. Lắng nghe phát sóng từ các thiết bị khác (Broadcast - siêu nhanh ~20ms, không phụ thuộc Postgres publication)
     sharedRealtimeChannel
       .on('broadcast', { event: 'table_update' }, (payload: any) => {
+        cachedTables = null;
         realtimeListeners['table_update']?.forEach(fn => {
           try { fn(payload); } catch (e) { console.error(e); }
         });
@@ -102,6 +104,7 @@ function getSharedRealtimeChannel() {
       })
       // 2. Lắng nghe thay đổi trực tiếp từ Postgres DB (Postgres Changes)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'danhsachban' }, (payload: any) => {
+        cachedTables = null;
         realtimeListeners['table_update']?.forEach(fn => {
           try { fn(payload); } catch (e) { console.error(e); }
         });
@@ -1278,15 +1281,21 @@ export const db = {
   },
 
   // --- TABLES (danhsachban) ---
-  async getTables() {
+  async getTables(forceFresh = false) {
+    if (cachedTables && !forceFresh) return cachedTables;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('danhsachban').select('*');
-      if (!error && data) return data.map(mapTableToClient).filter(Boolean).sort((a: any, b: any) => a.table_name.localeCompare(b.table_name)) as any[];
+      if (!error && data) {
+        cachedTables = data.map(mapTableToClient).filter(Boolean).sort((a: any, b: any) => a.table_name.localeCompare(b.table_name)) as any[];
+        mockDb.setTables(cachedTables);
+        return cachedTables;
+      }
     }
     return mockDb.getTables().sort((a, b) => a.table_name.localeCompare(b.table_name));
   },
 
   async updateTableStatus(id: string, status: 'Trống' | 'Đang phục vụ') {
+    cachedTables = null;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('danhsachban').update({ trang_thai: status }).eq('id', id).select();
       if (!error && data) return mapTableToClient(data[0]);
@@ -1929,17 +1938,13 @@ export const db = {
         return mapOrderToClient(order);
       }
 
-      // 2. Trừ kho nguyên liệu (Đồng bộ đảm bảo nhất quán số liệu kho)
-      if (items && items.length > 0) {
-        const cartItems = items.map(item => ({ product_id: item.idsp, quantity: item.so_luong }));
-        try {
-          await this.deductStockFromOrder(cartItems);
-        } catch (err) {
-          console.error('Lỗi khấu trừ kho khi thanh toán:', err);
-        }
-      }
+      // 2. Tối ưu siêu tốc: Chạy song song cập nhật hóa đơn, trả bàn và khấu trừ kho cùng một lúc
+      cachedTables = null;
+      const stockDeductionPromise = (items && items.length > 0)
+        ? this.deductStockFromOrder(items.map(item => ({ product_id: item.idsp, quantity: item.so_luong })))
+            .catch(err => console.error('Lỗi khấu trừ kho khi thanh toán:', err))
+        : Promise.resolve();
 
-      // 3. Song song: cập nhật trạng thái thanh toán + cập nhật trạng thái bàn cùng lúc
       const updatePromises: any[] = [
         supabase
           .from('hoadon')
@@ -1950,13 +1955,12 @@ export const db = {
           })
           .eq('id', orderId)
           .select()
-          .single()
+          .single(),
+        order?.id_ban
+          ? supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban)
+          : Promise.resolve(),
+        stockDeductionPromise
       ];
-      if (order?.id_ban) {
-        updatePromises.push(
-          supabase.from('danhsachban').update({ trang_thai: 'Trống' }).eq('id', order.id_ban)
-        );
-      }
       const [payResult] = await Promise.all(updatePromises);
       if (!payResult.error && payResult.data) {
         broadcastRealtimeEvent('order_update');
@@ -2801,6 +2805,25 @@ export const db = {
         ingredient_unit: r.unit || (ing ? ing.unit : '')
       };
     });
+  },
+
+  async getPendingInventoryLogs() {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('lichsukho')
+        .select('id, id_nguyen_lieu, id_nhan_vien, trang_thai, loai_giao_dich')
+        .eq('trang_thai', 'Chờ duyệt');
+      if (!error && data) {
+        return data.map(log => ({
+          id: log.id,
+          ingredient_id: log.id_nguyen_lieu,
+          staff_id: log.id_nhan_vien,
+          status: log.trang_thai,
+          type: log.loai_giao_dich
+        }));
+      }
+    }
+    return mockDb.getInventoryLogs().filter(l => l.status === 'Chờ duyệt');
   },
 
   async getInventoryLogs() {
