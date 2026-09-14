@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
 import { 
@@ -448,44 +448,42 @@ export default function PosPage() {
 
   // --- RENDERS ---
 
-  // Lọc và sắp xếp sản phẩm (Memoized tối ưu không lag khi gõ tìm kiếm hay chọn món)
-  const filteredProducts = useMemo(() => {
-    return products
-      .filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
-        return matchesSearch && matchesCategory;
-      })
-      .sort((a, b) => {
-        // 1. Ưu tiên 1: Số lượng bán ra ngày hôm qua (giảm dần)
-        const salesA = yesterdaySales[a.id] || 0;
-        const salesB = yesterdaySales[b.id] || 0;
-        if (salesB !== salesA) {
-          return salesB - salesA;
-        }
+  // Lọc và sắp xếp sản phẩm (Ưu tiên bán chạy hôm qua -> Thứ tự nhóm món -> Tên món)
+  const filteredProducts = products
+    .filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategoryId === 'all' || product.category_id === selectedCategoryId;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      // 1. Ưu tiên 1: Số lượng bán ra ngày hôm qua (giảm dần)
+      const salesA = yesterdaySales[a.id] || 0;
+      const salesB = yesterdaySales[b.id] || 0;
+      if (salesB !== salesA) {
+        return salesB - salesA;
+      }
 
-        // 2. Ưu tiên 2: Thứ tự nhóm món (Cà phê -> Trà -> Yaourt -> Khác -> Soda -> Nước ngọt -> Món ăn)
-        const categorySortOrder: { [key: string]: number } = {
-          'c_caphe': 1,
-          'c_tra': 2,
-          'c_yaourt': 3,
-          'c_douongkhac': 4,
-          'c_soda': 5,
-          'c_sualac': 6,
-          'c_nuocngot': 7,
-          'c_topping': 8,
-          'c_monan': 9
-        };
-        const orderA = categorySortOrder[a.category_id] || 99;
-        const orderB = categorySortOrder[b.category_id] || 99;
-        if (orderA !== orderB) {
-          return orderA - orderB;
-        }
+      // 2. Ưu tiên 2: Thứ tự nhóm món (Cà phê -> Trà -> Yaourt -> Khác -> Soda -> Nước ngọt -> Món ăn)
+      const categorySortOrder: { [key: string]: number } = {
+        'c_caphe': 1,
+        'c_tra': 2,
+        'c_yaourt': 3,
+        'c_douongkhac': 4,
+        'c_soda': 5,
+        'c_sualac': 6,
+        'c_nuocngot': 7,
+        'c_topping': 8,
+        'c_monan': 9
+      };
+      const orderA = categorySortOrder[a.category_id] || 99;
+      const orderB = categorySortOrder[b.category_id] || 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
 
-        // 3. Ưu tiên 3: Tên món theo bảng chữ cái tiếng Việt
-        return a.name.localeCompare(b.name, 'vi');
-      });
-  }, [products, searchTerm, selectedCategoryId, yesterdaySales]);
+      // 3. Ưu tiên 3: Tên món theo bảng chữ cái tiếng Việt
+      return a.name.localeCompare(b.name, 'vi');
+    });
 
   return (
     <div className="w-full space-y-6">

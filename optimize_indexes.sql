@@ -1,9 +1,3 @@
--- =====================================================================
--- BỘ CHỈ MỤC TỐI ƯU HÓA SIÊU TỐC ĐỘ (INDEXES) CHO AVA COFFEE HÓC MÔN
--- Giúp tăng tốc độ truy vấn hóa đơn, chi tiết món và kho hàng gấp 5 - 10 lần
--- Bạn chỉ cần copy toàn bộ nội dung file này dán vào SQL Editor trên Supabase và nhấn RUN.
--- =====================================================================
-
 -- 1. Bảng Hóa đơn (hoadon) - Tối ưu POS, Trang chủ, Thanh toán và Báo cáo ca
 CREATE INDEX IF NOT EXISTS idx_hoadon_trang_thai_ngay ON public.hoadon (trang_thai_thanh_toan, ngay_tao DESC);
 CREATE INDEX IF NOT EXISTS idx_hoadon_ban_chua_tt ON public.hoadon (id_ban, trang_thai_thanh_toan);
