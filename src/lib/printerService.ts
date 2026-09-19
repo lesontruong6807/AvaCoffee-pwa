@@ -18,8 +18,21 @@ export function removeDiacritics(str: string): string {
     .replace(/[^ -~]/g, ''); // Keep only basic printable ASCII characters (space to tilde)
 }
 
+// Cấu hình chiều rộng chuẩn cho máy in nhiệt K80/K58 (40 ký tự giúp không bị tràn lề)
+export const RECEIPT_WIDTH = 40;
+
+// Helper to format receipt time in short format (e.g. "19:30 19/09")
+export function formatShortReceiptTime(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const d = pad(date.getDate());
+  const m = pad(date.getMonth() + 1);
+  const h = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `${h}:${min} ${d}/${m}`;
+}
+
 // Helper to format a single line row with left-aligned and right-aligned text
-export function formatRow(left: string, right: string, totalWidth: number = 48): string {
+export function formatRow(left: string, right: string, totalWidth: number = RECEIPT_WIDTH): string {
   const leftClean = removeDiacritics(left);
   const rightClean = removeDiacritics(right);
   const leftLen = leftClean.length;
@@ -125,13 +138,14 @@ export interface OrderData {
   notes?: string;
 }
 
-// Build standard K80 format ESC/POS receipt data
+// Build compact, paper-saving ESC/POS receipt data (Tiết kiệm tối đa giấy in)
 export function buildReceiptBytes(orderData: OrderData, settings?: Partial<StoreSettings>): Uint8Array {
   const builder = new EscPosBuilder();
-  const now = new Date().toLocaleString('vi-VN');
+  const timeFormatted = formatShortReceiptTime(new Date());
   const storeName = settings?.store_name || 'AVA COFFEE';
+  const divider = '-'.repeat(RECEIPT_WIDTH);
 
-  // Header
+  // 1. Header quán (Gọn gàng, không feed dòng trống)
   builder.alignCenter()
     .fontSizeDouble()
     .bold(true)
@@ -139,80 +153,73 @@ export function buildReceiptBytes(orderData: OrderData, settings?: Partial<Store
     .fontSizeNormal()
     .bold(false);
 
-  if (settings?.store_address) {
-    builder.line(removeDiacritics(settings.store_address));
-  }
-  if (settings?.store_phone) {
-    builder.line(`Hotline: ${settings.store_phone}`);
+  const contactList: string[] = [];
+  if (settings?.store_address) contactList.push(removeDiacritics(settings.store_address));
+  if (settings?.store_phone) contactList.push(`Hotline: ${settings.store_phone}`);
+  if (contactList.length > 0) {
+    builder.line(contactList.join(' - '));
   }
 
-  builder.line('------------------------------------------------') // 48 chars
-    .feed(1);
+  builder.line(divider);
 
-  // Table & Order Info
+  // 2. Thông tin Bàn & Giờ (Gộp chung 1 dòng để tiết kiệm giấy)
   builder.alignLeft()
-    .fontSizeDouble()
     .bold(true)
-    .line(`BAN: ${orderData.tableName.toUpperCase()}`)
-    .fontSizeNormal()
-    .bold(false)
-    .line(`Thoi gian: ${now}`);
+    .line(formatRow(`BAN: ${orderData.tableName.toUpperCase()}`, timeFormatted, RECEIPT_WIDTH))
+    .bold(false);
 
-  if (orderData.notes) {
-    builder.line(`Ghi chu: ${removeDiacritics(orderData.notes)}`);
+  if (orderData.notes && orderData.notes.trim()) {
+    builder.line(`Ghi chu: ${removeDiacritics(orderData.notes.trim())}`);
   }
 
-  builder.line('------------------------------------------------');
+  builder.line(divider);
 
-  // Items Header
-  builder.bold(true)
-    .line(formatRow('Ten mon / Don gia', 'SL / T.Tien'))
-    .bold(false)
-    .line('------------------------------------------------');
-
-  // Items List
+  // 3. Danh sách món (Gộp 1 dòng cho mỗi món để tiết kiệm 50% giấy)
   orderData.items.forEach((item, index) => {
-    // Row 1: Name of the item
-    builder.bold(true)
-      .line(`${index + 1}. ${item.name}`)
-      .bold(false);
-    
-    // Row 2: Details (e.g. "   2 x 25.000                     50.000đ")
-    const priceStr = `${item.price.toLocaleString('vi-VN')}d`;
-    const detailsLeft = `   ${item.quantity} x ${priceStr}`;
+    const qtyStr = item.quantity > 1 ? ` x${item.quantity}` : '';
+    const nameWithQty = `${index + 1}. ${item.name}${qtyStr}`;
     const subtotalStr = `${item.subtotal.toLocaleString('vi-VN')}d`;
-    builder.line(formatRow(detailsLeft, subtotalStr));
+
+    // Nếu tên món vừa vặn trên 1 dòng
+    if (removeDiacritics(nameWithQty).length + subtotalStr.length + 1 <= RECEIPT_WIDTH) {
+      builder.line(formatRow(nameWithQty, subtotalStr, RECEIPT_WIDTH));
+    } else {
+      // Tên món quá dài: Dòng 1 tên món, Dòng 2 số lượng + thành tiền
+      builder.line(`${index + 1}. ${item.name}`);
+      const detailLeft = item.quantity > 1 
+        ? `   x${item.quantity} (${Math.round(item.price / 1000)}k)`
+        : `   x1`;
+      builder.line(formatRow(detailLeft, subtotalStr, RECEIPT_WIDTH));
+    }
   });
 
-  builder.line('------------------------------------------------');
+  builder.line(divider);
 
-  // Totals
-  const totalItemsAmount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0);
-  builder.line(formatRow('Tong tien mon:', `${totalItemsAmount.toLocaleString('vi-VN')}d`));
-  
+  // 4. Tổng tiền (Chỉ in các dòng thực sự cần thiết)
   if (orderData.discount > 0) {
-    builder.line(formatRow('Giam gia:', `-${orderData.discount.toLocaleString('vi-VN')}d`));
+    const totalItemsAmount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0);
+    builder.line(formatRow('Tien mon:', `${totalItemsAmount.toLocaleString('vi-VN')}d`, RECEIPT_WIDTH));
+    builder.line(formatRow('Giam gia:', `-${orderData.discount.toLocaleString('vi-VN')}d`, RECEIPT_WIDTH));
   }
 
+  // Dòng Tổng cộng in đậm nổi bật
   builder.bold(true)
-    .line(formatRow('TONG THANH TOAN:', `${orderData.totalAmount.toLocaleString('vi-VN')}d`))
+    .line(formatRow('TONG CONG:', `${orderData.totalAmount.toLocaleString('vi-VN')}d`, RECEIPT_WIDTH))
     .bold(false)
-    .line('------------------------------------------------')
-    .feed(1);
+    .line(divider);
 
-  // Footer
-  builder.alignCenter().bold(true);
-  if (settings?.bill_footer) {
+  // 5. Chân trang (1 dòng ngắn gọn, feed 2 dòng vừa khít dao cắt)
+  builder.alignCenter();
+  if (settings?.bill_footer && settings.bill_footer.trim()) {
     const lines = settings.bill_footer.split('\n');
     lines.forEach(l => {
       if (l.trim()) builder.line(removeDiacritics(l.trim()));
     });
   } else {
-    builder.line('AVA COFFEE XIN CAM ON !')
-      .line('CHUC QUY KHACH NGON MIENG');
+    builder.line('XIN CAM ON VA HEN GAP LAI!');
   }
-  builder.bold(false)
-    .feed(4) // Feed 4 lines before cutting to clear the print head
+
+  builder.feed(2) // Chỉ feed 2 dòng vừa tới lưỡi dao cắt thay vì 4 dòng
     .cut();
 
   return builder.getBuffer();
@@ -289,28 +296,25 @@ export async function printTestTicket(settings?: Partial<StoreSettings>): Promis
   const targetPort = Number(currentSettings.printer_port || 9100);
 
   const builder = new EscPosBuilder();
+  const divider = '-'.repeat(RECEIPT_WIDTH);
   builder.alignCenter()
     .fontSizeDouble()
     .bold(true)
     .line(removeDiacritics(currentSettings.store_name || 'AVA COFFEE'))
     .fontSizeNormal()
     .bold(false)
-    .line('------------------------------------------------')
-    .feed(1)
+    .line(divider)
     .bold(true)
-    .line('*** KIEM TRA KET NOI MAY IN ***')
+    .line('*** TEST KET NOI MAY IN ***')
     .bold(false)
-    .line(`Dia chi IP : ${targetIP}`)
-    .line(`Cong Port  : ${targetPort}`)
-    .line(`Thoi gian  : ${new Date().toLocaleString('vi-VN')}`)
-    .feed(1)
-    .line('------------------------------------------------')
+    .line(`IP: ${targetIP}  Port: ${targetPort}`)
+    .line(`Gio: ${formatShortReceiptTime(new Date())}`)
+    .line(divider)
     .bold(true)
-    .line('KET NOI MAY IN THANH CONG 100% !')
-    .line('SAN SANG IN BILL CHO KHACH HANG')
+    .line('KET NOI THANH CONG 100%!')
     .bold(false)
-    .line('------------------------------------------------')
-    .feed(4)
+    .line(divider)
+    .feed(2)
     .cut();
 
   const payload = builder.getBuffer();

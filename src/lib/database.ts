@@ -1580,11 +1580,27 @@ export const db = {
     cachedProducts = null;
     cachedRecipes = null;
     if (isSupabaseConfigured && supabase) {
+      // Kiểm tra xem sản phẩm đã từng phát sinh trong hóa đơn bán hàng nào chưa
+      const { data: pastOrders } = await supabase
+        .from('hoadondetail')
+        .select('id')
+        .eq('idsp', id)
+        .limit(1);
+
+      if (pastOrders && pastOrders.length > 0) {
+        throw new Error('Món ăn này đã từng có hóa đơn bán hàng trong lịch sử. Để bảo toàn dữ liệu báo cáo và hóa đơn cũ, vui lòng chuyển trạng thái sang "Hết hàng" thay vì xóa vĩnh viễn món!');
+      }
+
       const { error } = await supabase.from('sanpham').delete().eq('id', id);
-      if (!error) return true;
+      if (error) {
+        throw new Error(`Lỗi khi xóa món ăn: ${error.message}`);
+      }
+      broadcastRealtimeEvent('order_update');
+      return true;
     }
     const products = mockDb.getProducts();
     mockDb.setProducts(products.filter(p => p.id !== id));
+    broadcastRealtimeEvent('order_update');
     return true;
   },
 
@@ -1615,13 +1631,13 @@ export const db = {
     calculatedCost = Math.round(calculatedCost);
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Tạo sản phẩm
+      // 1. Tạo sản phẩm (dùng chính xác cột don_gia trong schema CSDL)
       const { data: newProd, error: prodErr } = await supabase
         .from('sanpham')
         .insert([{
           id: prodId,
           ten_san_pham: productData.name.trim(),
-          gia_ban: Number(productData.price),
+          don_gia: Number(productData.price),
           gia_von: calculatedCost,
           id_danh_muc: productData.category_id,
           hinh_anh: productData.image_url || '/logo.jpg',
@@ -1711,12 +1727,12 @@ export const db = {
     calculatedCost = Math.round(calculatedCost);
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Cập nhật thông tin món
+      // 1. Cập nhật thông tin món (dùng chính xác cột don_gia trong schema CSDL)
       const { data: updatedProd, error: prodErr } = await supabase
         .from('sanpham')
         .update({
           ten_san_pham: productData.name.trim(),
-          gia_ban: Number(productData.price),
+          don_gia: Number(productData.price),
           gia_von: calculatedCost,
           id_danh_muc: productData.category_id,
           hinh_anh: productData.image_url || '/logo.jpg',

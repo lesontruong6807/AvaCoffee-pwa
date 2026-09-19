@@ -299,3 +299,13 @@ CREATE INDEX IF NOT EXISTS idx_nghiphep_nhan_vien ON public.nghiphep (id_nhan_vi
 CREATE INDEX IF NOT EXISTS idx_congthuc_sanpham ON public.congthuc (id_san_pham);
 CREATE INDEX IF NOT EXISTS idx_congthuc_nguyenlieu ON public.congthuc (id_nguyen_lieu);
 CREATE INDEX IF NOT EXISTS idx_sanpham_danhmuc ON public.sanpham (id_danh_muc);
+
+-- 15. BẢNG CẤU HÌNH HỆ THỐNG & MÁY IN
+CREATE TABLE IF NOT EXISTS public.cauhinh (
+    id TEXT PRIMARY KEY,
+    khoa TEXT UNIQUE NOT NULL,
+    gia_tri TEXT NOT NULL,
+    ngay_cap_nhat TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+ALTER TABLE public.cauhinh ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all cauhinh" ON public.cauhinh FOR ALL USING (true) WITH CHECK (true);
