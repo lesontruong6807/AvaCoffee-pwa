@@ -144,6 +144,27 @@ export default function LeaveRequestPage() {
             {/* Lý do */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-coffee-medium uppercase">Lý do xin nghỉ</label>
+              <div className="flex flex-wrap gap-1.5 pb-1">
+                {[
+                  'Bận việc gia đình / Việc riêng',
+                  'Đi khám sức khỏe / Bị ốm',
+                  'Vướng lịch học / Thi cử',
+                  'Về quê / Có việc đột xuất'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setReason(preset)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                      reason === preset
+                        ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                        : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}

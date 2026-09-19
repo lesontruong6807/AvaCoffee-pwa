@@ -954,6 +954,27 @@ export default function InventoryPage() {
                 <label className="text-xs font-bold text-coffee-medium uppercase">
                   Ghi chú {selectedIngId === 'other' ? '(Bắt buộc)' : '(Không bắt buộc)'}
                 </label>
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {[
+                    'Mua nước đá giao hàng ca',
+                    'Mua lẻ siêu thị / Tạp hóa',
+                    'Nhập bổ sung khẩn cấp',
+                    'Nhà cung cấp giao hàng mới'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setRestockNote(preset)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                        restockNote === preset
+                          ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                          : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   placeholder={selectedIngId === 'other' ? "Ví dụ: 2 bao nước đá..." : "Ví dụ: Mua lẻ siêu thị, vừa giao hàng..."}
@@ -1079,6 +1100,27 @@ export default function InventoryPage() {
               {/* Ghi chú lý do */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-coffee-medium uppercase">Lý do chênh lệch (Bắt buộc)</label>
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {[
+                    'Kiểm kê định kỳ cuối ca/tuần',
+                    'Hao hụt / Đổ vỡ khi pha chế',
+                    'Nguyên liệu hỏng / Hết hạn',
+                    'Nhập thiếu / Sai sót số liệu'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setStocktakeNote(preset)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                        stocktakeNote === preset
+                          ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                          : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   placeholder="Ví dụ: Kiểm kho cuối tuần, đổ vỡ nguyên liệu, hư hỏng..."

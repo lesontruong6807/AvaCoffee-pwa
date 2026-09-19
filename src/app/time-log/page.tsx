@@ -708,6 +708,27 @@ export default function TimeLogPage() {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-coffee-medium uppercase block">Lý do chỉnh sửa giờ (Bắt buộc)</label>
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {[
+                    'Quên bấm chấm công khi vào ca',
+                    'Quên bấm chấm công khi ra ca',
+                    'Mất mạng / Thiết bị gặp sự cố',
+                    'Đổi ca trực với đồng nghiệp'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditReason(preset)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                        editReason === preset
+                          ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                          : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   placeholder="Ví dụ: quên bấm chấm công đúng giờ, ghi nhận sai giờ..."

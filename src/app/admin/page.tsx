@@ -1599,7 +1599,11 @@ export default function AdminPage() {
     return notes.includes('[Chờ duyệt hủy]') && !notes.includes('[Admin đã duyệt hủy]') && !notes.includes('[Admin từ chối hủy]');
   };
 
+  const pendingTimeLogs = timeLogs.filter(l => l.status === 'Chờ duyệt');
+  const pendingLeaveRequests = leaveRequests.filter(r => r.status === 'Chờ duyệt');
+  const pendingInventoryLogs = inventoryLogs.filter(l => l.status === 'Chờ duyệt' && !l.note?.includes('hủy đơn'));
   const pendingCancelOrders = orders.filter(isOrderPendingCancel);
+  const totalPendingCount = pendingTimeLogs.length + pendingLeaveRequests.length + pendingInventoryLogs.length + pendingCancelOrders.length;
 
   return (
     <div className="space-y-6">
@@ -1622,9 +1626,9 @@ export default function AdminPage() {
         >
           <Clock className="w-4.5 h-4.5" />
           <span>Duyệt yêu cầu</span>
-          {pendingCancelOrders.length > 0 && (
+          {totalPendingCount > 0 && (
             <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-extrabold animate-pulse">
-              {pendingCancelOrders.length}
+              {totalPendingCount}
             </span>
           )}
         </button>
@@ -1752,27 +1756,42 @@ export default function AdminPage() {
             <div className="flex bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light overflow-x-auto max-w-full gap-1">
               <button
                 onClick={() => setApprovalSubTab('time')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 flex items-center space-x-1.5 ${
                   approvalSubTab === 'time' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
                 }`}
               >
-                Chấm công
+                <span>Chấm công</span>
+                {pendingTimeLogs.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[9px] font-extrabold animate-pulse">
+                    {pendingTimeLogs.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setApprovalSubTab('leave')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 flex items-center space-x-1.5 ${
                   approvalSubTab === 'leave' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
                 }`}
               >
-                Nghỉ phép
+                <span>Nghỉ phép</span>
+                {pendingLeaveRequests.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[9px] font-extrabold animate-pulse">
+                    {pendingLeaveRequests.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setApprovalSubTab('inventory')}
-                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 flex items-center space-x-1.5 ${
                   approvalSubTab === 'inventory' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
                 }`}
               >
-                Duyệt Kho & Kiểm Kho
+                <span>Duyệt Kho & Kiểm Kho</span>
+                {pendingInventoryLogs.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[9px] font-extrabold animate-pulse">
+                    {pendingInventoryLogs.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setApprovalSubTab('order_cancel')}
@@ -4422,8 +4441,29 @@ export default function AdminPage() {
                 </div>
 
                 {/* Ghi chú */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="font-bold text-coffee-medium uppercase">Ghi chú công việc</label>
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {[
+                      'Đông khách đột biến ca trực',
+                      'Trực thay / Hỗ trợ đồng nghiệp',
+                      'Tổng vệ sinh / Sắp xếp quán',
+                      'Chuẩn bị nguyên liệu ngày mai'
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setOtNotes(preset)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                          otNotes === preset
+                            ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                            : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="text"
                     value={otNotes}
