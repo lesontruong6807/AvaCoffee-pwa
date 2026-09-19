@@ -110,7 +110,7 @@ CREATE TABLE public.hoadon (
     id_ban TEXT REFERENCES public.danhsachban(id) ON DELETE SET NULL,
     id_nhan_vien TEXT REFERENCES public.nguoidung(id) ON DELETE SET NULL,
     tong_tien NUMERIC NOT NULL CHECK (tong_tien >= 0) DEFAULT 0,
-    trang_thai_thanh_toan TEXT NOT NULL CHECK (trang_thai_thanh_toan IN ('Chưa thanh toán', 'Đã thanh toán', 'Đã hủy')) DEFAULT 'Chưa thanh toán',
+    trang_thai_thanh_toan TEXT NOT NULL CHECK (trang_thai_thanh_toan IN ('Chưa thanh toán', 'Đã thanh toán', 'Đã hủy', 'Chờ duyệt hủy')) DEFAULT 'Chưa thanh toán',
     phuong_thuc_thanh_toan TEXT CHECK (phuong_thuc_thanh_toan IN ('Tiền mặt', 'Chuyển khoản')),
     giam_gia NUMERIC DEFAULT 0 CHECK (giam_gia >= 0),
     ghi_chu TEXT,

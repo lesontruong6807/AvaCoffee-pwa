@@ -515,11 +515,11 @@ export default function AdminPage() {
         if (pendingIds.length === 0) { toast.info('Không có đơn nghỉ phép nào chờ duyệt.'); return; }
         await db.approveAllLeaveRequests(pendingIds, 'Đã duyệt');
       } else if (approvalSubTab === 'inventory') {
-        const pendingIds = inventoryLogs.filter(l => l.status === 'Chờ duyệt').map(l => l.id);
+        const pendingIds = inventoryLogs.filter(l => l.status === 'Chờ duyệt' && !l.note?.includes('hủy đơn')).map(l => l.id);
         if (pendingIds.length === 0) { toast.info('Không có đơn kho nào chờ duyệt.'); return; }
         await db.approveAllInventoryLogs(pendingIds, 'Đã duyệt');
       } else if (approvalSubTab === 'order_cancel') {
-        const pendingOrders = orders.filter(o => o.payment_status === 'Chờ duyệt hủy' || (o as any).trang_thai_thanh_toan === 'Chờ duyệt hủy');
+        const pendingOrders = orders.filter(isOrderPendingCancel);
         if (pendingOrders.length === 0) { toast.info('Không có đơn hàng nào chờ duyệt hủy.'); return; }
         for (const o of pendingOrders) {
           await db.approveOrderCancellation(o.id, currentUser?.id || 'admin', true);
@@ -1228,6 +1228,8 @@ export default function AdminPage() {
 
   const paidOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
+    const notes = o.notes || (o as any).ghi_chu || '';
+    if (notes.includes('[Chờ duyệt hủy]') && !notes.includes('[Admin từ chối hủy]')) return false;
     const t = new Date(o.created_at).getTime();
     return t >= repStartT && t <= repEndT;
   });
@@ -1590,10 +1592,14 @@ export default function AdminPage() {
     };
   };
 
-  const pendingCancelOrders = orders.filter(o => 
-    o.payment_status === 'Chờ duyệt hủy' || 
-    (o as any).trang_thai_thanh_toan === 'Chờ duyệt hủy'
-  );
+  const isOrderPendingCancel = (o: any) => {
+    const status = o.payment_status || (o as any).trang_thai_thanh_toan;
+    if (status === 'Chờ duyệt hủy') return true;
+    const notes = o.notes || (o as any).ghi_chu || '';
+    return notes.includes('[Chờ duyệt hủy]') && !notes.includes('[Admin đã duyệt hủy]') && !notes.includes('[Admin từ chối hủy]');
+  };
+
+  const pendingCancelOrders = orders.filter(isOrderPendingCancel);
 
   return (
     <div className="space-y-6">
@@ -2002,10 +2008,10 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* DUYỆT NHẬP & KIỂM KHO */}
+          {/* DUYỆT NHẬP & KIỂM KHO (Loại trừ các dòng hoàn kho của đơn hủy) */}
           {approvalSubTab === 'inventory' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {inventoryLogs.filter(l => l.status === 'Chờ duyệt').map((log) => (
+              {inventoryLogs.filter(l => l.status === 'Chờ duyệt' && !l.note?.includes('hủy đơn')).map((log) => (
                 <div key={log.id} className="bg-white rounded-3xl p-6 border border-coffee-light shadow-sm flex flex-col justify-between space-y-4">
                   <div className="flex items-center justify-between border-b border-coffee-light pb-3">
                     <div className="flex items-center space-x-2">
@@ -2064,7 +2070,7 @@ export default function AdminPage() {
                 </div>
               ))}
 
-              {inventoryLogs.filter(l => l.status === 'Chờ duyệt').length === 0 && (
+              {inventoryLogs.filter(l => l.status === 'Chờ duyệt' && !l.note?.includes('hủy đơn')).length === 0 && (
                 <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                   <p className="font-bold">Tuyệt vời! Không còn đơn kho hoặc kiểm kho nào chờ duyệt</p>
@@ -3243,7 +3249,7 @@ export default function AdminPage() {
                 className="px-3 py-2 bg-coffee-primary hover:bg-coffee-dark text-white text-[10px] font-bold rounded-xl transition shadow flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Thêm nguyên liệu</span>
+                <span>Thêm nguyên liệu</span>
               </button>
             </div>
           </div>

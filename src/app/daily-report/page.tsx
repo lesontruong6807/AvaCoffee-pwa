@@ -6,6 +6,14 @@ import { db, getCurrentUser } from '@/lib/database';
 import { toast } from '@/lib/toast';
 import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft, ArrowLeft, X } from 'lucide-react';
 
+const isOrderPendingCancel = (o: any) => {
+  if (!o) return false;
+  const status = o.payment_status || (o as any).trang_thai_thanh_toan;
+  if (status === 'Chờ duyệt hủy') return true;
+  const notes = o.notes || (o as any).ghi_chu || '';
+  return notes.includes('[Chờ duyệt hủy]') && !notes.includes('[Admin đã duyệt hủy]') && !notes.includes('[Admin từ chối hủy]');
+};
+
 export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
@@ -89,17 +97,19 @@ export default function DailyReportPage() {
   };
 
   // 1. Lọc hóa đơn ngày hôm nay (chuẩn hóa múi giờ Việt Nam):
-  // - todayPaidOrders: Chỉ các đơn Đã thanh toán (dùng để tính doanh thu thực tế, tiền két và bán hàng)
+  // - todayPaidOrders: Chỉ các đơn Đã thanh toán hợp lệ (loại trừ ngay đơn đang Chờ duyệt hủy để tiền két và doanh thu khớp 100%)
   // - todayAllOrders: Bao gồm cả đơn Đã thanh toán & đơn Chờ duyệt hủy (dùng để hiển thị danh sách đối soát)
   const todayVn = getVnDate();
   const todayPaidOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
+    if (isOrderPendingCancel(o)) return false;
     return getVnDate(o.created_at) === todayVn;
   });
 
   const todayAllOrders = orders.filter(o => {
-    const isPaidOrPendingCancel = o.payment_status === 'Đã thanh toán' || (o.payment_status as any) === 'Chờ duyệt hủy';
-    if (!isPaidOrPendingCancel) return false;
+    const isPaid = o.payment_status === 'Đã thanh toán';
+    const isPending = isOrderPendingCancel(o);
+    if (!isPaid && !isPending) return false;
     return getVnDate(o.created_at) === todayVn;
   });
 
@@ -596,7 +606,7 @@ function ShiftMetricsSection({ metrics, currentUser, onRefresh }: { metrics: any
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className="font-extrabold text-coffee-primary mr-1">{order.total_amount.toLocaleString('vi-VN')}đ</span>
-                              {order.payment_status === 'Chờ duyệt hủy' ? (
+                              {isOrderPendingCancel(order) ? (
                                 <span className="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-extrabold flex items-center space-x-1">
                                   <span>⏳ Chờ duyệt hủy</span>
                                 </span>

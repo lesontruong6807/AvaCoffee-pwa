@@ -2389,7 +2389,9 @@ export const db = {
   },
 
   // 1. Nhân viên gửi yêu cầu hủy đơn đã thanh toán:
-  // Kho tạm hoàn ngay lập tức (ghi log Chờ duyệt), đơn chuyển trạng thái 'Chờ duyệt hủy'
+  // - Kho được hoàn trả ngay lập tức (ghi log Đã duyệt để không nhảy vào duyệt kho lẻ tẻ)
+  // - Tiền và đơn được trừ ngay lập tức khỏi doanh thu để nhân viên kiểm két & kho khớp 100%
+  // - Hóa đơn được đưa vào danh sách chờ Admin duyệt hủy
   async requestCancelPaidOrder(orderId: string, staffId: string = 'system', reason: string = '') {
     try {
       let items: any[] = [];
@@ -2404,19 +2406,24 @@ export const db = {
           .single();
 
         if (!orderData) throw new Error('Không tìm thấy hóa đơn cần hủy.');
-        if (orderData.trang_thai_thanh_toan === 'Đã hủy') {
-          throw new Error('Hóa đơn này đã bị hủy trước đó.');
-        }
-        if (orderData.trang_thai_thanh_toan === 'Chờ duyệt hủy') {
+        
+        const existingNote = orderData.ghi_chu || '';
+        const isAlreadyPending = orderData.trang_thai_thanh_toan === 'Chờ duyệt hủy' || 
+          (existingNote.includes('[Chờ duyệt hủy]') && !existingNote.includes('[Admin từ chối hủy]') && !existingNote.includes('[Admin đã duyệt hủy]'));
+        
+        if (isAlreadyPending) {
           throw new Error('Hóa đơn này đang trong danh sách chờ Admin phê duyệt hủy.');
         }
+        if (orderData.trang_thai_thanh_toan === 'Đã hủy' && !existingNote.includes('[Chờ duyệt hủy]')) {
+          throw new Error('Hóa đơn này đã bị hủy trước đó.');
+        }
 
-        // Nếu đơn chưa thanh toán -> chỉ xóa đơn và giải phóng bàn (chưa từng trừ kho)
+        // Nếu đơn chưa thanh toán -> chỉ xóa đơn và giải phóng bàn
         if (orderData.trang_thai_thanh_toan !== 'Đã thanh toán') {
           return await this.cancelOrder(orderId);
         }
 
-        // Lấy chi tiết món để hoàn kho
+        // Lấy chi tiết món để hoàn kho ngay lập tức
         const { data: dbItems } = await supabase
           .from('hoadondetail')
           .select('idsp, so_luong')
@@ -2431,8 +2438,10 @@ export const db = {
 
         const updatedNote = [orderData.ghi_chu, `[Chờ duyệt hủy] Lý do: ${cleanReason}`].filter(Boolean).join(' | ');
 
-        // Cập nhật trạng thái hóa đơn thành 'Chờ duyệt hủy'
-        await supabase
+        // Cập nhật trạng thái hóa đơn:
+        // Cố gắng cập nhật 'Chờ duyệt hủy'. Nếu DB có check constraint cũ thì fallback sang 'Đã hủy'
+        // Cả 2 trạng thái đều loại bỏ đơn khỏi 'Đã thanh toán' giúp tiền và hóa đơn thành công lập tức trừ khỏi ca
+        const { error: updateErr } = await supabase
           .from('hoadon')
           .update({
             trang_thai_thanh_toan: 'Chờ duyệt hủy',
@@ -2440,15 +2449,27 @@ export const db = {
           })
           .eq('id', orderId);
 
+        if (updateErr) {
+          await supabase
+            .from('hoadon')
+            .update({
+              trang_thai_thanh_toan: 'Đã hủy',
+              ghi_chu: updatedNote
+            })
+            .eq('id', orderId);
+        }
+
       } else {
         // Mock DB Fallback
         const orders = mockDb.getOrders();
         const targetOrder = orders.find(o => o.id === orderId);
         if (!targetOrder) throw new Error('Không tìm thấy hóa đơn.');
-        if ((targetOrder.payment_status as any) === 'Đã hủy') {
-          throw new Error('Hóa đơn này đã bị hủy trước đó.');
-        }
-        if ((targetOrder.payment_status as any) === 'Chờ duyệt hủy') {
+        
+        const existingNote = targetOrder.notes || '';
+        const isAlreadyPending = (targetOrder.payment_status as any) === 'Chờ duyệt hủy' || 
+          (existingNote.includes('[Chờ duyệt hủy]') && !existingNote.includes('[Admin từ chối hủy]') && !existingNote.includes('[Admin đã duyệt hủy]'));
+
+        if (isAlreadyPending) {
           throw new Error('Hóa đơn này đang chờ Admin phê duyệt hủy.');
         }
         if (targetOrder.payment_status !== 'Đã thanh toán') {
@@ -2466,13 +2487,14 @@ export const db = {
         mockDb.setOrders(orders);
       }
 
-      // Tạm thời hoàn trả kho ngay lập tức, nhưng log kho được gắn trạng thái 'Chờ duyệt'
+      // Hoàn trả nguyên liệu kho ngay lập tức để nhân viên kiểm kho khớp 100%
+      // Đặt status: 'Đã duyệt' để không rơi vào tab "Duyệt Kho & Kiểm Kho" lẻ tẻ
       if (items.length > 0) {
         await this.restoreStockFromOrder(items, {
           orderId,
           staffId,
-          status: 'Chờ duyệt',
-          reason: `[Chờ duyệt hủy đơn #${orderId}] ${cleanReason}`
+          status: 'Đã duyệt',
+          reason: `[Hoàn kho đơn hủy #${orderId}] ${cleanReason}`
         });
       }
 
@@ -2487,9 +2509,9 @@ export const db = {
   },
 
   // 2. Admin Phê duyệt / Từ chối hủy hóa đơn:
-  // - Đồng ý: Giữ nguyên hủy, log kho thành 'Đã duyệt', đơn thành 'Đã hủy'.
-  // - Từ chối: Khôi phục đơn về 'Đã thanh toán' (lấy lại doanh thu đúng khoảng thời gian ban đầu),
-  //   đồng thời thu hồi kho (trừ kho trở lại số lượng đã hoàn) để kho không còn cộng đơn đó nữa.
+  // - Admin chấp nhận hủy: Giữ nguyên như vậy (kho đã cộng, tiền đã trừ), hóa đơn chuyển hẳn sang 'Đã hủy'.
+  // - Admin từ chối hủy: Khôi phục đơn về 'Đã thanh toán' (tiền cộng lại vào ca),
+  //   đồng thời thu hồi kho (trừ kho trở lại) để nguyên liệu trở về như lúc vừa thanh toán xong.
   async approveOrderCancellation(orderId: string, adminId: string, approved: boolean) {
     try {
       if (isSupabaseConfigured && supabase) {
@@ -2503,6 +2525,7 @@ export const db = {
 
         if (approved) {
           // ADMIN ĐỒNG Ý HỦY:
+          // Giữ nguyên (kho đã hoàn và tiền đã trừ), gắn cờ đã duyệt hủy
           const updatedNote = [orderData.ghi_chu, `[Admin đã duyệt hủy]`].filter(Boolean).join(' | ');
           await supabase
             .from('hoadon')
@@ -2512,16 +2535,16 @@ export const db = {
             })
             .eq('id', orderId);
 
-          // Cập nhật các log hoàn kho tạm sang 'Đã duyệt'
+          // Cập nhật tất cả log kho liên quan sang 'Đã duyệt'
           await supabase
             .from('lichsukho')
             .update({ trang_thai: 'Đã duyệt' })
-            .ilike('ghi_chu', `%[Chờ duyệt hủy đơn #${orderId}]%`)
+            .ilike('ghi_chu', `%hủy đơn #${orderId}%`)
             .eq('trang_thai', 'Chờ duyệt');
 
         } else {
           // ADMIN TỪ CHỐI HỦY:
-          // 1. Khôi phục đơn về 'Đã thanh toán'
+          // 1. Khôi phục đơn về 'Đã thanh toán' (Doanh thu & tiền két tự động cộng lại đúng như ban đầu)
           const updatedNote = [orderData.ghi_chu, `[Admin từ chối hủy - Khôi phục đơn]`].filter(Boolean).join(' | ');
           await supabase
             .from('hoadon')
@@ -2531,31 +2554,32 @@ export const db = {
             })
             .eq('id', orderId);
 
-          // 2. Tìm tất cả log hoàn kho tạm thời của đơn này
-          const { data: pendingLogs } = await supabase
-            .from('lichsukho')
-            .select('*')
-            .ilike('ghi_chu', `%[Chờ duyệt hủy đơn #${orderId}]%`)
-            .eq('trang_thai', 'Chờ duyệt');
+          // 2. Thu hồi kho: Trừ ngược lại số lượng nguyên liệu đã hoàn
+          const { data: dbItems } = await supabase
+            .from('hoadondetail')
+            .select('idsp, so_luong')
+            .eq('idhoadon', orderId);
 
-          if (pendingLogs && pendingLogs.length > 0) {
-            // Chuyển các log cũ thành 'Từ chối'
-            const logIds = pendingLogs.map(l => l.id);
-            await supabase
-              .from('lichsukho')
-              .update({ trang_thai: 'Từ chối' })
-              .in('id', logIds);
-
-            // 3. Thu hồi kho: Trừ ngược lại số lượng đã cộng tạm thời
+          if (dbItems && dbItems.length > 0) {
+            const recipes = await this.getRecipes();
             const ingredients = await this.getIngredients();
-            const revokeLogs: any[] = [];
+            const ingDeductions: { [id: string]: number } = {};
 
-            for (const pLog of pendingLogs) {
-              const ing = ingredients.find(i => i.id === pLog.id_nguyen_lieu);
-              const restoreQty = Number(pLog.so_luong_thay_doi || 0);
-              if (ing && restoreQty > 0) {
+            for (const item of dbItems) {
+              const itemRecipes = recipes.filter(r => r.product_id === item.idsp);
+              for (const rec of itemRecipes) {
+                const qty = Number(rec.quantity_needed || 0) * Number(item.so_luong || 0);
+                ingDeductions[rec.ingredient_id] = (ingDeductions[rec.ingredient_id] || 0) + qty;
+              }
+            }
+
+            const revokeLogs: any[] = [];
+            for (const ingId in ingDeductions) {
+              const ing = ingredients.find(i => i.id === ingId);
+              const deductQty = ingDeductions[ingId];
+              if (ing && deductQty > 0) {
                 const currentStock = Number(ing.stock_quantity ?? (ing as any).so_luong_ton ?? 0) || 0;
-                const newStock = Math.max(0, currentStock - restoreQty);
+                const newStock = Math.max(0, currentStock - deductQty);
                 await supabase
                   .from('nguyenlieu')
                   .update({ so_luong_ton: newStock })
@@ -2564,7 +2588,7 @@ export const db = {
                 revokeLogs.push({
                   id: generateShortId('inv_'),
                   id_nguyen_lieu: ing.id,
-                  so_luong_thay_doi: -restoreQty,
+                  so_luong_thay_doi: -deductQty,
                   loai_giao_dich: 'Xuất kho',
                   chi_phi: 0,
                   ghi_chu: `[Từ chối hủy đơn #${orderId}] Thu hồi kho về trạng thái đã bán`,
@@ -2591,7 +2615,7 @@ export const db = {
 
           const logs = mockDb.getInventoryLogs();
           logs.forEach(l => {
-            if (l.note?.includes(`[Chờ duyệt hủy đơn #${orderId}]`) && l.status === 'Chờ duyệt') {
+            if (l.note?.includes(`hủy đơn #${orderId}`) && l.status === 'Chờ duyệt') {
               l.status = 'Đã duyệt';
             }
           });
@@ -2601,17 +2625,20 @@ export const db = {
           targetOrder.payment_status = 'Đã thanh toán';
           targetOrder.notes = [targetOrder.notes, `[Admin từ chối hủy - Khôi phục đơn]`].filter(Boolean).join(' | ');
 
-          const logs = mockDb.getInventoryLogs();
+          const mockItems = mockDb.getOrderItems().filter(item => item.order_id === orderId);
+          const recipes = mockDb.getRecipes();
           const ingredients = mockDb.getIngredients();
+          const logs = mockDb.getInventoryLogs();
 
-          logs.forEach(l => {
-            if (l.note?.includes(`[Chờ duyệt hủy đơn #${orderId}]`) && l.status === 'Chờ duyệt') {
-              l.status = 'Từ chối';
-              const ing = ingredients.find(i => i.id === l.ingredient_id);
-              if (ing && l.change_amount > 0) {
-                ing.stock_quantity = Math.max(0, Number(ing.stock_quantity || 0) - l.change_amount);
+          mockItems.forEach(item => {
+            const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
+            itemRecipes.forEach(rec => {
+              const ing = ingredients.find(i => i.id === rec.ingredient_id);
+              const deductQty = rec.quantity_needed * item.quantity;
+              if (ing && deductQty > 0) {
+                ing.stock_quantity = Math.max(0, Number(ing.stock_quantity || 0) - deductQty);
               }
-            }
+            });
           });
 
           logs.push({
@@ -2647,15 +2674,33 @@ export const db = {
   async getPendingCancelOrders() {
     try {
       if (isSupabaseConfigured && supabase) {
-        const { data: pendingOrders } = await supabase
+        const { data: allOrders } = await supabase
           .from('hoadon')
           .select('*, danhsachban(ten_ban), nguoidung(ho_ten), hoadondetail(*)')
-          .eq('trang_thai_thanh_toan', 'Chờ duyệt hủy')
-          .order('ngay_tao', { ascending: false });
+          .order('ngay_tao', { ascending: false })
+          .limit(100);
 
-        return (pendingOrders || []).map(o => mapOrderToClient(o));
+        const pending = (allOrders || []).filter(o => {
+          const status = o.trang_thai_thanh_toan;
+          const note = o.ghi_chu || '';
+          if (status === 'Chờ duyệt hủy') return true;
+          if (note.includes('[Chờ duyệt hủy]') && !note.includes('[Admin đã duyệt hủy]') && !note.includes('[Admin từ chối hủy]')) {
+            return true;
+          }
+          return false;
+        });
+
+        return pending.map(o => mapOrderToClient(o));
       } else {
-        const orders = mockDb.getOrders().filter(o => (o.payment_status as any) === 'Chờ duyệt hủy');
+        const orders = mockDb.getOrders().filter(o => {
+          const status = (o.payment_status as any);
+          const note = o.notes || '';
+          if (status === 'Chờ duyệt hủy') return true;
+          if (note.includes('[Chờ duyệt hủy]') && !note.includes('[Admin đã duyệt hủy]') && !note.includes('[Admin từ chối hủy]')) {
+            return true;
+          }
+          return false;
+        });
         return orders;
       }
     } catch (e) {
