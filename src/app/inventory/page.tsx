@@ -281,7 +281,7 @@ export default function InventoryPage() {
   // Helper: Trích xuất lý do/ghi chú thực tế do nhân viên nhập
   const extractCleanNote = (rawNote?: string | null): string => {
     if (!rawNote) return '';
-    let text = rawNote.trim();
+    const text = rawNote.trim();
     const match = text.match(/Kiểm kho thực tế:\s*[\d.]+\s*\(Hệ thống:\s*[\d.]+\)\.?\s*(.*)/i);
     if (match) {
       const custom = match[1]?.trim();

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db, getCurrentUser } from '@/lib/database';
 import { toast } from '@/lib/toast';
-import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft, ArrowLeft } from 'lucide-react';
+import { BarChart3, Clock, DollarSign, ShoppingBag, TrendingUp, ShieldCheck, Calendar, ArrowRightLeft, ArrowLeft, X } from 'lucide-react';
 
 export default function DailyReportPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -88,10 +88,18 @@ export default function DailyReportPage() {
     }
   };
 
-  // 1. Chỉ lấy hóa đơn đã thanh toán trong ngày hôm nay (chuẩn hóa múi giờ Việt Nam)
+  // 1. Lọc hóa đơn ngày hôm nay (chuẩn hóa múi giờ Việt Nam):
+  // - todayPaidOrders: Chỉ các đơn Đã thanh toán (dùng để tính doanh thu thực tế, tiền két và bán hàng)
+  // - todayAllOrders: Bao gồm cả đơn Đã thanh toán & đơn Chờ duyệt hủy (dùng để hiển thị danh sách đối soát)
   const todayVn = getVnDate();
-  const todayOrders = orders.filter(o => {
+  const todayPaidOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
+    return getVnDate(o.created_at) === todayVn;
+  });
+
+  const todayAllOrders = orders.filter(o => {
+    const isPaidOrPendingCancel = o.payment_status === 'Đã thanh toán' || (o.payment_status as any) === 'Chờ duyệt hủy';
+    if (!isPaidOrPendingCancel) return false;
     return getVnDate(o.created_at) === todayVn;
   });
 
@@ -101,15 +109,17 @@ export default function DailyReportPage() {
 
   // 2. Phân loại theo Ca làm việc (theo chuẩn giờ Việt Nam)
   // Ca sáng: 05:30 - 12:00 (Tính các order/chi phí tạo trước 14:00 VN)
-  const morningOrders = todayOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
+  const morningOrders = todayPaidOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
+  const morningAllOrders = todayAllOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
   const morningLogs = todayLogs.filter(l => getVnMins(l.created_at) < (14 * 60));
 
   // Ca chiều: 16:00 - 21:00 (Tính các order/chi phí tạo từ 14:00 VN trở đi)
-  const afternoonOrders = todayOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
+  const afternoonOrders = todayPaidOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
+  const afternoonAllOrders = todayAllOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
   const afternoonLogs = todayLogs.filter(l => getVnMins(l.created_at) >= (14 * 60));
 
   // 3. Hàm tính toán các chỉ số cho từng ca
-  const calculateMetrics = (shiftOrders: any[], shiftLogs: any[]) => {
+  const calculateMetrics = (shiftOrders: any[], shiftLogs: any[], displayOrders: any[] = shiftOrders) => {
     const totalDiscount = shiftOrders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
     const grossRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) + totalDiscount;
     const actualRevenue = shiftOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
@@ -173,7 +183,7 @@ export default function DailyReportPage() {
     const totalLy = lyDen + lyTrang + lyHoaVan + lyTraTac;
 
     return {
-      orders: shiftOrders,
+      orders: displayOrders,
       grossRevenue,
       actualRevenue,
       totalCash,
@@ -195,9 +205,9 @@ export default function DailyReportPage() {
     };
   };
 
-  const morning = calculateMetrics(morningOrders, morningLogs);
-  const afternoon = calculateMetrics(afternoonOrders, afternoonLogs);
-  const bothShifts = calculateMetrics(todayOrders, todayLogs);
+  const morning = calculateMetrics(morningOrders, morningLogs, morningAllOrders);
+  const afternoon = calculateMetrics(afternoonOrders, afternoonLogs, afternoonAllOrders);
+  const bothShifts = calculateMetrics(todayPaidOrders, todayLogs, todayAllOrders);
 
   if (loading) {
     return (
@@ -278,7 +288,7 @@ export default function DailyReportPage() {
               {bothShifts.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={bothShifts} onRefresh={loadData} />
+          <ShiftMetricsSection metrics={bothShifts} currentUser={currentUser} onRefresh={loadData} />
         </div>
       ) : activeShiftFilter === 'morning' ? (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -291,7 +301,7 @@ export default function DailyReportPage() {
               {morning.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={morning} onRefresh={loadData} />
+          <ShiftMetricsSection metrics={morning} currentUser={currentUser} onRefresh={loadData} />
         </div>
       ) : (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -304,7 +314,7 @@ export default function DailyReportPage() {
               {afternoon.orders.length} Đơn hàng
             </span>
           </div>
-          <ShiftMetricsSection metrics={afternoon} onRefresh={loadData} />
+          <ShiftMetricsSection metrics={afternoon} currentUser={currentUser} onRefresh={loadData} />
         </div>
       )}
     </div>
@@ -312,12 +322,16 @@ export default function DailyReportPage() {
 }
 
 // Component phụ hiển thị các chỉ số chi tiết cho từng ca
-function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: () => void }) {
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
+function ShiftMetricsSection({ metrics, currentUser, onRefresh }: { metrics: any; currentUser?: any; onRefresh: () => void }) {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [expandedOrderItems, setExpandedOrderItems] = useState<any[]>([]);
   const [loadingExpandedItems, setLoadingExpandedItems] = useState<boolean>(false);
+
+  // State Modal Hủy đơn kiểm duyệt 2 chiều
+  const [cancelModalOrder, setCancelModalOrder] = useState<any | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [submittingCancel, setSubmittingCancel] = useState<boolean>(false);
 
   useEffect(() => {
     if (!expandedOrderId) {
@@ -347,30 +361,34 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
     setExpandedOrderId(null);
   }, [metrics]);
 
-  const handleCancelOrder = async (orderId: string) => {
-    const isConfirm = window.confirm(
-      `⚠️ CẢNH BÁO: Bạn có chắc chắn muốn HỦY HÓA ĐƠN #${orderId.substring(0, 6)} không?\n\n` +
-      `- Thao tác này sẽ XÓA VĨNH VIỄN hóa đơn khỏi hệ thống.\n` +
-      `- Nguyên liệu đã trừ của các món trong hóa đơn này sẽ được HOÀN LẠI KHO.\n` +
-      `- Số tiền của hóa đơn sẽ bị trừ ra khỏi doanh thu ca.\n\n` +
-      `Bạn có muốn tiếp tục?`
-    );
-    if (!isConfirm) return;
+  const handleOpenCancelModal = (order: any) => {
+    setCancelModalOrder(order);
+    setCancelReason('');
+  };
 
-    setCancelingId(orderId);
+  const handleConfirmRequestCancel = async () => {
+    if (!cancelModalOrder) return;
+    if (!cancelReason.trim()) {
+      toast.error('Vui lòng nhập hoặc chọn lý do hủy hóa đơn!');
+      return;
+    }
+
+    setSubmittingCancel(true);
     try {
-      const success = await db.cancelPaidOrder(orderId);
-      if (success) {
-        alert('Đã hủy hóa đơn và hoàn kho nguyên liệu thành công!');
-        onRefresh();
-      } else {
-        alert('Lỗi: Không thể hủy hóa đơn. Vui lòng kiểm tra kết nối.');
-      }
-    } catch (e) {
+      await db.requestCancelPaidOrder(
+        cancelModalOrder.id,
+        currentUser?.id || 'staff',
+        cancelReason.trim()
+      );
+      toast.success(`Đã gửi yêu cầu hủy đơn #${cancelModalOrder.id.substring(0, 6)} và tạm hoàn kho nguyên liệu. Đang chờ Admin duyệt!`);
+      setCancelModalOrder(null);
+      setCancelReason('');
+      onRefresh();
+    } catch (e: any) {
       console.error(e);
-      alert('Đã xảy ra lỗi khi hủy hóa đơn.');
+      toast.error(e.message || 'Lỗi khi gửi yêu cầu hủy đơn.');
     } finally {
-      setCancelingId(null);
+      setSubmittingCancel(false);
     }
   };
 
@@ -578,16 +596,21 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className="font-extrabold text-coffee-primary mr-1">{order.total_amount.toLocaleString('vi-VN')}đ</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCancelOrder(order.id);
-                                }}
-                                disabled={cancelingId !== null}
-                                className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold transition disabled:opacity-50 flex items-center space-x-1"
-                              >
-                                <span>Hủy</span>
-                              </button>
+                              {order.payment_status === 'Chờ duyệt hủy' ? (
+                                <span className="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-extrabold flex items-center space-x-1">
+                                  <span>⏳ Chờ duyệt hủy</span>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenCancelModal(order);
+                                  }}
+                                  className="px-2.5 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold transition flex items-center space-x-1 cursor-pointer"
+                                >
+                                  <span>Hủy</span>
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -718,6 +741,94 @@ function ShiftMetricsSection({ metrics, onRefresh }: { metrics: any; onRefresh: 
           </div>
         )}
       </div>
+
+      {/* MODAL YÊU CẦU HỦY HÓA ĐƠN ĐÃ THANH TOÁN (KIỂM DUYỆT 2 CHIỀU) */}
+      {cancelModalOrder && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border border-red-200 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+              <h3 className="font-extrabold text-base text-red-600 flex items-center space-x-2">
+                <span>⚠️ Yêu cầu hủy hóa đơn #{cancelModalOrder.id.substring(0, 6)}</span>
+              </h3>
+              <button
+                onClick={() => setCancelModalOrder(null)}
+                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1.5 leading-relaxed">
+              <p className="font-bold">📌 Quy trình kiểm duyệt hủy đơn:</p>
+              <p>• Nguyên liệu của đơn sẽ được <strong>tạm hoàn ngay vào kho</strong>.</p>
+              <p>• Hóa đơn chuyển trạng thái <strong>"Chờ duyệt hủy"</strong> và tạm trừ khỏi tiền két ca trực.</p>
+              <p>• Admin sẽ duyệt: nếu Đồng ý thì giữ nguyên; nếu Từ chối thì đơn được khôi phục và kho tự động thu hồi.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="font-bold text-coffee-dark uppercase text-[10px] tracking-wider block">
+                Chọn nhanh lý do hủy:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {['Khách đổi ý hủy món', 'Thu ngân bấm nhầm đơn/bàn', 'Khách không đủ tiền', 'Món bị lỗi/hỏng'].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCancelReason(preset)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                      cancelReason === preset
+                        ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                        : 'bg-[#FAF6F0] text-coffee-dark border-coffee-light hover:bg-coffee-light/50'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-coffee-dark uppercase text-[10px] tracking-wider block">
+                Chi tiết lý do hủy <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                required
+                placeholder="Nhập lý do chi tiết để Admin kiểm duyệt..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full p-3 bg-[#FAF6F0] rounded-xl text-xs font-medium border border-coffee-light focus:ring-2 focus:ring-red-400 text-coffee-dark outline-none resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-coffee-light/60">
+              <button
+                type="button"
+                onClick={() => setCancelModalOrder(null)}
+                disabled={submittingCancel}
+                className="px-4 py-2.5 bg-[#FAF6F0] hover:bg-coffee-light text-coffee-dark font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRequestCancel}
+                disabled={submittingCancel || !cancelReason.trim()}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition shadow shadow-red-600/20 flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {submittingCancel ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang gửi...</span>
+                  </>
+                ) : (
+                  <span>Gửi yêu cầu hủy</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

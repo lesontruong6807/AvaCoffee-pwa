@@ -21,6 +21,10 @@ import {
   TrendingUp, 
   ShoppingBag,
   Loader2,
+  Upload,
+  AlertTriangle,
+  Sparkles,
+  Coffee,
   CheckCircle2,
   Map,
   ArrowLeft,
@@ -31,9 +35,13 @@ import {
 import confetti from 'canvas-confetti';
 import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF, exportProductSalesToExcel, exportProductSalesToPDF, exportAttendanceToExcel, exportAttendanceToPDF } from '@/lib/exportUtils';
 
+const generateShortId = (prefix: string = '') => {
+  return `${prefix}${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+};
+
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'sales' | 'inventory' | 'products' | 'staff' | 'attendance' | 'expenses'>('approvals');
+  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'sales' | 'inventory' | 'products' | 'staff' | 'attendance' | 'expenses' | 'overtime'>('approvals');
   const [loading, setLoading] = useState(true);
 
   // Dữ liệu quản trị
@@ -49,18 +57,46 @@ export default function AdminPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
 
-  // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho)
-  const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory'>('time');
+  // Trạng thái phê duyệt (Duyệt chấm công / Duyệt nghỉ phép / Duyệt đơn kho / Duyệt hủy đơn)
+  const [approvalSubTab, setApprovalSubTab] = useState<'time' | 'leave' | 'inventory' | 'order_cancel'>('time');
 
-  // Trạng thái Form CRUD Sản phẩm
+  // Trạng thái Form CRUD Sản phẩm mở rộng (Công thức định lượng, Base cost, Phân loại mới)
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [prodName, setProdName] = useState('');
   const [prodPrice, setProdPrice] = useState(0);
-  const [prodCostPrice, setProdCostPrice] = useState(0);
+  const [prodBaseCost, setProdBaseCost] = useState(0);
   const [prodCategoryId, setProdCategoryId] = useState('');
   const [prodImageUrl, setProdImageUrl] = useState('');
   const [prodStatus, setProdStatus] = useState<'Còn hàng' | 'Hết hàng'>('Còn hàng');
+  const [prodRecipeList, setProdRecipeList] = useState<Array<{
+    id: string;
+    ingredient_id: string;
+    quantity_needed: number;
+    isPremix?: boolean;
+    premix_type?: 'nuoc_duong' | 'hong_tra' | 'kem_muoi';
+    premix_ml?: number;
+  }>>([]);
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [recipeAddType, setRecipeAddType] = useState<'stock' | 'premix'>('stock');
+  const [selectedStockIngId, setSelectedStockIngId] = useState('');
+  const [selectedStockQty, setSelectedStockQty] = useState('');
+  const [selectedPremixType, setSelectedPremixType] = useState<'nuoc_duong' | 'hong_tra' | 'kem_muoi'>('nuoc_duong');
+  const [selectedPremixMl, setSelectedPremixMl] = useState('');
+
+  // Trạng thái Chấm công ngoài giờ (Overtime - Dành cho Quản lý)
+  const [otStaffId, setOtStaffId] = useState('');
+  const [otDate, setOtDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [otShift, setOtShift] = useState('Ca sáng (05:30 - 12:00)');
+  const [otStartTime, setOtStartTime] = useState('05:30');
+  const [otEndTime, setOtEndTime] = useState('12:00');
+  const [otNotes, setOtNotes] = useState('');
+  const [isOtConfirmModalOpen, setIsOtConfirmModalOpen] = useState(false);
+  const [editingOtLog, setEditingOtLog] = useState<any | null>(null);
+  const [submittingOt, setSubmittingOt] = useState(false);
 
   // Trạng thái Form CRUD Nhân viên
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
@@ -367,6 +403,25 @@ export default function AdminPage() {
     }
   };
 
+  const handleApproveOrderCancel = async (orderId: string, approved: boolean) => {
+    const isConfirmed = window.confirm(
+      approved
+        ? `Bạn có chắc chắn muốn ĐỒNG Ý HỦY vĩnh viễn hóa đơn #${orderId.substring(0, 6)}?\n- Kho nguyên liệu sẽ giữ nguyên việc hoàn lại.\n- Hóa đơn chính thức chuyển thành 'Đã hủy'.`
+        : `Bạn có chắc chắn muốn TỪ CHỐI hủy hóa đơn #${orderId.substring(0, 6)}?\n- Đơn hàng sẽ được khôi phục về trạng thái 'Đã thanh toán'.\n- Doanh thu sẽ được tính lại bình thường.\n- Kho nguyên liệu sẽ tự động THU HỒI (trừ kho trở lại).`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await db.approveOrderCancellation(orderId, currentUser?.id || 'admin', approved);
+      confetti({ particleCount: 50, spread: 40 });
+      toast.success(approved ? 'Đã duyệt hủy đơn hàng thành công!' : 'Đã từ chối hủy, khôi phục đơn và thu hồi kho thành công!');
+      await loadAllData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Lỗi khi phê duyệt hủy đơn.');
+    }
+  };
+
   // Duyệt hàng loạt tất cả đơn chờ duyệt trong sub-tab hiện tại
   const handleApproveAll = async () => {
     const isConfirmed = window.confirm('Bạn có chắc chắn muốn PHÊ DUYỆT TẤT CẢ các đơn đang chờ duyệt trong mục này không?');
@@ -385,6 +440,12 @@ export default function AdminPage() {
         const pendingIds = inventoryLogs.filter(l => l.status === 'Chờ duyệt').map(l => l.id);
         if (pendingIds.length === 0) { toast.info('Không có đơn kho nào chờ duyệt.'); return; }
         await db.approveAllInventoryLogs(pendingIds, 'Đã duyệt');
+      } else if (approvalSubTab === 'order_cancel') {
+        const pendingOrders = orders.filter(o => o.payment_status === 'Chờ duyệt hủy' || (o as any).trang_thai_thanh_toan === 'Chờ duyệt hủy');
+        if (pendingOrders.length === 0) { toast.info('Không có đơn hàng nào chờ duyệt hủy.'); return; }
+        for (const o of pendingOrders) {
+          await db.approveOrderCancellation(o.id, currentUser?.id || 'admin', true);
+        }
       }
 
       confetti({ particleCount: 100, spread: 80 });
@@ -395,15 +456,18 @@ export default function AdminPage() {
     }
   };
 
-  // --- LÓGIC CRUD SẢN PHẨM ---
+  // --- LÓGIC CRUD SẢN PHẨM MỞ RỘNG (CÔNG THỨC & BASE COST) ---
   const openAddProduct = () => {
     setEditingProduct(null);
     setProdName('');
     setProdPrice(0);
-    setProdCostPrice(0);
+    setProdBaseCost(0);
     setProdCategoryId(categories[0]?.id || '');
     setProdImageUrl('');
     setProdStatus('Còn hàng');
+    setProdRecipeList([]);
+    setIsAddingNewCategory(false);
+    setNewCategoryName('');
     setIsProductModalOpen(true);
   };
 
@@ -411,36 +475,328 @@ export default function AdminPage() {
     setEditingProduct(prod);
     setProdName(prod.name);
     setProdPrice(prod.price);
-    setProdCostPrice(prod.cost_price || 0);
+    setProdBaseCost(prod.base_cost || 0);
     setProdCategoryId(prod.category_id);
     setProdImageUrl(prod.image_url || '');
     setProdStatus(prod.status);
+    setIsAddingNewCategory(false);
+    setNewCategoryName('');
+
+    // Load công thức hiện tại của sản phẩm
+    const currentRecipes = recipes
+      .filter(r => r.product_id === prod.id)
+      .map(r => ({
+        id: r.id || generateShortId('rec_'),
+        ingredient_id: r.ingredient_id,
+        quantity_needed: Number(r.quantity_needed || 0)
+      }));
+    setProdRecipeList(currentRecipes);
     setIsProductModalOpen(true);
   };
 
+  // Tạo phân loại danh mục mới ngay trong Modal
+  const handleCreateCategoryInline = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Vui lòng nhập tên loại món mới!');
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      const newCat = await db.createCategory(newCategoryName.trim());
+      if (!newCat) {
+        throw new Error('Không thể tạo loại món mới.');
+      }
+      toast.success(`Đã thêm loại món mới: "${newCat.name}"!`);
+      const updatedCats = await db.getCategories();
+      setCategories(updatedCats);
+      setProdCategoryId(newCat.id);
+      setIsAddingNewCategory(false);
+      setNewCategoryName('');
+    } catch (err) {
+      console.error(err);
+      toast.error('Không thể tạo loại món mới.');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  // Upload hình ảnh từ máy và chuyển sang DataURL
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ảnh có kích thước quá lớn (> 2MB). Vui lòng chọn ảnh nhẹ hơn!');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (base64) {
+        setProdImageUrl(base64);
+        toast.success('Đã tải ảnh lên thành công!');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Thêm nguyên liệu kho thông thường vào công thức món
+  const handleAddStockIngredient = (ingId: string, qty: number) => {
+    if (!ingId || qty <= 0) return;
+    const existingIdx = prodRecipeList.findIndex(r => !r.isPremix && r.ingredient_id === ingId);
+    if (existingIdx !== -1) {
+      const updated = [...prodRecipeList];
+      updated[existingIdx].quantity_needed += qty;
+      setProdRecipeList(updated);
+    } else {
+      setProdRecipeList([
+        ...prodRecipeList,
+        {
+          id: generateShortId('rec_'),
+          ingredient_id: ingId,
+          quantity_needed: qty,
+          isPremix: false
+        }
+      ]);
+    }
+  };
+
+  // Thêm nguyên liệu pha sẵn (Nước đường, Nước cốt hồng trà, Kem muối) vào công thức
+  const handleAddPremixIngredient = (type: 'nuoc_duong' | 'hong_tra' | 'kem_muoi', ml: number) => {
+    if (ml <= 0) return;
+    setProdRecipeList([
+      ...prodRecipeList,
+      {
+        id: generateShortId('pre_'),
+        ingredient_id: type === 'nuoc_duong' ? 'ing_duong' : type === 'hong_tra' ? 'ing_hongtra' : 'ing_kembeo',
+        quantity_needed: 0,
+        isPremix: true,
+        premix_type: type,
+        premix_ml: ml
+      }
+    ]);
+  };
+
+  // Xóa một dòng nguyên liệu trong công thức
+  const handleRemoveRecipeRow = (index: number) => {
+    const updated = [...prodRecipeList];
+    updated.splice(index, 1);
+    setProdRecipeList(updated);
+  };
+
+  // Tự động tính tổng Giá vốn dự tính
+  const calculateTotalEstimatedCost = () => {
+    let cost = Number(prodBaseCost || 0);
+    for (const item of prodRecipeList) {
+      if (item.isPremix) {
+        const ml = Number(item.premix_ml || 0);
+        if (item.premix_type === 'nuoc_duong') {
+          const ing = ingredients.find(i => i.id === 'ing_duong');
+          const unitPrice = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+          cost += ml * 0.8333 * unitPrice;
+        } else if (item.premix_type === 'hong_tra') {
+          const ing = ingredients.find(i => i.id === 'ing_hongtra');
+          const unitPrice = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+          cost += ml * 0.01875 * unitPrice;
+        } else if (item.premix_type === 'kem_muoi') {
+          const ingKembeo = ingredients.find(i => i.id === 'ing_kembeo');
+          const ingSuadac = ingredients.find(i => i.id === 'ing_suadac');
+          const ingSuatuoi = ingredients.find(i => i.id === 'ing_suatuoi');
+          const ingMuoi = ingredients.find(i => i.id === 'ing_muoibien');
+          const pKembeo = ingKembeo ? Number((ingKembeo as any).gia_von_trung_binh || (ingKembeo as any).don_gia_nhap || 0) : 0;
+          const pSuadac = ingSuadac ? Number((ingSuadac as any).gia_von_trung_binh || (ingSuadac as any).don_gia_nhap || 0) : 0;
+          const pSuatuoi = ingSuatuoi ? Number((ingSuatuoi as any).gia_von_trung_binh || (ingSuatuoi as any).don_gia_nhap || 0) : 0;
+          const pMuoi = ingMuoi ? Number((ingMuoi as any).gia_von_trung_binh || (ingMuoi as any).don_gia_nhap || 0) : 0;
+          cost += ml * (0.5044 * pKembeo + 0.0222 * pSuadac + 0.0333 * pSuatuoi + 0.0111 * pMuoi);
+        }
+      } else {
+        const ing = ingredients.find(i => i.id === item.ingredient_id);
+        const unitPrice = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+        cost += Number(item.quantity_needed || 0) * unitPrice;
+      }
+    }
+    return Math.round(cost);
+  };
+
+  // Bung ra các nguyên liệu kho cơ sở để lưu vào CSDL
+  const flattenRecipeRows = () => {
+    const ingMap: { [ingId: string]: number } = {};
+    for (const item of prodRecipeList) {
+      if (item.isPremix) {
+        const ml = Number(item.premix_ml || 0);
+        if (item.premix_type === 'nuoc_duong') {
+          ingMap['ing_duong'] = (ingMap['ing_duong'] || 0) + (ml * 0.8333);
+        } else if (item.premix_type === 'hong_tra') {
+          ingMap['ing_hongtra'] = (ingMap['ing_hongtra'] || 0) + (ml * 0.01875);
+        } else if (item.premix_type === 'kem_muoi') {
+          ingMap['ing_kembeo'] = (ingMap['ing_kembeo'] || 0) + (ml * 0.5044);
+          ingMap['ing_suadac'] = (ingMap['ing_suadac'] || 0) + (ml * 0.0222);
+          ingMap['ing_suatuoi'] = (ingMap['ing_suatuoi'] || 0) + (ml * 0.0333);
+          ingMap['ing_muoibien'] = (ingMap['ing_muoibien'] || 0) + (ml * 0.0111);
+        }
+      } else {
+        ingMap[item.ingredient_id] = (ingMap[item.ingredient_id] || 0) + Number(item.quantity_needed || 0);
+      }
+    }
+    return Object.keys(ingMap).map(ingId => ({
+      ingredient_id: ingId,
+      quantity_needed: Math.round(ingMap[ingId] * 1000) / 1000
+    }));
+  };
+
+  // Lưu món ăn kèm công thức & giá vốn
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    const productPayload = {
-      name: prodName,
-      price: Number(prodPrice),
-      cost_price: Number(prodCostPrice),
-      category_id: prodCategoryId,
-      image_url: prodImageUrl || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-      status: prodStatus
-    };
+    if (!prodName.trim()) {
+      toast.error('Vui lòng nhập tên đồ uống!');
+      return;
+    }
+    if (prodPrice <= 0) {
+      toast.error('Vui lòng nhập giá bán lớn hơn 0đ!');
+      return;
+    }
+    if (!prodCategoryId) {
+      toast.error('Vui lòng chọn phân loại cho đồ uống!');
+      return;
+    }
 
+    setSavingProduct(true);
     try {
+      const cleanRecipes = flattenRecipeRows();
+      const productPayload = {
+        name: prodName.trim(),
+        price: Number(prodPrice),
+        category_id: prodCategoryId,
+        image_url: prodImageUrl || '/logo.jpg',
+        status: prodStatus,
+        base_cost: Number(prodBaseCost || 0)
+      };
+
       if (editingProduct) {
-        await db.updateProduct(editingProduct.id, productPayload);
-        toast.success('Cập nhật món ăn thành công!');
+        await db.updateProductWithRecipe(editingProduct.id, productPayload, cleanRecipes);
+        toast.success(`Cập nhật món "${prodName}" và công thức thành công!`);
       } else {
-        await db.createProduct(productPayload);
-        toast.success('Thêm món ăn mới thành công!');
+        await db.createProductWithRecipe(productPayload, cleanRecipes);
+        toast.success(`Thêm món "${prodName}" và công thức thành công!`);
       }
+
       setIsProductModalOpen(false);
-      loadAllData();
+      await loadAllData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Lỗi khi lưu món ăn.');
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  // --- LÓGIC CHẤM CÔNG NGOÀI GIỜ (DÀNH RIÊNG CHO QUẢN LÝ) ---
+  const handleOpenOtModal = () => {
+    const firstStaff = users.find(u => u.role !== 'Admin') || users[0];
+    setOtStaffId(firstStaff?.id || '');
+    setOtDate(new Date().toLocaleDateString('en-CA'));
+    setOtShift('Ca sáng (05:30 - 12:00)');
+    setOtStartTime('05:30');
+    setOtEndTime('12:00');
+    setOtNotes('');
+    setEditingOtLog(null);
+    setIsOtConfirmModalOpen(false);
+  };
+
+  const openEditOvertime = (log: any) => {
+    setEditingOtLog(log);
+    setOtStaffId(log.user_id);
+    const dStr = new Date(log.check_in_time).toLocaleDateString('en-CA');
+    setOtDate(dStr);
+    setOtShift(log.shift || 'Ca ngoài giờ');
+
+    const inD = new Date(log.check_in_time);
+    const inH = String(inD.getHours()).padStart(2, '0');
+    const inM = String(inD.getMinutes()).padStart(2, '0');
+    setOtStartTime(`${inH}:${inM}`);
+
+    if (log.check_out_time) {
+      const outD = new Date(log.check_out_time);
+      const outH = String(outD.getHours()).padStart(2, '0');
+      const outM = String(outD.getMinutes()).padStart(2, '0');
+      setOtEndTime(`${outH}:${outM}`);
+    } else {
+      setOtEndTime('12:00');
+    }
+
+    const cleanNote = (log.ghi_chu_vao || '').replace('[Quản lý chấm ngoài giờ]', '').trim();
+    setOtNotes(cleanNote);
+    setIsOtConfirmModalOpen(false);
+  };
+
+  const handleConfirmSaveOvertime = async () => {
+    if (!otStaffId) {
+      toast.error('Vui lòng chọn nhân viên cần chấm công!');
+      return;
+    }
+    if (!otStartTime || !otEndTime) {
+      toast.error('Vui lòng nhập giờ vào và giờ ra đầy đủ!');
+      return;
+    }
+
+    setSubmittingOt(true);
+    try {
+      const [inH, inM] = otStartTime.split(':').map(Number);
+      const [outH, outM] = otEndTime.split(':').map(Number);
+
+      const inDate = new Date(`${otDate}T00:00:00`);
+      inDate.setHours(inH, inM, 0, 0);
+
+      const outDate = new Date(`${otDate}T00:00:00`);
+      outDate.setHours(outH, outM, 0, 0);
+
+      if (outDate.getTime() <= inDate.getTime()) {
+        toast.error('Giờ ra ca phải sau giờ vào ca!');
+        setSubmittingOt(false);
+        return;
+      }
+
+      if (editingOtLog) {
+        await db.updateOvertimeTimeLog(editingOtLog.id, {
+          staff_id: otStaffId,
+          shift: otShift,
+          check_in_time: inDate.toISOString(),
+          check_out_time: outDate.toISOString(),
+          notes: otNotes.trim()
+        });
+        toast.success('Đã cập nhật ca làm ngoài giờ!');
+      } else {
+        await db.createOvertimeTimeLog({
+          staff_id: otStaffId,
+          date: otDate,
+          shift: otShift,
+          check_in_time: inDate.toISOString(),
+          check_out_time: outDate.toISOString(),
+          notes: otNotes.trim()
+        });
+        confetti({ particleCount: 50, spread: 40 });
+        toast.success('Đã chấm công ngoài giờ thành công! Ca đã được phê duyệt và tính công.');
+      }
+
+      setIsOtConfirmModalOpen(false);
+      setEditingOtLog(null);
+      setOtNotes('');
+      await loadAllData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Lỗi khi lưu chấm công ngoài giờ.');
+    } finally {
+      setSubmittingOt(false);
+    }
+  };
+
+  const handleDeleteOvertime = async (logId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa ca làm ngoài giờ này không?')) return;
+    try {
+      await db.deleteOvertimeTimeLog(logId);
+      toast.success('Đã xóa ca làm ngoài giờ.');
+      await loadAllData();
     } catch (err) {
-      toast.error('Lỗi lưu món ăn.');
+      toast.error('Không thể xóa ca làm ngoài giờ.');
     }
   };
 
@@ -763,7 +1119,7 @@ export default function AdminPage() {
   // Helper: Trích xuất lý do/ghi chú thực tế do nhân viên nhập
   const extractCleanNote = (rawNote?: string | null): string => {
     if (!rawNote) return '';
-    let text = rawNote.trim();
+    const text = rawNote.trim();
     const match = text.match(/Kiểm kho thực tế:\s*[\d.]+\s*\(Hệ thống:\s*[\d.]+\)\.?\s*(.*)/i);
     if (match) {
       const custom = match[1]?.trim();
@@ -898,7 +1254,10 @@ export default function AdminPage() {
     };
   };
 
-
+  const pendingCancelOrders = orders.filter(o => 
+    o.payment_status === 'Chờ duyệt hủy' || 
+    (o as any).trang_thai_thanh_toan === 'Chờ duyệt hủy'
+  );
 
   return (
     <div className="space-y-6">
@@ -921,6 +1280,11 @@ export default function AdminPage() {
         >
           <Clock className="w-4.5 h-4.5" />
           <span>Duyệt yêu cầu</span>
+          {pendingCancelOrders.length > 0 && (
+            <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-extrabold animate-pulse">
+              {pendingCancelOrders.length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setAdminTab('reports')}
@@ -999,6 +1363,17 @@ export default function AdminPage() {
           <DollarSign className="w-4.5 h-4.5" />
           <span>Chi phí vận hành</span>
         </button>
+        <button
+          onClick={() => setAdminTab('overtime')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'overtime'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <Sparkles className="w-4.5 h-4.5" />
+          <span>Chấm công ngoài giờ</span>
+        </button>
       </div>
 
       {/* 1. TAB PHÊ DUYỆT YÊU CẦU */}
@@ -1007,7 +1382,7 @@ export default function AdminPage() {
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Yêu Cầu Chờ Duyệt</h3>
-              <p className="text-xs text-coffee-medium">Xem lại vị trí chấm công, nghỉ phép và đơn nhập/kiểm kho để duyệt.</p>
+              <p className="text-xs text-coffee-medium">Xem lại vị trí chấm công, nghỉ phép, duyệt hủy đơn và đơn nhập/kiểm kho để duyệt.</p>
             </div>
             {/* Sub-tabs */}
             <div className="flex bg-[#FAF6F0] p-1.5 rounded-2xl border border-coffee-light overflow-x-auto max-w-full gap-1">
@@ -1034,6 +1409,19 @@ export default function AdminPage() {
                 }`}
               >
                 Duyệt Kho & Kiểm Kho
+              </button>
+              <button
+                onClick={() => setApprovalSubTab('order_cancel')}
+                className={`px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition shrink-0 flex items-center space-x-1.5 ${
+                  approvalSubTab === 'order_cancel' ? 'bg-white text-coffee-dark shadow-sm' : 'text-coffee-medium hover:bg-coffee-light/45'
+                }`}
+              >
+                <span>Duyệt hủy đơn</span>
+                {pendingCancelOrders.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-red-500 text-white rounded-full text-[9px] font-extrabold animate-pulse">
+                    {pendingCancelOrders.length}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -1322,6 +1710,112 @@ export default function AdminPage() {
                 <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                   <p className="font-bold">Tuyệt vời! Không còn đơn kho hoặc kiểm kho nào chờ duyệt</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DUYỆT HỦY ĐƠN ĐÃ THANH TOÁN */}
+          {approvalSubTab === 'order_cancel' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {pendingCancelOrders.map((order: any) => {
+                const staff = users.find(u => u.id === order.staff_id || u.id === (order as any).id_nhan_vien);
+                const orderDate = new Date(order.created_at || (order as any).ngay_tao).toLocaleString('vi-VN');
+                const itemsInOrder = allOrderItems.filter(it => it.order_id === order.id || (it as any).idhoadon === order.id);
+                const totalItemQty = itemsInOrder.reduce((sum, it) => sum + (Number(it.quantity || (it as any).so_luong || 1)), 0);
+
+                const rawNotes = order.notes || (order as any).ghi_chu || '';
+                const reasonMatch = rawNotes.match(/\[Chờ duyệt hủy\] Lý do: ([^|]+)/);
+                const cancelReason = reasonMatch ? reasonMatch[1].trim() : (rawNotes || 'Không có lý do chi tiết');
+
+                return (
+                  <div key={order.id} className="bg-white p-5 rounded-3xl border border-red-200 shadow-sm space-y-4 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          ⏳ Chờ duyệt hủy đơn
+                        </span>
+                        <h4 className="font-extrabold text-base text-coffee-dark mt-1.5">
+                          Hóa đơn #{order.id.slice(0, 8)}
+                        </h4>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-black text-base text-red-600 block">
+                          {Number(order.total_amount || (order as any).tong_tien || 0).toLocaleString('vi-VN')}đ
+                        </span>
+                        <span className="text-[11px] text-coffee-medium font-medium">
+                          {totalItemQty > 0 ? `${totalItemQty} món` : (order.tables?.table_name || 'Bàn')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs text-coffee-medium bg-[#FAF6F0] p-3.5 rounded-2xl border border-coffee-light/60">
+                      <div className="flex justify-between">
+                        <span>Nhân viên tạo/thu ngân:</span>
+                        <span className="font-bold text-coffee-dark">{staff?.full_name || 'Nhân viên'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Thời gian thanh toán:</span>
+                        <span className="font-bold text-coffee-dark">{orderDate}</span>
+                      </div>
+                      <div className="pt-2 border-t border-coffee-light/50">
+                        <span className="font-bold text-coffee-dark">Lý do hủy đơn:</span>
+                        <p className="text-xs text-red-700 font-bold mt-1 bg-red-50 p-2 rounded-xl border border-red-100 italic">
+                          "{cancelReason}"
+                        </p>
+                      </div>
+                      {itemsInOrder.length > 0 && (
+                        <div className="pt-2 border-t border-coffee-light/50">
+                          <span className="font-bold text-coffee-dark block mb-1">Món trong đơn:</span>
+                          <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                            {itemsInOrder.map((it, idx) => (
+                              <div key={idx} className="flex justify-between text-[11px] text-coffee-dark">
+                                <span>• {it.products?.name || it.ten_san_pham || 'Món'}</span>
+                                <span className="font-bold">x{it.quantity || (it as any).so_luong}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] text-coffee-medium bg-amber-50 p-3 rounded-xl border border-amber-200 space-y-1">
+                      <p className="font-bold text-amber-900 flex items-center space-x-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 inline shrink-0" />
+                        <span>Quy trình kiểm duyệt kho 2 chiều:</span>
+                      </p>
+                      <p>
+                        • <strong>Đồng ý duyệt hủy:</strong> Giữ nguyên việc hoàn trả nguyên liệu vào kho, doanh thu hủy vĩnh viễn.
+                      </p>
+                      <p>
+                        • <strong>Từ chối duyệt hủy:</strong> Khôi phục hóa đơn 'Đã thanh toán', tính lại doanh thu, và <strong>tự động THU HỒI (trừ kho trở lại)</strong>.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <button
+                        onClick={() => handleApproveOrderCancel(order.id, false)}
+                        className="py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Từ chối hủy</span>
+                      </button>
+                      <button
+                        onClick={() => handleApproveOrderCancel(order.id, true)}
+                        className="py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Đồng ý duyệt hủy</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {pendingCancelOrders.length === 0 && (
+                <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-coffee-light text-coffee-medium text-xs space-y-2">
+                  <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
+                  <p className="font-bold">Không có yêu cầu hủy đơn nào đang chờ duyệt</p>
                 </div>
               )}
             </div>
@@ -2811,12 +3305,14 @@ export default function AdminPage() {
         const attEndT = new Date(attEndDate + 'T23:59:59').getTime();
 
         const filteredLogs = timeLogs.filter(log => {
+          if (log.status === 'Từ chối') return false;
           if (attUserId !== 'all' && log.user_id !== attUserId) return false;
           const t = new Date(log.check_in_time).getTime();
           return t >= attStartT && t <= attEndT;
         });
 
         const filteredLeaves = leaveRequests.filter(leave => {
+          if (leave.status === 'Từ chối') return false;
           if (attUserId !== 'all' && leave.user_id !== attUserId) return false;
           const startT = new Date(leave.start_date + 'T00:00:00').getTime();
           const endT = new Date(leave.end_date + 'T23:59:59').getTime();
@@ -3414,108 +3910,730 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* POPUP FORM CRUD SẢN PHẨM */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">
-                {editingProduct ? 'Cập nhật đồ uống' : 'Thêm đồ uống mới'}
-              </h3>
-              <button onClick={() => setIsProductModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium">
-                <X className="w-5 h-5" />
-              </button>
+      {/* 8. TAB CHẤM CÔNG NGOÀI GIỜ (DÀNH CHO QUẢN LÝ) */}
+      {adminTab === 'overtime' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-extrabold text-lg text-coffee-dark flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-600" />
+                  <span>Chấm Công Ngoài Giờ & Ca Bù Cho Nhân Viên</span>
+                </h3>
+                <p className="text-xs text-coffee-medium mt-1">
+                  Dành riêng cho Quản lý / Admin: Trực tiếp chấm công cho nhân viên làm thêm ca, hỗ trợ quán ngoài lịch, hoặc chấm bù ca. Ca sau khi lưu sẽ được tự động <strong>Đã duyệt</strong> và tính đủ giờ vào Báo cáo chấm công. Nhân viên chỉ xem đối soát, không thể tự sửa ca này.
+                </p>
+              </div>
             </div>
+          </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
-              {/* Tên món */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-coffee-medium uppercase">Tên đồ uống</label>
-                <input
-                  type="text"
-                  value={prodName}
-                  onChange={(e) => setProdName(e.target.value)}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
-                  required
-                />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Form Chấm công ngoài giờ */}
+            <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
+              <h4 className="font-extrabold text-sm text-coffee-dark border-b border-coffee-light pb-3">
+                {editingOtLog ? '✏️ Chỉnh sửa ca ngoài giờ' : '➕ Tạo ca làm việc mới'}
+              </h4>
 
-              {/* Giá bán */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-coffee-medium uppercase">Giá bán (đ)</label>
-                <input
-                  type="number"
-                  value={prodPrice}
-                  onChange={(e) => setProdPrice(Number(e.target.value))}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
-                  min={0}
-                  required
-                />
-              </div>
-
-              {/* Giá vốn */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-coffee-medium uppercase">Giá vốn (đ)</label>
-                <input
-                  type="number"
-                  value={prodCostPrice}
-                  onChange={(e) => setProdCostPrice(Number(e.target.value))}
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
-                  min={0}
-                  required
-                />
-              </div>
-
-              {/* Loại món và trạng thái */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-coffee-medium uppercase">Phân loại</label>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!otStaffId) {
+                  toast.error('Vui lòng chọn nhân viên cần chấm công!');
+                  return;
+                }
+                if (!otStartTime || !otEndTime) {
+                  toast.error('Vui lòng nhập giờ vào và giờ ra đầy đủ!');
+                  return;
+                }
+                setIsOtConfirmModalOpen(true);
+              }} className="space-y-3.5 text-xs">
+                {/* Chọn nhân viên */}
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Nhân viên *</label>
                   <select
-                    value={prodCategoryId}
-                    onChange={(e) => setProdCategoryId(e.target.value)}
-                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                    value={otStaffId}
+                    onChange={(e) => setOtStaffId(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-3.5 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
+                    required
                   >
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                    <option value="">-- Chọn nhân viên --</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name} (@{u.username}) {u.role === 'Admin' ? '[Admin]' : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="font-bold text-coffee-medium uppercase">Trạng thái kho</label>
+                {/* Ngày làm việc */}
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Ngày làm việc *</label>
+                  <input
+                    type="date"
+                    value={otDate}
+                    onChange={(e) => setOtDate(e.target.value)}
+                    className="w-full bg-[#FAF6F0] px-3.5 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
+                    required
+                  />
+                </div>
+
+                {/* Loại ca */}
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Loại ca làm việc *</label>
                   <select
-                    value={prodStatus}
-                    onChange={(e) => setProdStatus(e.target.value as any)}
-                    className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark"
+                    value={otShift}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOtShift(val);
+                      if (val.includes('sáng')) {
+                        setOtStartTime('05:30');
+                        setOtEndTime('12:00');
+                      } else if (val.includes('chiều')) {
+                        setOtStartTime('12:00');
+                        setOtEndTime('18:00');
+                      } else if (val.includes('tối')) {
+                        setOtStartTime('18:00');
+                        setOtEndTime('23:00');
+                      }
+                    }}
+                    className="w-full bg-[#FAF6F0] px-3.5 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
                   >
-                    <option value="Còn hàng">Còn hàng</option>
-                    <option value="Hết hàng">Hết hàng</option>
+                    <option value="Ca sáng (05:30 - 12:00)">Ca sáng (05:30 - 12:00)</option>
+                    <option value="Ca chiều (12:00 - 18:00)">Ca chiều (12:00 - 18:00)</option>
+                    <option value="Ca tối (18:00 - 23:00)">Ca tối (18:00 - 23:00)</option>
+                    <option value="Ngoài giờ / Tăng ca">Ngoài giờ / Tăng ca</option>
+                    <option value="Chấm bù ca làm">Chấm bù ca làm</option>
                   </select>
                 </div>
+
+                {/* Giờ vào & Giờ ra */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-coffee-medium uppercase">Giờ vào *</label>
+                    <input
+                      type="time"
+                      value={otStartTime}
+                      onChange={(e) => setOtStartTime(e.target.value)}
+                      className="w-full bg-[#FAF6F0] px-3 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-bold text-center"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-coffee-medium uppercase">Giờ ra *</label>
+                    <input
+                      type="time"
+                      value={otEndTime}
+                      onChange={(e) => setOtEndTime(e.target.value)}
+                      className="w-full bg-[#FAF6F0] px-3 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-bold text-center"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Ghi chú */}
+                <div className="space-y-1">
+                  <label className="font-bold text-coffee-medium uppercase">Ghi chú công việc</label>
+                  <input
+                    type="text"
+                    value={otNotes}
+                    onChange={(e) => setOtNotes(e.target.value)}
+                    placeholder="VD: Hỗ trợ kiểm kê, tăng ca đông khách..."
+                    className="w-full bg-[#FAF6F0] px-3.5 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium/60"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                  {editingOtLog && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingOtLog(null);
+                        handleOpenOtModal();
+                      }}
+                      className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-coffee-medium font-bold rounded-2xl transition"
+                    >
+                      Hủy
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold rounded-2xl shadow transition flex items-center justify-center space-x-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{editingOtLog ? 'Cập nhật ca' : 'Lưu ca làm việc'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Danh sách ca ngoài giờ đã chấm */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4">
+              <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+                <h4 className="font-extrabold text-sm text-coffee-dark">
+                  Danh sách ca Quản lý đã chấm ({timeLogs.filter(l => (l.ghi_chu_vao || '').includes('[Quản lý chấm ngoài giờ]') || (l.notes || '').includes('[Quản lý chấm ngoài giờ]')).length})
+                </h4>
+                <span className="text-[11px] text-coffee-medium">Tất cả đều tự động Đã duyệt</span>
               </div>
 
-              {/* URL Hình ảnh */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-coffee-medium uppercase">Hình ảnh (URL)</label>
-                <input
-                  type="text"
-                  value={prodImageUrl}
-                  onChange={(e) => setProdImageUrl(e.target.value)}
-                  placeholder="Nhập link ảnh hoặc để trống"
-                  className="w-full bg-[#FAF6F0] px-4 py-3 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark placeholder-coffee-medium"
-                />
-              </div>
+              <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
+                {timeLogs
+                  .filter(l => (l.ghi_chu_vao || '').includes('[Quản lý chấm ngoài giờ]') || (l.notes || '').includes('[Quản lý chấm ngoài giờ]'))
+                  .sort((a, b) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime())
+                  .map((log: any) => {
+                    const staff = users.find(u => u.id === log.user_id);
+                    const inDate = new Date(log.check_in_time);
+                    const outDate = log.check_out_time ? new Date(log.check_out_time) : null;
+                    const dateStr = inDate.toLocaleDateString('vi-VN');
+                    const inStr = inDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                    const outStr = outDate ? outDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Chưa ra ca';
+                    
+                    let hours = 0;
+                    if (outDate) {
+                      const diff = outDate.getTime() - inDate.getTime();
+                      if (diff > 0) hours = Math.round((diff / (1000 * 60 * 60)) * 100) / 100;
+                    }
 
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold rounded-2xl shadow transition"
-              >
-                Lưu đồ uống
-              </button>
-            </form>
+                    const cleanNote = (log.ghi_chu_vao || '').replace('[Quản lý chấm ngoài giờ]', '').trim();
+
+                    return (
+                      <div key={log.id} className="p-4 rounded-2xl border border-coffee-light/80 bg-[#FAF6F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-coffee-primary/30 transition">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-xs text-coffee-dark">{staff?.full_name || 'Nhân viên'}</span>
+                            <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-[10px] font-bold">
+                              ✓ Đã duyệt
+                            </span>
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">
+                              {log.shift || 'Ngoài giờ'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-coffee-medium">
+                            📅 <strong>{dateStr}</strong> | ⏰ {inStr} - {outStr} ({hours} giờ công)
+                          </p>
+                          {cleanNote && (
+                            <p className="text-[11px] text-coffee-medium italic">
+                              "{cleanNote}"
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          <button
+                            onClick={() => openEditOvertime(log)}
+                            className="p-2 bg-white hover:bg-coffee-light rounded-xl text-coffee-primary border border-coffee-light/60 transition shadow-sm"
+                            title="Sửa ca làm"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOvertime(log.id)}
+                            className="p-2 bg-white hover:bg-red-50 rounded-xl text-red-600 border border-red-200 transition shadow-sm"
+                            title="Xóa ca làm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {timeLogs.filter(l => (l.ghi_chu_vao || '').includes('[Quản lý chấm ngoài giờ]') || (l.notes || '').includes('[Quản lý chấm ngoài giờ]')).length === 0 && (
+                  <div className="p-8 text-center text-coffee-medium text-xs">
+                    Chưa có ca làm ngoài giờ nào do Quản lý chấm. Bạn có thể sử dụng form bên trái để chấm ca mới!
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* MODAL XÁC NHẬN 2 LỚP CHẤM CÔNG NGOÀI GIỜ */}
+      {isOtConfirmModalOpen && (() => {
+        const staff = users.find(u => u.id === otStaffId);
+        const [inH, inM] = otStartTime.split(':').map(Number);
+        const [outH, outM] = otEndTime.split(':').map(Number);
+        const inMinutes = inH * 60 + inM;
+        const outMinutes = outH * 60 + outM;
+        const diffHours = outMinutes > inMinutes ? Math.round(((outMinutes - inMinutes) / 60) * 100) / 100 : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-coffee-light">
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 mx-auto">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+                <h3 className="font-extrabold text-lg text-coffee-dark">
+                  Xác nhận Chấm công Ngoài giờ
+                </h3>
+                <p className="text-xs text-coffee-medium">
+                  Vui lòng kiểm tra kỹ thông tin ca làm trước khi lưu vào hệ thống.
+                </p>
+              </div>
+
+              <div className="bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light/80 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-coffee-medium">Nhân viên:</span>
+                  <span className="font-extrabold text-coffee-dark">{staff?.full_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-coffee-medium">Ngày làm việc:</span>
+                  <span className="font-bold text-coffee-dark">{new Date(otDate).toLocaleDateString('vi-VN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-coffee-medium">Ca làm việc:</span>
+                  <span className="font-bold text-coffee-dark">{otShift}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-coffee-medium">Khung giờ:</span>
+                  <span className="font-bold text-coffee-dark">{otStartTime} - {otEndTime}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-coffee-light/50">
+                  <span className="font-bold text-coffee-dark">Tổng giờ tính công:</span>
+                  <span className="font-black text-amber-700 text-sm">{diffHours} giờ</span>
+                </div>
+                {otNotes && (
+                  <div className="pt-1 border-t border-coffee-light/50">
+                    <span className="text-coffee-medium">Ghi chú:</span>
+                    <p className="font-semibold text-coffee-dark italic mt-0.5">"{otNotes}"</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                <p className="font-bold">🔒 Cơ chế bảo mật và phê duyệt:</p>
+                <p>• Ca làm sẽ được đánh dấu <strong>[Quản lý chấm ngoài giờ]</strong> và chuyển thành <strong>Đã duyệt</strong> ngay lập tức.</p>
+                <p>• Nhân viên sẽ <strong>bị khóa nút sửa</strong> ca này trong mục Chấm công cá nhân.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOtConfirmModalOpen(false)}
+                  disabled={submittingOt}
+                  className="py-3 bg-gray-100 hover:bg-gray-200 text-coffee-dark font-bold text-xs rounded-2xl transition"
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSaveOvertime}
+                  disabled={submittingOt}
+                  className="py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-2xl shadow transition flex items-center justify-center space-x-1.5"
+                >
+                  {submittingOt ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Xác nhận & Lưu</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* POPUP FORM CRUD SẢN PHẨM MỞ RỘNG (ĐỊNH MỨC & GIÁ VỐN) */}
+      {isProductModalOpen && (() => {
+        const estCost = calculateTotalEstimatedCost();
+        const profit = Number(prodPrice || 0) - estCost;
+        const profitMargin = Number(prodPrice || 0) > 0 ? Math.round((profit / Number(prodPrice)) * 100) : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 border border-coffee-accent/40">
+              <div className="flex items-center justify-between border-b border-coffee-light pb-4">
+                <div>
+                  <h3 className="font-extrabold text-lg text-coffee-dark">
+                    {editingProduct ? 'Cập nhật đồ uống & Định mức' : 'Thêm đồ uống mới'}
+                  </h3>
+                  <p className="text-xs text-coffee-medium mt-0.5">
+                    Tùy chỉnh phân loại, tải ảnh, cài đặt công thức nguyên liệu kho & nguyên liệu pha sẵn
+                  </p>
+                </div>
+                <button onClick={() => setIsProductModalOpen(false)} className="p-1.5 hover:bg-coffee-light rounded-xl text-coffee-medium">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProduct} className="space-y-5 text-xs">
+                {/* 1. Thông tin cơ bản */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Tên món */}
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-coffee-medium uppercase">Tên đồ uống *</label>
+                    <input
+                      type="text"
+                      value={prodName}
+                      onChange={(e) => setProdName(e.target.value)}
+                      placeholder="VD: Cà phê sữa muối..."
+                      className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
+                      required
+                    />
+                  </div>
+
+                  {/* Giá bán */}
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-coffee-medium uppercase">Giá bán (VND) *</label>
+                    <input
+                      type="number"
+                      value={prodPrice || ''}
+                      onChange={(e) => setProdPrice(Number(e.target.value))}
+                      placeholder="VD: 25000"
+                      className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-bold"
+                      min={0}
+                      step={1000}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Phân loại & Trạng thái kho */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-coffee-medium uppercase">Phân loại *</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingNewCategory(!isAddingNewCategory)}
+                        className="text-[11px] font-bold text-coffee-primary hover:underline"
+                      >
+                        {isAddingNewCategory ? 'Hủy thêm loại' : '+ Thêm loại mới'}
+                      </button>
+                    </div>
+
+                    {isAddingNewCategory ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Nhập tên loại mới..."
+                          className="flex-1 bg-[#FAF6F0] px-3.5 py-2 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateCategoryInline}
+                          disabled={savingCategory}
+                          className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs shrink-0"
+                        >
+                          {savingCategory ? '...' : 'Lưu'}
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={prodCategoryId}
+                        onChange={(e) => setProdCategoryId(e.target.value)}
+                        className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
+                        required
+                      >
+                        {categories.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-coffee-medium uppercase">Trạng thái phục vụ</label>
+                    <select
+                      value={prodStatus}
+                      onChange={(e) => setProdStatus(e.target.value as any)}
+                      className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
+                    >
+                      <option value="Còn hàng">Còn hàng (Phục vụ bình thường)</option>
+                      <option value="Hết hàng">Hết hàng (Tạm ngưng)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 3. Hình ảnh món */}
+                <div className="space-y-1.5 bg-[#FAF6F0] p-4 rounded-2xl border border-coffee-light/70">
+                  <label className="font-bold text-coffee-medium uppercase block">Hình ảnh đồ uống</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl border border-coffee-light overflow-hidden bg-white shrink-0 flex items-center justify-center shadow-inner">
+                      {prodImageUrl ? (
+                        <img src={prodImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Coffee className="w-8 h-8 text-coffee-light" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="px-3.5 py-2 bg-white hover:bg-coffee-light border border-coffee-light rounded-xl font-bold text-coffee-primary cursor-pointer transition text-xs inline-flex items-center gap-1.5 shadow-sm">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Tải ảnh từ máy</span>
+                          <input type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
+                        </label>
+                        <span className="text-[11px] text-coffee-medium">hoặc dán link bên dưới:</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={prodImageUrl}
+                        onChange={(e) => setProdImageUrl(e.target.value)}
+                        placeholder="VD: /products/CP001.png hoặc https://..."
+                        className="w-full bg-white px-3.5 py-2 rounded-xl border border-coffee-light text-coffee-dark placeholder-coffee-medium/60 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Định mức & Công thức nguyên liệu */}
+                <div className="space-y-3 pt-2 border-t border-coffee-light">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-coffee-dark">Công thức định lượng & Nguyên liệu</h4>
+                      <p className="text-[11px] text-coffee-medium">Kho sẽ tự động trừ nguyên liệu gốc mỗi khi món này được bán</p>
+                    </div>
+                  </div>
+
+                  {/* Danh sách các dòng nguyên liệu trong công thức */}
+                  <div className="space-y-2">
+                    {prodRecipeList.map((row, idx) => {
+                      if (row.isPremix) {
+                        const premixLabel = row.premix_type === 'nuoc_duong' 
+                          ? `Nước đường (${row.premix_ml}ml)` 
+                          : row.premix_type === 'hong_tra' 
+                          ? `Nước cốt hồng trà (${row.premix_ml}ml)` 
+                          : `Kem muối (${row.premix_ml}ml)`;
+                        
+                        const convertedDesc = row.premix_type === 'nuoc_duong'
+                          ? `≈ ${Math.round((row.premix_ml || 0) * 0.8333 * 10) / 10}g đường kho`
+                          : row.premix_type === 'hong_tra'
+                          ? `≈ ${Math.round((row.premix_ml || 0) * 0.01875 * 10) / 10}g hồng trà kho`
+                          : `≈ kem béo, sữa đặc, sữa tươi, muối biển`;
+
+                        return (
+                          <div key={row.id || idx} className="flex items-center justify-between p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs">
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-coffee-dark">⚡ {premixLabel}</span>
+                              <span className="text-[10px] text-amber-800 ml-2 font-medium">({convertedDesc})</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRecipeRow(idx)}
+                              className="p-1 hover:bg-red-100 rounded-lg text-red-600 transition"
+                              title="Xóa dòng"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      const ing = ingredients.find(i => i.id === row.ingredient_id);
+                      return (
+                        <div key={row.id || idx} className="flex items-center justify-between p-2.5 bg-[#FAF6F0] border border-coffee-light rounded-xl text-xs">
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-coffee-dark">{ing?.name || row.ingredient_id}</span>
+                            <span className="text-coffee-medium ml-2 font-semibold">
+                              : {row.quantity_needed} {ing?.unit || 'g/ml'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRecipeRow(idx)}
+                            className="p-1 hover:bg-red-100 rounded-lg text-red-600 transition"
+                            title="Xóa dòng"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {prodRecipeList.length === 0 && (
+                      <p className="text-[11px] text-coffee-medium italic p-3 bg-[#FAF6F0] rounded-xl text-center">
+                        Chưa có nguyên liệu nào. Thêm nguyên liệu kho hoặc pha sẵn ở bên dưới:
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Bộ thêm nguyên liệu vào công thức */}
+                  <div className="bg-[#FAF6F0] p-3.5 rounded-2xl border border-coffee-light space-y-3">
+                    <div className="flex gap-2 border-b border-coffee-light/60 pb-2">
+                      <button
+                        type="button"
+                        onClick={() => setRecipeAddType('stock')}
+                        className={`px-3 py-1 rounded-xl font-bold text-xs transition ${
+                          recipeAddType === 'stock' ? 'bg-coffee-primary text-white' : 'text-coffee-medium hover:bg-coffee-light'
+                        }`}
+                      >
+                        Nguyên liệu trong kho
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRecipeAddType('premix')}
+                        className={`px-3 py-1 rounded-xl font-bold text-xs transition ${
+                          recipeAddType === 'premix' ? 'bg-amber-600 text-white' : 'text-coffee-medium hover:bg-coffee-light'
+                        }`}
+                      >
+                        ⚡ Nguyên liệu pha sẵn
+                      </button>
+                    </div>
+
+                    {recipeAddType === 'stock' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                        <div className="sm:col-span-6">
+                          <select
+                            value={selectedStockIngId}
+                            onChange={(e) => setSelectedStockIngId(e.target.value)}
+                            className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light text-xs font-medium"
+                          >
+                            <option value="">-- Chọn nguyên liệu kho --</option>
+                            {ingredients.map(i => (
+                              <option key={i.id} value={i.id}>
+                                {i.name} ({i.unit})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <input
+                            type="number"
+                            value={selectedStockQty}
+                            onChange={(e) => setSelectedStockQty(e.target.value)}
+                            placeholder="Số lượng"
+                            min={0}
+                            step={0.1}
+                            className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light text-xs font-bold"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const qty = Number(selectedStockQty);
+                              if (!selectedStockIngId || qty <= 0) {
+                                toast.error('Vui lòng chọn nguyên liệu và số lượng > 0!');
+                                return;
+                              }
+                              handleAddStockIngredient(selectedStockIngId, qty);
+                              setSelectedStockQty('');
+                            }}
+                            className="w-full py-2 bg-coffee-primary hover:bg-coffee-dark text-white rounded-xl font-bold text-xs transition"
+                          >
+                            + Thêm
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                        <div className="sm:col-span-6">
+                          <select
+                            value={selectedPremixType}
+                            onChange={(e) => setSelectedPremixType(e.target.value as any)}
+                            className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light text-xs font-medium"
+                          >
+                            <option value="nuoc_duong">Nước đường (tự quy đổi đường kho)</option>
+                            <option value="hong_tra">Nước cốt hồng trà (tự quy đổi trà kho)</option>
+                            <option value="kem_muoi">Kem muối (tự quy đổi 4 nguyên liệu)</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <input
+                            type="number"
+                            value={selectedPremixMl}
+                            onChange={(e) => setSelectedPremixMl(e.target.value)}
+                            placeholder="Số ml"
+                            min={1}
+                            className="w-full bg-white px-3 py-2 rounded-xl border border-coffee-light text-xs font-bold"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ml = Number(selectedPremixMl);
+                              if (ml <= 0) {
+                                toast.error('Vui lòng nhập số ml > 0!');
+                                return;
+                              }
+                              handleAddPremixIngredient(selectedPremixType, ml);
+                              setSelectedPremixMl('');
+                            }}
+                            className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition"
+                          >
+                            + Thêm
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 5. Phụ liệu & Tính giá vốn */}
+                <div className="space-y-2 pt-2 border-t border-coffee-light">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-coffee-medium uppercase">
+                      Chi phí phụ liệu ngoài kho (Ly, nắp, ống hút, túi mang về...)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={prodBaseCost || ''}
+                      onChange={(e) => setProdBaseCost(Number(e.target.value))}
+                      placeholder="VD: 1500 (VND)"
+                      min={0}
+                      step={100}
+                      className="w-full bg-[#FAF6F0] px-4 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-bold"
+                    />
+                  </div>
+
+                  {/* Thẻ thống kê tài chính dự tính */}
+                  <div className="p-4 bg-[#FAF6F0] rounded-2xl border border-coffee-light grid grid-cols-3 gap-2 text-center mt-2">
+                    <div>
+                      <span className="text-[10px] text-coffee-medium uppercase font-bold block">Giá vốn ước tính</span>
+                      <span className="text-sm font-extrabold text-red-600">
+                        {estCost.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-coffee-medium uppercase font-bold block">Lãi gộp / ly</span>
+                      <span className="text-sm font-extrabold text-green-600">
+                        {profit.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-coffee-medium uppercase font-bold block">Biên lợi nhuận</span>
+                      <span className="text-sm font-extrabold text-coffee-dark">
+                        {profitMargin}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={savingProduct}
+                    className="w-full py-3.5 bg-coffee-primary hover:bg-coffee-dark text-white font-extrabold text-sm rounded-2xl shadow transition flex items-center justify-center space-x-2"
+                  >
+                    {savingProduct ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang lưu đồ uống...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>{editingProduct ? 'Lưu cập nhật đồ uống' : 'Thêm món vào thực đơn'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* POPUP FORM CRUD NHÂN VIÊN */}
       {isStaffModalOpen && (

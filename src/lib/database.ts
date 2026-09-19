@@ -65,7 +65,8 @@ const realtimeListeners: { [event: string]: Set<(payload: any) => void> } = {
   table_update: new Set(),
   order_update: new Set(),
   report_update: new Set(),
-  inventory_update: new Set()
+  inventory_update: new Set(),
+  attendance_update: new Set()
 };
 
 function getSharedRealtimeChannel() {
@@ -93,6 +94,11 @@ function getSharedRealtimeChannel() {
       })
       .on('broadcast', { event: 'inventory_update' }, (payload: any) => {
         realtimeListeners['inventory_update']?.forEach(fn => {
+          try { fn(payload); } catch (e) { console.error(e); }
+        });
+      })
+      .on('broadcast', { event: 'attendance_update' }, (payload: any) => {
+        realtimeListeners['attendance_update']?.forEach(fn => {
           try { fn(payload); } catch (e) { console.error(e); }
         });
       })
@@ -143,7 +149,7 @@ function getSharedRealtimeChannel() {
   return sharedRealtimeChannel;
 }
 
-export function broadcastRealtimeEvent(event: 'table_update' | 'order_update' | 'report_update' | 'inventory_update', payload?: any) {
+export function broadcastRealtimeEvent(event: 'table_update' | 'order_update' | 'report_update' | 'inventory_update' | 'attendance_update', payload?: any) {
   try {
     const ch = getSharedRealtimeChannel();
     if (ch) {
@@ -271,6 +277,24 @@ const MOCK_PRODUCTS = [
     price: 30000,
     cost_price: 9619,
     image_url: '/products/TUK004.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'TUK005',
+    category_id: 'c_douongkhac',
+    name: 'Chanh đá',
+    price: 15000,
+    cost_price: 1618,
+    image_url: '/products/TUK005.png',
+    status: 'Còn hàng' as const
+  },
+  {
+    id: 'TUK006',
+    category_id: 'c_douongkhac',
+    name: 'Chanh nóng',
+    price: 15000,
+    cost_price: 2237,
+    image_url: '/products/TUK006.png',
     status: 'Còn hàng' as const
   },
   // Trà (T)
@@ -676,6 +700,14 @@ export const MOCK_RECIPES = [
   { id: 'rec_tuk4_suadac_km', product_id: 'TUK004', ingredient_id: 'ing_suadac', quantity_needed: 1.33, unit: 'g' },
   { id: 'rec_tuk4_suatuoi_km', product_id: 'TUK004', ingredient_id: 'ing_suatuoi', quantity_needed: 2, unit: 'ml' },
   { id: 'rec_tuk4_5', product_id: 'TUK004', ingredient_id: 'ing_lytrang', quantity_needed: 1, unit: 'cái' },
+
+  // 9.1. Chanh đá
+  { id: 'rec_tuk5_duong', product_id: 'TUK005', ingredient_id: 'ing_duong', quantity_needed: 41.67, unit: 'g' },
+  { id: 'rec_tuk5_ly', product_id: 'TUK005', ingredient_id: 'ing_lytratac', quantity_needed: 1, unit: 'cái' },
+
+  // 9.2. Chanh nóng
+  { id: 'rec_tuk6_duong', product_id: 'TUK006', ingredient_id: 'ing_duong', quantity_needed: 41.67, unit: 'g' },
+  { id: 'rec_tuk6_ly', product_id: 'TUK006', ingredient_id: 'ing_lyden', quantity_needed: 1, unit: 'cái' },
 
   // 10. Trà tắc
   { id: 'rec_t1_lytratac', product_id: 'T001', ingredient_id: 'ing_lytratac', quantity_needed: 1, unit: 'cái' },
@@ -1448,6 +1480,187 @@ export const db = {
     return true;
   },
 
+  // Tạo sản phẩm kèm công thức định lượng và chi phí phụ liệu cố định (Base Cost)
+  async createProductWithRecipe(
+    productData: {
+      name: string;
+      price: number;
+      category_id: string;
+      image_url?: string;
+      status: 'Còn hàng' | 'Hết hàng';
+      base_cost?: number;
+    },
+    recipes: Array<{ ingredient_id: string; quantity_needed: number }>
+  ) {
+    cachedProducts = null;
+    const prodId = generateShortId('p_');
+    const baseCost = Number(productData.base_cost || 0);
+
+    // Tính tổng giá vốn dự tính (giá nguyên liệu kho theo định lượng + chi phí cứng)
+    const ingredients = await this.getIngredients();
+    let calculatedCost = baseCost;
+    for (const r of recipes) {
+      const ing = ingredients.find(i => i.id === r.ingredient_id);
+      const unitCost = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+      calculatedCost += r.quantity_needed * unitCost;
+    }
+    calculatedCost = Math.round(calculatedCost);
+
+    if (isSupabaseConfigured && supabase) {
+      // 1. Tạo sản phẩm
+      const { data: newProd, error: prodErr } = await supabase
+        .from('sanpham')
+        .insert([{
+          id: prodId,
+          ten_san_pham: productData.name.trim(),
+          gia_ban: Number(productData.price),
+          gia_von: calculatedCost,
+          id_danh_muc: productData.category_id,
+          hinh_anh: productData.image_url || '/logo.jpg',
+          trang_thai: productData.status
+        }])
+        .select()
+        .single();
+
+      if (prodErr) throw prodErr;
+
+      // 2. Chèn công thức định lượng nếu có
+      if (recipes.length > 0) {
+        const recipeRows = recipes.map(r => ({
+          id: generateShortId('rec_'),
+          id_san_pham: prodId,
+          id_nguyen_lieu: r.ingredient_id,
+          dinh_luong: r.quantity_needed
+        }));
+        await supabase.from('dinhluong').insert(recipeRows);
+      }
+
+      broadcastRealtimeEvent('order_update');
+      return mapProductToClient(newProd);
+    } else {
+      const products = mockDb.getProducts();
+      const newProd = {
+        id: prodId,
+        name: productData.name.trim(),
+        price: Number(productData.price),
+        cost_price: calculatedCost,
+        category_id: productData.category_id,
+        image_url: productData.image_url || '/logo.jpg',
+        status: productData.status
+      };
+      (products as any[]).push(newProd);
+      mockDb.setProducts(products);
+
+      if (recipes.length > 0) {
+        const mockRecipes = mockDb.getRecipes();
+        recipes.forEach(r => {
+          const ing = ingredients.find(i => i.id === r.ingredient_id);
+          mockRecipes.push({
+            id: generateShortId('rec_'),
+            product_id: prodId,
+            ingredient_id: r.ingredient_id,
+            quantity_needed: r.quantity_needed,
+            unit: (ing as any)?.unit || 'g'
+          });
+        });
+        mockDb.setRecipes(mockRecipes);
+      }
+
+      broadcastRealtimeEvent('order_update');
+      return newProd;
+    }
+  },
+
+  // Cập nhật sản phẩm kèm làm mới công thức định lượng
+  async updateProductWithRecipe(
+    productId: string,
+    productData: {
+      name: string;
+      price: number;
+      category_id: string;
+      image_url?: string;
+      status: 'Còn hàng' | 'Hết hàng';
+      base_cost?: number;
+    },
+    recipes: Array<{ ingredient_id: string; quantity_needed: number }>
+  ) {
+    cachedProducts = null;
+    const baseCost = Number(productData.base_cost || 0);
+    const ingredients = await this.getIngredients();
+    let calculatedCost = baseCost;
+    for (const r of recipes) {
+      const ing = ingredients.find(i => i.id === r.ingredient_id);
+      const unitCost = ing ? Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0) : 0;
+      calculatedCost += r.quantity_needed * unitCost;
+    }
+    calculatedCost = Math.round(calculatedCost);
+
+    if (isSupabaseConfigured && supabase) {
+      // 1. Cập nhật thông tin món
+      const { data: updatedProd, error: prodErr } = await supabase
+        .from('sanpham')
+        .update({
+          ten_san_pham: productData.name.trim(),
+          gia_ban: Number(productData.price),
+          gia_von: calculatedCost,
+          id_danh_muc: productData.category_id,
+          hinh_anh: productData.image_url || '/logo.jpg',
+          trang_thai: productData.status
+        })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (prodErr) throw prodErr;
+
+      // 2. Xóa công thức cũ và chèn công thức mới
+      await supabase.from('dinhluong').delete().eq('id_san_pham', productId);
+      if (recipes.length > 0) {
+        const recipeRows = recipes.map(r => ({
+          id: generateShortId('rec_'),
+          id_san_pham: productId,
+          id_nguyen_lieu: r.ingredient_id,
+          dinh_luong: r.quantity_needed
+        }));
+        await supabase.from('dinhluong').insert(recipeRows);
+      }
+
+      broadcastRealtimeEvent('order_update');
+      return mapProductToClient(updatedProd);
+    } else {
+      const products = mockDb.getProducts();
+      const pIdx = products.findIndex(p => p.id === productId);
+      if (pIdx !== -1) {
+        products[pIdx] = {
+          ...products[pIdx],
+          name: productData.name.trim(),
+          price: Number(productData.price),
+          cost_price: calculatedCost,
+          category_id: productData.category_id,
+          image_url: productData.image_url || '/logo.jpg',
+          status: productData.status
+        } as any;
+        mockDb.setProducts(products);
+      }
+
+      const allRecipes = mockDb.getRecipes().filter(r => r.product_id !== productId);
+      recipes.forEach(r => {
+        const ing = ingredients.find(i => i.id === r.ingredient_id);
+        allRecipes.push({
+          id: generateShortId('rec_'),
+          product_id: productId,
+          ingredient_id: r.ingredient_id,
+          quantity_needed: r.quantity_needed,
+          unit: (ing as any)?.unit || 'g'
+        });
+      });
+      mockDb.setRecipes(allRecipes);
+
+      broadcastRealtimeEvent('order_update');
+      return products[pIdx];
+    }
+  },
+
   // --- ORDERS & ORDER ITEMS (hoadon & hoadondetail) ---
   // Tải nhanh danh sách hóa đơn CHƯA THANH TOÁN (tối ưu hóa tốc độ cực nhanh cho POS & Thanh toán)
   async getUnpaidOrders() {
@@ -2051,39 +2264,75 @@ export const db = {
     return false;
   },
 
-  async cancelPaidOrder(orderId: string) {
+  async cancelPaidOrder(orderId: string, staffId: string = 'system', reason: string = 'Nhân viên hủy đơn tại ca trực') {
+    // Tương thích ngược: tự động chuyển thành yêu cầu duyệt hủy
+    return await this.requestCancelPaidOrder(orderId, staffId, reason);
+  },
+
+  // 1. Nhân viên gửi yêu cầu hủy đơn đã thanh toán:
+  // Kho tạm hoàn ngay lập tức (ghi log Chờ duyệt), đơn chuyển trạng thái 'Chờ duyệt hủy'
+  async requestCancelPaidOrder(orderId: string, staffId: string = 'system', reason: string = '') {
     try {
       let items: any[] = [];
+      const cleanReason = reason.trim() || 'Hủy đơn tại ca trực';
+
       if (isSupabaseConfigured && supabase) {
-        // 1. Kiểm tra trạng thái đơn: Chỉ hoàn kho nếu đơn thực sự ĐÃ THANH TOÁN (đã trừ kho)
+        // Kiểm tra hóa đơn
         const { data: orderData } = await supabase
           .from('hoadon')
-          .select('trang_thai_thanh_toan')
+          .select('id, trang_thai_thanh_toan, ghi_chu, id_ban')
           .eq('id', orderId)
           .single();
 
-        if (orderData?.trang_thai_thanh_toan !== 'Đã thanh toán') {
-          // Chưa thanh toán -> chưa từng trừ kho -> chỉ xóa hóa đơn, không hoàn kho
+        if (!orderData) throw new Error('Không tìm thấy hóa đơn cần hủy.');
+        if (orderData.trang_thai_thanh_toan === 'Đã hủy') {
+          throw new Error('Hóa đơn này đã bị hủy trước đó.');
+        }
+        if (orderData.trang_thai_thanh_toan === 'Chờ duyệt hủy') {
+          throw new Error('Hóa đơn này đang trong danh sách chờ Admin phê duyệt hủy.');
+        }
+
+        // Nếu đơn chưa thanh toán -> chỉ xóa đơn và giải phóng bàn (chưa từng trừ kho)
+        if (orderData.trang_thai_thanh_toan !== 'Đã thanh toán') {
           return await this.cancelOrder(orderId);
         }
 
-        // 2. Lấy chi tiết hóa đơn từ Supabase
+        // Lấy chi tiết món để hoàn kho
         const { data: dbItems } = await supabase
           .from('hoadondetail')
           .select('idsp, so_luong')
           .eq('idhoadon', orderId);
-        
+
         if (dbItems && dbItems.length > 0) {
           items = dbItems.map(item => ({
             product_id: item.idsp,
             quantity: item.so_luong
           }));
         }
+
+        const updatedNote = [orderData.ghi_chu, `[Chờ duyệt hủy] Lý do: ${cleanReason}`].filter(Boolean).join(' | ');
+
+        // Cập nhật trạng thái hóa đơn thành 'Chờ duyệt hủy'
+        await supabase
+          .from('hoadon')
+          .update({
+            trang_thai_thanh_toan: 'Chờ duyệt hủy',
+            ghi_chu: updatedNote
+          })
+          .eq('id', orderId);
+
       } else {
-        // Mock DB
+        // Mock DB Fallback
         const orders = mockDb.getOrders();
         const targetOrder = orders.find(o => o.id === orderId);
-        if (targetOrder?.payment_status !== 'Đã thanh toán') {
+        if (!targetOrder) throw new Error('Không tìm thấy hóa đơn.');
+        if ((targetOrder.payment_status as any) === 'Đã hủy') {
+          throw new Error('Hóa đơn này đã bị hủy trước đó.');
+        }
+        if ((targetOrder.payment_status as any) === 'Chờ duyệt hủy') {
+          throw new Error('Hóa đơn này đang chờ Admin phê duyệt hủy.');
+        }
+        if (targetOrder.payment_status !== 'Đã thanh toán') {
           return await this.cancelOrder(orderId);
         }
 
@@ -2092,20 +2341,207 @@ export const db = {
           product_id: item.product_id,
           quantity: item.quantity
         }));
+
+        targetOrder.payment_status = 'Chờ duyệt hủy' as any;
+        targetOrder.notes = [targetOrder.notes, `[Chờ duyệt hủy] Lý do: ${cleanReason}`].filter(Boolean).join(' | ');
+        mockDb.setOrders(orders);
       }
 
-      // 3. Hoàn lại tồn kho
+      // Tạm thời hoàn trả kho ngay lập tức, nhưng log kho được gắn trạng thái 'Chờ duyệt'
       if (items.length > 0) {
-        await this.restoreStockFromOrder(items);
+        await this.restoreStockFromOrder(items, {
+          orderId,
+          staffId,
+          status: 'Chờ duyệt',
+          reason: `[Chờ duyệt hủy đơn #${orderId}] ${cleanReason}`
+        });
       }
 
-      // 4. Xóa hóa đơn và giải phóng bàn
-      const success = await this.cancelOrder(orderId);
+      broadcastRealtimeEvent('order_update');
       broadcastRealtimeEvent('inventory_update');
-      return success;
+      broadcastRealtimeEvent('report_update');
+      return true;
+    } catch (e: any) {
+      console.error('Lỗi khi gửi yêu cầu hủy hóa đơn đã thanh toán:', e);
+      throw e;
+    }
+  },
+
+  // 2. Admin Phê duyệt / Từ chối hủy hóa đơn:
+  // - Đồng ý: Giữ nguyên hủy, log kho thành 'Đã duyệt', đơn thành 'Đã hủy'.
+  // - Từ chối: Khôi phục đơn về 'Đã thanh toán' (lấy lại doanh thu đúng khoảng thời gian ban đầu),
+  //   đồng thời thu hồi kho (trừ kho trở lại số lượng đã hoàn) để kho không còn cộng đơn đó nữa.
+  async approveOrderCancellation(orderId: string, adminId: string, approved: boolean) {
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { data: orderData } = await supabase
+          .from('hoadon')
+          .select('id, trang_thai_thanh_toan, ghi_chu, id_ban')
+          .eq('id', orderId)
+          .single();
+
+        if (!orderData) throw new Error('Không tìm thấy hóa đơn cần duyệt.');
+
+        if (approved) {
+          // ADMIN ĐỒNG Ý HỦY:
+          const updatedNote = [orderData.ghi_chu, `[Admin đã duyệt hủy]`].filter(Boolean).join(' | ');
+          await supabase
+            .from('hoadon')
+            .update({
+              trang_thai_thanh_toan: 'Đã hủy',
+              ghi_chu: updatedNote
+            })
+            .eq('id', orderId);
+
+          // Cập nhật các log hoàn kho tạm sang 'Đã duyệt'
+          await supabase
+            .from('lichsukho')
+            .update({ trang_thai: 'Đã duyệt' })
+            .ilike('ghi_chu', `%[Chờ duyệt hủy đơn #${orderId}]%`)
+            .eq('trang_thai', 'Chờ duyệt');
+
+        } else {
+          // ADMIN TỪ CHỐI HỦY:
+          // 1. Khôi phục đơn về 'Đã thanh toán'
+          const updatedNote = [orderData.ghi_chu, `[Admin từ chối hủy - Khôi phục đơn]`].filter(Boolean).join(' | ');
+          await supabase
+            .from('hoadon')
+            .update({
+              trang_thai_thanh_toan: 'Đã thanh toán',
+              ghi_chu: updatedNote
+            })
+            .eq('id', orderId);
+
+          // 2. Tìm tất cả log hoàn kho tạm thời của đơn này
+          const { data: pendingLogs } = await supabase
+            .from('lichsukho')
+            .select('*')
+            .ilike('ghi_chu', `%[Chờ duyệt hủy đơn #${orderId}]%`)
+            .eq('trang_thai', 'Chờ duyệt');
+
+          if (pendingLogs && pendingLogs.length > 0) {
+            // Chuyển các log cũ thành 'Từ chối'
+            const logIds = pendingLogs.map(l => l.id);
+            await supabase
+              .from('lichsukho')
+              .update({ trang_thai: 'Từ chối' })
+              .in('id', logIds);
+
+            // 3. Thu hồi kho: Trừ ngược lại số lượng đã cộng tạm thời
+            const ingredients = await this.getIngredients();
+            const revokeLogs: any[] = [];
+
+            for (const pLog of pendingLogs) {
+              const ing = ingredients.find(i => i.id === pLog.id_nguyen_lieu);
+              const restoreQty = Number(pLog.so_luong_thay_doi || 0);
+              if (ing && restoreQty > 0) {
+                const currentStock = Number(ing.stock_quantity ?? (ing as any).so_luong_ton ?? 0) || 0;
+                const newStock = Math.max(0, currentStock - restoreQty);
+                await supabase
+                  .from('nguyenlieu')
+                  .update({ so_luong_ton: newStock })
+                  .eq('id', ing.id);
+
+                revokeLogs.push({
+                  id: generateShortId('inv_'),
+                  id_nguyen_lieu: ing.id,
+                  so_luong_thay_doi: -restoreQty,
+                  loai_giao_dich: 'Xuất kho',
+                  chi_phi: 0,
+                  ghi_chu: `[Từ chối hủy đơn #${orderId}] Thu hồi kho về trạng thái đã bán`,
+                  id_nhan_vien: adminId,
+                  trang_thai: 'Đã duyệt'
+                });
+              }
+            }
+
+            if (revokeLogs.length > 0) {
+              await supabase.from('lichsukho').insert(revokeLogs);
+            }
+          }
+        }
+      } else {
+        // Mock DB Fallback
+        const orders = mockDb.getOrders();
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (!targetOrder) throw new Error('Không tìm thấy hóa đơn.');
+
+        if (approved) {
+          targetOrder.payment_status = 'Đã hủy' as any;
+          targetOrder.notes = [targetOrder.notes, `[Admin đã duyệt hủy]`].filter(Boolean).join(' | ');
+
+          const logs = mockDb.getInventoryLogs();
+          logs.forEach(l => {
+            if (l.note?.includes(`[Chờ duyệt hủy đơn #${orderId}]`) && l.status === 'Chờ duyệt') {
+              l.status = 'Đã duyệt';
+            }
+          });
+          mockDb.setInventoryLogs(logs);
+          mockDb.setOrders(orders);
+        } else {
+          targetOrder.payment_status = 'Đã thanh toán';
+          targetOrder.notes = [targetOrder.notes, `[Admin từ chối hủy - Khôi phục đơn]`].filter(Boolean).join(' | ');
+
+          const logs = mockDb.getInventoryLogs();
+          const ingredients = mockDb.getIngredients();
+
+          logs.forEach(l => {
+            if (l.note?.includes(`[Chờ duyệt hủy đơn #${orderId}]`) && l.status === 'Chờ duyệt') {
+              l.status = 'Từ chối';
+              const ing = ingredients.find(i => i.id === l.ingredient_id);
+              if (ing && l.change_amount > 0) {
+                ing.stock_quantity = Math.max(0, Number(ing.stock_quantity || 0) - l.change_amount);
+              }
+            }
+          });
+
+          logs.push({
+            id: generateShortId('inv_'),
+            ingredient_id: '',
+            custom_ingredient_name: 'Thu hồi tồn kho đơn hủy',
+            change_amount: 0,
+            type: 'Khác' as const,
+            cost: 0,
+            note: `[Từ chối hủy đơn #${orderId}] Thu hồi kho về trạng thái đã bán`,
+            staff_id: adminId,
+            created_at: new Date().toISOString(),
+            status: 'Đã duyệt' as const
+          });
+
+          mockDb.setIngredients(ingredients);
+          mockDb.setInventoryLogs(logs);
+          mockDb.setOrders(orders);
+        }
+      }
+
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('inventory_update');
+      broadcastRealtimeEvent('report_update');
+      return true;
+    } catch (e: any) {
+      console.error('Lỗi khi duyệt hủy đơn hàng:', e);
+      throw e;
+    }
+  },
+
+  // 3. Lấy danh sách hóa đơn đang chờ Admin duyệt hủy
+  async getPendingCancelOrders() {
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { data: pendingOrders } = await supabase
+          .from('hoadon')
+          .select('*, danhsachban(ten_ban), nguoidung(ho_ten), hoadondetail(*)')
+          .eq('trang_thai_thanh_toan', 'Chờ duyệt hủy')
+          .order('ngay_tao', { ascending: false });
+
+        return (pendingOrders || []).map(o => mapOrderToClient(o));
+      } else {
+        const orders = mockDb.getOrders().filter(o => (o.payment_status as any) === 'Chờ duyệt hủy');
+        return orders;
+      }
     } catch (e) {
-      console.error('Lỗi khi hủy hóa đơn đã thanh toán:', e);
-      return false;
+      console.error('Lỗi khi lấy danh sách đơn chờ duyệt hủy:', e);
+      return [];
     }
   },
 
@@ -2645,7 +3081,141 @@ export const db = {
     return null;
   },
 
-  // --- LEAVE REQUESTS (nghiphep) ---
+  // --- CHẤM CÔNG NGOÀI GIỜ (DÀNH RIÊNG CHO QUẢN LÝ) ---
+  async createOvertimeTimeLog(payload: {
+    staff_id: string;
+    date: string; // YYYY-MM-DD
+    shift: string;
+    check_in_time: string; // ISO string
+    check_out_time: string; // ISO string
+    notes?: string;
+  }) {
+    const logId = generateShortId('ot_');
+    const noteText = `[Quản lý chấm ngoài giờ] ${payload.notes || ''}`.trim();
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('chamcong')
+        .insert([{
+          id: logId,
+          id_nhan_vien: payload.staff_id,
+          ca_lam: payload.shift,
+          gio_vao: payload.check_in_time,
+          gio_ra: payload.check_out_time,
+          thoi_gian_thuc_vao: payload.check_in_time,
+          thoi_gian_thuc_ra: payload.check_out_time,
+          vi_do: 10.8872,
+          kinh_do: 106.5932,
+          dia_chi: 'AVA Coffee Hóc Môn (Quản lý chấm ngoài giờ)',
+          trang_thai: 'Đã duyệt',
+          ghi_chu_vao: noteText,
+          ghi_chu_ra: noteText
+        }])
+        .select(`
+          *,
+          nguoidung (ho_ten, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      broadcastRealtimeEvent('attendance_update');
+      return mapTimeLogToClient(data);
+    } else {
+      const logs = mockDb.getTimeLogs();
+      const users = mockDb.getUsers();
+      const user = users.find(u => u.id === payload.staff_id);
+      const newLog = {
+        id: logId,
+        user_id: payload.staff_id,
+        shift: payload.shift,
+        check_in_time: payload.check_in_time,
+        check_out_time: payload.check_out_time,
+        submitted_at: payload.check_in_time,
+        real_check_out_time: payload.check_out_time,
+        latitude: 10.8872,
+        longitude: 106.5932,
+        location_address: 'AVA Coffee Hóc Môn (Quản lý chấm ngoài giờ)',
+        status: 'Đã duyệt' as const,
+        ghi_chu_vao: noteText,
+        ghi_chu_ra: noteText,
+        users: user ? { full_name: user.full_name, email: user.email } : undefined
+      };
+      logs.push(newLog);
+      mockDb.setTimeLogs(logs);
+      broadcastRealtimeEvent('attendance_update');
+      return newLog;
+    }
+  },
+
+  async updateOvertimeTimeLog(
+    id: string,
+    payload: {
+      staff_id: string;
+      shift: string;
+      check_in_time: string;
+      check_out_time: string;
+      notes?: string;
+    }
+  ) {
+    const noteText = `[Quản lý chấm ngoài giờ] ${payload.notes || ''}`.trim();
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('chamcong')
+        .update({
+          id_nhan_vien: payload.staff_id,
+          ca_lam: payload.shift,
+          gio_vao: payload.check_in_time,
+          gio_ra: payload.check_out_time,
+          thoi_gian_thuc_vao: payload.check_in_time,
+          thoi_gian_thuc_ra: payload.check_out_time,
+          ghi_chu_vao: noteText,
+          ghi_chu_ra: noteText
+        })
+        .eq('id', id)
+        .select(`
+          *,
+          nguoidung (ho_ten, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      broadcastRealtimeEvent('attendance_update');
+      return mapTimeLogToClient(data);
+    } else {
+      const logs = mockDb.getTimeLogs();
+      const users = mockDb.getUsers();
+      const idx = logs.findIndex(l => l.id === id);
+      if (idx !== -1) {
+        const user = users.find(u => u.id === payload.staff_id);
+        logs[idx] = {
+          ...logs[idx],
+          user_id: payload.staff_id,
+          shift: payload.shift,
+          check_in_time: payload.check_in_time,
+          check_out_time: payload.check_out_time,
+          ghi_chu_vao: noteText,
+          ghi_chu_ra: noteText,
+          users: user ? { full_name: user.full_name, email: user.email } : logs[idx].users
+        };
+        mockDb.setTimeLogs(logs);
+      }
+      broadcastRealtimeEvent('attendance_update');
+      return logs[idx];
+    }
+  },
+
+  async deleteOvertimeTimeLog(id: string) {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('chamcong').delete().eq('id', id);
+      if (error) throw error;
+    } else {
+      const logs = mockDb.getTimeLogs().filter(l => l.id !== id);
+      mockDb.setTimeLogs(logs);
+    }
+    broadcastRealtimeEvent('attendance_update');
+    return true;
+  },
   async getLeaveRequests() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
@@ -3276,8 +3846,16 @@ export const db = {
     }
   },
 
-  // Hoàn trả kho nguyên liệu khi hủy đơn hàng
-  async restoreStockFromOrder(items: Array<{ product_id: string; quantity: number }>) {
+  // Hoàn trả kho nguyên liệu khi hủy đơn hàng (hỗ trợ kiểm duyệt kho)
+  async restoreStockFromOrder(
+    items: Array<{ product_id: string; quantity: number }>,
+    options?: {
+      orderId?: string;
+      staffId?: string;
+      status?: 'Chờ duyệt' | 'Đã duyệt';
+      reason?: string;
+    }
+  ) {
     try {
       const recipes = await this.getRecipes();
       const ingredients = await this.getIngredients();
@@ -3302,6 +3880,8 @@ export const db = {
 
       const dbUpdates: any[] = [];
       const historyLogsToInsert: any[] = [];
+      const logStatus = options?.status || 'Đã duyệt';
+      const staffId = options?.staffId || 'system';
 
       for (const ingId in ingChanges) {
         const ing = ingredients.find(i => i.id === ingId);
@@ -3310,6 +3890,11 @@ export const db = {
           const currentStock = Number(ing.stock_quantity ?? (ing as any).so_luong_ton ?? 0) || 0;
           ing.stock_quantity = currentStock + restoreQty;
           updated = true;
+
+          const defaultNote = options?.orderId
+            ? `Hoàn kho do hủy đơn #${options.orderId} (Mã SP: ${productIds.join(', ')})`
+            : `Hoàn kho do hủy đơn hàng (Mã SP: ${productIds.join(', ')})`;
+          const logNote = options?.reason ? options.reason : defaultNote;
 
           if (isSupabaseConfigured && supabase) {
             dbUpdates.push(
@@ -3321,8 +3906,9 @@ export const db = {
               so_luong_thay_doi: restoreQty,
               loai_giao_dich: 'Khác',
               chi_phi: 0,
-              ghi_chu: `Hoàn kho do hủy đơn hàng (Mã SP: ${productIds.join(', ')})`,
-              trang_thai: 'Đã duyệt'
+              ghi_chu: logNote,
+              id_nhan_vien: staffId,
+              trang_thai: logStatus
             });
           } else {
             const logs = mockDb.getInventoryLogs();
@@ -3333,10 +3919,10 @@ export const db = {
               change_amount: restoreQty,
               type: 'Khác' as const,
               cost: 0,
-              note: `Hoàn kho do hủy đơn hàng (Mã SP: ${productIds.join(', ')})`,
-              staff_id: 'system',
+              note: logNote,
+              staff_id: staffId,
               created_at: new Date().toISOString(),
-              status: 'Đã duyệt' as const
+              status: logStatus
             });
             mockDb.setInventoryLogs(logs);
           }

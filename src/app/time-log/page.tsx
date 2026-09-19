@@ -630,14 +630,27 @@ export default function TimeLogPage() {
                     <span className="line-clamp-2">{log.location_address || `Tọa độ: ${log.latitude}, ${log.longitude}`}</span>
                   </a>
 
-                  {new Date(log.check_in_time).toDateString() === new Date().toDateString() && (
-                    <button
-                      onClick={() => handleOpenEditModal(log)}
-                      className="w-full mt-2 py-2 bg-coffee-primary/10 hover:bg-coffee-primary hover:text-white text-coffee-primary font-bold text-[10px] rounded-xl transition flex items-center justify-center space-x-1 border border-coffee-primary/25"
-                    >
-                      ✏️ Chỉnh sửa lại giờ làm hôm nay
-                    </button>
-                  )}
+                  {(() => {
+                    const isOvertimeByAdmin = log.ghi_chu_vao?.includes('[Quản lý chấm ngoài giờ]') || log.ghi_chu_ra?.includes('[Quản lý chấm ngoài giờ]');
+                    if (isOvertimeByAdmin) {
+                      return (
+                        <div className="w-full mt-2 py-2 bg-purple-50 text-purple-700 text-[10px] font-semibold rounded-xl text-center border border-purple-200">
+                          🔒 Ca do Quản lý chấm trực tiếp, nhân viên không thể chỉnh sửa.
+                        </div>
+                      );
+                    }
+                    if (new Date(log.check_in_time).toDateString() === new Date().toDateString()) {
+                      return (
+                        <button
+                          onClick={() => handleOpenEditModal(log)}
+                          className="w-full mt-2 py-2 bg-coffee-primary/10 hover:bg-coffee-primary hover:text-white text-coffee-primary font-bold text-[10px] rounded-xl transition flex items-center justify-center space-x-1 border border-coffee-primary/25 cursor-pointer"
+                        >
+                          ✏️ Chỉnh sửa lại giờ làm hôm nay
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               ))
             )}
