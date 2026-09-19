@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { db, StoreSettings } from '@/lib/database';
 
 // Helper to remove Vietnamese diacritics (accents) to ensure correct printing on any device
 export function removeDiacritics(str: string): string {
@@ -107,14 +108,14 @@ class EscPosBuilder {
   }
 }
 
-interface OrderItem {
+export interface OrderItem {
   name: string;
   price: number;
   quantity: number;
   subtotal: number;
 }
 
-interface OrderData {
+export interface OrderData {
   tableName: string;
   staffName: string;
   items: OrderItem[];
@@ -125,18 +126,27 @@ interface OrderData {
 }
 
 // Build standard K80 format ESC/POS receipt data
-export function buildReceiptBytes(orderData: OrderData): Uint8Array {
+export function buildReceiptBytes(orderData: OrderData, settings?: Partial<StoreSettings>): Uint8Array {
   const builder = new EscPosBuilder();
   const now = new Date().toLocaleString('vi-VN');
+  const storeName = settings?.store_name || 'AVA COFFEE';
 
   // Header
   builder.alignCenter()
     .fontSizeDouble()
     .bold(true)
-    .line('AVA COFFEE')
+    .line(storeName)
     .fontSizeNormal()
-    .bold(false)
-    .line('------------------------------------------------') // 48 chars
+    .bold(false);
+
+  if (settings?.store_address) {
+    builder.line(removeDiacritics(settings.store_address));
+  }
+  if (settings?.store_phone) {
+    builder.line(`Hotline: ${settings.store_phone}`);
+  }
+
+  builder.line('------------------------------------------------') // 48 chars
     .feed(1);
 
   // Table & Order Info
@@ -191,11 +201,17 @@ export function buildReceiptBytes(orderData: OrderData): Uint8Array {
     .feed(1);
 
   // Footer
-  builder.alignCenter()
-    .bold(true)
-    .line('AVA COFFEE XIN CAM ON !')
-    .line('CHUC QUY KHACH NGON MIENG')
-    .bold(false)
+  builder.alignCenter().bold(true);
+  if (settings?.bill_footer) {
+    const lines = settings.bill_footer.split('\n');
+    lines.forEach(l => {
+      if (l.trim()) builder.line(removeDiacritics(l.trim()));
+    });
+  } else {
+    builder.line('AVA COFFEE XIN CAM ON !')
+      .line('CHUC QUY KHACH NGON MIENG');
+  }
+  builder.bold(false)
     .feed(4) // Feed 4 lines before cutting to clear the print head
     .cut();
 
@@ -205,30 +221,34 @@ export function buildReceiptBytes(orderData: OrderData): Uint8Array {
 // Print order directly via TCP Socket
 export async function printOrderDirect(
   orderData: OrderData,
-  printerIP: string = '192.168.1.232',
-  port: number = 9100
+  printerIP?: string,
+  port?: number
 ): Promise<void> {
+  const storeSettings = db.getStoreSettingsSync();
+  const targetIP = printerIP || storeSettings.printer_ip || '192.168.1.232';
+  const targetPort = port || storeSettings.printer_port || 9100;
+
   // If not running in native Capacitor platform, do not try to open TCP connection
   if (!Capacitor.isNativePlatform()) {
     console.log('[Web/Browser Dev Mode] Skipping TCP socket print. Order data:', orderData);
     return;
   }
 
-  console.log(`[Native Mode] Initiating TCP printing to ${printerIP}:${port}`);
+  console.log(`[Native Mode] Initiating TCP printing to ${targetIP}:${targetPort}`);
   
   let connection: any = null;
   try {
     // Dynamic import of the plugin to ensure it's not resolved during web SSR builds
     const { TCPClient } = await import('@devioarts/capacitor-tcpclient');
 
-    const receiptBytes = buildReceiptBytes(orderData);
+    const receiptBytes = buildReceiptBytes(orderData, storeSettings);
     
     // Create socket connection
     const connectionId = `printer-${Date.now()}`;
     connection = TCPClient.createConnection({
       connectionId,
-      host: printerIP,
-      port: port
+      host: targetIP,
+      port: targetPort
     });
 
     console.log('[TCP] Connecting to printer...');
@@ -248,6 +268,81 @@ export async function printOrderDirect(
         await connection.destroy();
       } catch (err) {
         console.error('[TCP Close Error] Failed to destroy connection:', err);
+      }
+    }
+  }
+}
+
+// In thử kết nối máy in (Test Ticket)
+export async function printTestTicket(settings?: Partial<StoreSettings>): Promise<{ success: boolean; isWeb?: boolean; message: string }> {
+  // Kiểm tra môi trường Web: Trình duyệt web không thể mở TCP socket trực tiếp
+  if (!Capacitor.isNativePlatform()) {
+    return {
+      success: false,
+      isWeb: true,
+      message: 'Tính năng in trực tiếp qua mạng LAN chỉ hoạt động trên App Android (APK/máy POS). Cấu hình này đã được lưu để máy POS sử dụng!'
+    };
+  }
+
+  const currentSettings = { ...db.getStoreSettingsSync(), ...settings };
+  const targetIP = currentSettings.printer_ip || '192.168.1.232';
+  const targetPort = Number(currentSettings.printer_port || 9100);
+
+  const builder = new EscPosBuilder();
+  builder.alignCenter()
+    .fontSizeDouble()
+    .bold(true)
+    .line(removeDiacritics(currentSettings.store_name || 'AVA COFFEE'))
+    .fontSizeNormal()
+    .bold(false)
+    .line('------------------------------------------------')
+    .feed(1)
+    .bold(true)
+    .line('*** KIEM TRA KET NOI MAY IN ***')
+    .bold(false)
+    .line(`Dia chi IP : ${targetIP}`)
+    .line(`Cong Port  : ${targetPort}`)
+    .line(`Thoi gian  : ${new Date().toLocaleString('vi-VN')}`)
+    .feed(1)
+    .line('------------------------------------------------')
+    .bold(true)
+    .line('KET NOI MAY IN THANH CONG 100% !')
+    .line('SAN SANG IN BILL CHO KHACH HANG')
+    .bold(false)
+    .line('------------------------------------------------')
+    .feed(4)
+    .cut();
+
+  const payload = builder.getBuffer();
+  let connection: any = null;
+
+  try {
+    const { TCPClient } = await import('@devioarts/capacitor-tcpclient');
+    const connectionId = `printer-test-${Date.now()}`;
+    connection = TCPClient.createConnection({
+      connectionId,
+      host: targetIP,
+      port: targetPort
+    });
+
+    await connection.connect();
+    await connection.write({ data: payload });
+    return {
+      success: true,
+      message: `In test thành công tới máy in ${targetIP}:${targetPort}!`
+    };
+  } catch (err: any) {
+    console.error('[TCP Test Print Error]:', err);
+    return {
+      success: false,
+      message: `Không thể kết nối máy in ${targetIP}:${targetPort}: ${err?.message || 'Vui lòng kiểm tra IP máy in và kết nối Wi-Fi/LAN!'}`
+    };
+  } finally {
+    if (connection) {
+      try {
+        await connection.destroy();
+      } catch (e) {
+        console.error('[TCP Test Close Error]:', e);
       }
     }
   }

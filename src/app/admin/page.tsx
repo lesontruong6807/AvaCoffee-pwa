@@ -30,10 +30,29 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Calendar
+  Calendar,
+  Settings,
+  LayoutGrid,
+  Printer,
+  Download,
+  FileSpreadsheet,
+  FileJson,
+  Database,
+  ShieldAlert
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { exportInventoryToExcel, exportInventoryToPDF, exportRevenueToExcel, exportRevenueToPDF, exportProductSalesToExcel, exportProductSalesToPDF, exportAttendanceToExcel, exportAttendanceToPDF } from '@/lib/exportUtils';
+import { 
+  exportInventoryToExcel, 
+  exportInventoryToPDF, 
+  exportRevenueToExcel, 
+  exportRevenueToPDF, 
+  exportProductSalesToExcel, 
+  exportProductSalesToPDF, 
+  exportAttendanceToExcel, 
+  exportAttendanceToPDF,
+  exportFullDatabaseToExcel
+} from '@/lib/exportUtils';
+import { printTestTicket } from '@/lib/printerService';
 
 const generateShortId = (prefix: string = '') => {
   return `${prefix}${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
@@ -41,8 +60,51 @@ const generateShortId = (prefix: string = '') => {
 
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'sales' | 'inventory' | 'products' | 'staff' | 'attendance' | 'expenses' | 'overtime'>('approvals');
+  const [adminTab, setAdminTab] = useState<'approvals' | 'reports' | 'sales' | 'inventory' | 'products' | 'staff' | 'attendance' | 'expenses' | 'overtime' | 'tables' | 'settings'>('approvals');
   const [loading, setLoading] = useState(true);
+
+  // Dữ liệu quản trị mở rộng
+  const [tables, setTables] = useState<any[]>([]);
+  const [_storeSettings, setStoreSettings] = useState<any>(null);
+
+  // Form CRUD Bàn & Sơ đồ
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+  const [editingTable, setEditingTable] = useState<any>(null);
+  const [tableName, setTableName] = useState('');
+  const [tableCapacity, setTableCapacity] = useState('4');
+  const [tableStatus, setTableStatus] = useState<'Trống' | 'Đang phục vụ'>('Trống');
+  const [savingTable, setSavingTable] = useState(false);
+
+  // Form CRUD Nguyên liệu kho
+  const [isIngModalOpen, setIsIngModalOpen] = useState(false);
+  const [editingIng, setEditingIng] = useState<any>(null);
+  const [ingName, setIngName] = useState('');
+  const [ingUnit, setIngUnit] = useState('ml');
+  const [ingQuyCach, setIngQuyCach] = useState('');
+  const [ingMinStock, setIngMinStock] = useState('');
+  const [ingInitialStock, setIngInitialStock] = useState('');
+  const [ingDonGia, setIngDonGia] = useState('');
+  const [ingGiaVon, setIngGiaVon] = useState('');
+  const [savingIng, setSavingIng] = useState(false);
+
+  // Cài đặt Cửa hàng & Máy in LAN/Wi-Fi
+  const [cfgStoreName, setCfgStoreName] = useState('AVA COFFEE');
+  const [cfgStoreAddress, setCfgStoreAddress] = useState('Hóc Môn, TP. Hồ Chí Minh');
+  const [cfgStorePhone, setCfgStorePhone] = useState('0909 123 456');
+  const [cfgBillFooter, setCfgBillFooter] = useState('AVA COFFEE XIN CẢM ƠN QUÝ KHÁCH !\nCHÚC QUÝ KHÁCH NGON MIỆNG');
+  const [cfgPrinterIp, setCfgPrinterIp] = useState('192.168.1.232');
+  const [cfgPrinterPort, setCfgPrinterPort] = useState('9100');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [testingPrinter, setTestingPrinter] = useState(false);
+
+  // Sao lưu & Dọn dẹp an toàn 3 lớp
+  const [exportingJson, setExportingJson] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [cleanupHorizon, setCleanupHorizon] = useState<'180' | '365' | '548' | '730'>('365');
+  const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
+  const [cleanupConfirmText, setCleanupConfirmText] = useState('');
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const [lastBackupDownloaded, setLastBackupDownloaded] = useState(false);
 
   // Dữ liệu quản trị
   const [timeLogs, setTimeLogs] = useState<any[]>([]);
@@ -188,7 +250,7 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems, exps, recs] = await Promise.all([
+      const [logs, leaves, ords, prods, cats, usrs, invLogs, ings, ordItems, exps, recs, tbls, settings] = await Promise.all([
         db.getTimeLogs(),
         db.getLeaveRequests(),
         db.getOrders(),
@@ -199,7 +261,9 @@ export default function AdminPage() {
         db.getIngredients(),
         db.getAllOrderItems(),
         db.getExpenses(),
-        db.getRecipes()
+        db.getRecipes(),
+        db.getTables(true),
+        db.getStoreSettings()
       ]);
       setTimeLogs(logs);
       setLeaveRequests(leaves);
@@ -212,6 +276,16 @@ export default function AdminPage() {
       setAllOrderItems(ordItems);
       setExpenses(exps);
       setRecipes(recs);
+      setTables(tbls);
+      setStoreSettings(settings);
+      if (settings) {
+        setCfgStoreName(settings.store_name || 'AVA COFFEE');
+        setCfgStoreAddress(settings.store_address || 'Hóc Môn, TP. Hồ Chí Minh');
+        setCfgStorePhone(settings.store_phone || '0909 123 456');
+        setCfgBillFooter(settings.bill_footer || 'AVA COFFEE XIN CẢM ƠN QUÝ KHÁCH !\nCHÚC QUÝ KHÁCH NGON MIỆNG');
+        setCfgPrinterIp(settings.printer_ip || '192.168.1.232');
+        setCfgPrinterPort(String(settings.printer_port || 9100));
+      }
     } catch (e) {
       console.error('Lỗi khi tải dữ liệu admin:', e);
     } finally {
@@ -234,10 +308,14 @@ export default function AdminPage() {
     const unsubReport = db.subscribeToReportChanges(() => {
       loadAllData();
     });
+    const unsubTables = db.subscribeToTableChanges(() => {
+      loadAllData();
+    });
 
     return () => {
       unsubInv();
       unsubReport();
+      unsubTables();
     };
   }, []);
 
@@ -797,6 +875,264 @@ export default function AdminPage() {
       await loadAllData();
     } catch (err) {
       toast.error('Không thể xóa ca làm ngoài giờ.');
+    }
+  };
+
+  // --- LOGIC CRUD BÀN & KHU VỰC ---
+  const handleOpenCreateTable = () => {
+    setEditingTable(null);
+    setTableName('');
+    setTableCapacity('4');
+    setTableStatus('Trống');
+    setIsTableModalOpen(true);
+  };
+
+  const handleOpenEditTable = (table: any) => {
+    setEditingTable(table);
+    setTableName(table.table_name || '');
+    setTableCapacity(String(table.capacity || 4));
+    setTableStatus(table.status || 'Trống');
+    setIsTableModalOpen(true);
+  };
+
+  const handleSaveTable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tableName.trim()) {
+      toast.error('Vui lòng nhập tên bàn!');
+      return;
+    }
+    setSavingTable(true);
+    try {
+      if (editingTable) {
+        await db.updateTable(editingTable.id, {
+          table_name: tableName.trim(),
+          capacity: Number(tableCapacity) || 4,
+          status: tableStatus
+        });
+        toast.success(`Đã cập nhật thông tin "${tableName.trim()}" thành công!`);
+      } else {
+        await db.createTable({
+          table_name: tableName.trim(),
+          capacity: Number(tableCapacity) || 4,
+          status: 'Trống'
+        });
+        toast.success(`Đã thêm bàn mới "${tableName.trim()}"!`);
+      }
+      setIsTableModalOpen(false);
+      await loadAllData();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi lưu thông tin bàn');
+    } finally {
+      setSavingTable(false);
+    }
+  };
+
+  const handleDeleteTable = async (table: any) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa bàn "${table.table_name}" không?`)) return;
+    try {
+      const res = await db.deleteTable(table.id);
+      if (res.success) {
+        toast.success(`Đã xóa bàn "${table.table_name}" thành công!`);
+        await loadAllData();
+      } else {
+        toast.error(res.message || 'Không thể xóa bàn.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi xóa bàn');
+    }
+  };
+
+  // --- LOGIC CRUD NGUYÊN LIỆU KHO ---
+  const handleOpenCreateIngredient = () => {
+    setEditingIng(null);
+    setIngName('');
+    setIngUnit('ml');
+    setIngQuyCach('');
+    setIngMinStock('');
+    setIngInitialStock('0');
+    setIngDonGia('');
+    setIngGiaVon('');
+    setIsIngModalOpen(true);
+  };
+
+  const handleOpenEditIngredient = (ing: any) => {
+    setEditingIng(ing);
+    setIngName(ing.name || '');
+    setIngUnit(ing.unit || 'ml');
+    setIngQuyCach(ing.quy_cach || '');
+    setIngMinStock(ing.min_stock !== null && ing.min_stock !== undefined ? String(ing.min_stock) : '');
+    setIngInitialStock(String(ing.stock_quantity || 0));
+    setIngDonGia(ing.don_gia_nhap ? String(ing.don_gia_nhap) : '');
+    setIngGiaVon(ing.gia_von_trung_binh ? String(ing.gia_von_trung_binh) : '');
+    setIsIngModalOpen(true);
+  };
+
+  const handleSaveIngredient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ingName.trim()) {
+      toast.error('Vui lòng nhập tên nguyên liệu!');
+      return;
+    }
+    if (!ingUnit.trim()) {
+      toast.error('Vui lòng nhập hoặc chọn đơn vị tính!');
+      return;
+    }
+    setSavingIng(true);
+    try {
+      const minStockNum = ingMinStock.trim() ? Number(ingMinStock) : null;
+      const donGiaNum = ingDonGia.trim() ? Number(ingDonGia) : 0;
+      const giaVonNum = ingGiaVon.trim() ? Number(ingGiaVon) : donGiaNum;
+
+      if (editingIng) {
+        await db.updateIngredient(editingIng.id, {
+          name: ingName.trim(),
+          unit: ingUnit.trim(),
+          quy_cach: ingQuyCach.trim(),
+          min_stock: minStockNum,
+          don_gia_nhap: donGiaNum,
+          gia_von_trung_binh: giaVonNum
+        });
+        toast.success(`Đã cập nhật nguyên liệu "${ingName.trim()}"!`);
+      } else {
+        const initialQty = Number(ingInitialStock) || 0;
+        await db.createIngredient({
+          name: ingName.trim(),
+          unit: ingUnit.trim(),
+          quy_cach: ingQuyCach.trim(),
+          min_stock: minStockNum,
+          initial_stock: initialQty,
+          don_gia_nhap: donGiaNum,
+          gia_von_trung_binh: giaVonNum
+        });
+        toast.success(`Đã thêm nguyên liệu mới "${ingName.trim()}" vào kho!`);
+      }
+      setIsIngModalOpen(false);
+      await loadAllData();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi lưu nguyên liệu');
+    } finally {
+      setSavingIng(false);
+    }
+  };
+
+  const handleDeleteIngredient = async (ing: any) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa nguyên liệu "${ing.name}" khỏi hệ thống không?`)) return;
+    try {
+      const res = await db.deleteIngredient(ing.id);
+      if (res.success) {
+        toast.success(`Đã xóa nguyên liệu "${ing.name}" thành công!`);
+        await loadAllData();
+      } else {
+        toast.error(res.message || 'Không thể xóa nguyên liệu.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi xóa nguyên liệu');
+    }
+  };
+
+  // --- LOGIC CÀI ĐẶT CỬA HÀNG & MÁY IN ---
+  const handleSaveStoreSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const updated = await db.updateStoreSettings({
+        store_name: cfgStoreName.trim(),
+        store_address: cfgStoreAddress.trim(),
+        store_phone: cfgStorePhone.trim(),
+        bill_footer: cfgBillFooter.trim(),
+        printer_ip: cfgPrinterIp.trim(),
+        printer_port: Number(cfgPrinterPort) || 9100
+      });
+      setStoreSettings(updated);
+      toast.success('Đã lưu cấu hình cửa hàng & máy in thành công!');
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể lưu cấu hình');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleTestPrinter = async () => {
+    setTestingPrinter(true);
+    try {
+      const res = await printTestTicket({
+        store_name: cfgStoreName,
+        printer_ip: cfgPrinterIp,
+        printer_port: Number(cfgPrinterPort) || 9100
+      });
+      if (res.success) {
+        toast.success(res.message);
+      } else if (res.isWeb) {
+        toast.info(res.message);
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error('Lỗi in test: ' + (err.message || 'Không thể kết nối máy in'));
+    } finally {
+      setTestingPrinter(false);
+    }
+  };
+
+  // --- LOGIC SAO LƯU & DỌN DẸP AN TOÀN 3 LỚP ---
+  const handleDownloadBackupJson = async () => {
+    setExportingJson(true);
+    try {
+      const data = await db.exportFullBackupData();
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+      const downloadAnchor = document.createElement('a');
+      const today = new Date().toISOString().replace(/[:.]/g, '-');
+      downloadAnchor.setAttribute('href', jsonString);
+      downloadAnchor.setAttribute('download', `AVA_COFFEE_BACKUP_FULL_${today}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setLastBackupDownloaded(true);
+      toast.success('Đã tải xuống file sao lưu JSON toàn diện!');
+    } catch (err: any) {
+      toast.error('Lỗi tải sao lưu JSON: ' + err.message);
+    } finally {
+      setExportingJson(false);
+    }
+  };
+
+  const handleDownloadBackupExcel = async () => {
+    setExportingExcel(true);
+    try {
+      const data = await db.exportFullBackupData();
+      exportFullDatabaseToExcel(data);
+      setLastBackupDownloaded(true);
+      toast.success('Đã xuất file Excel sao lưu đa Sheet thành công!');
+    } catch (err: any) {
+      toast.error('Lỗi xuất file Excel: ' + err.message);
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  const handleExecuteCleanup = async () => {
+    if (cleanupConfirmText.trim() !== 'XAC NHAN XOA') {
+      toast.error('Vui lòng gõ chính xác cụm từ "XAC NHAN XOA" để xác nhận!');
+      return;
+    }
+    setCleaningUp(true);
+    try {
+      if (!lastBackupDownloaded) {
+        const data = await db.exportFullBackupData();
+        exportFullDatabaseToExcel(data);
+        setLastBackupDownloaded(true);
+      }
+
+      const days = Number(cleanupHorizon);
+      const res = await db.cleanupOldData(days);
+      setIsCleanupModalOpen(false);
+      setCleanupConfirmText('');
+      await loadAllData();
+      toast.success(`Dọn dẹp thành công! Đã dọn ${res.deletedOrdersCount} đơn hàng cũ và ${res.deletedLogsCount} dòng lịch sử kho. Tồn kho và thực đơn hiện tại được bảo toàn 100%!`);
+    } catch (err: any) {
+      toast.error('Lỗi khi dọn dẹp dữ liệu: ' + err.message);
+    } finally {
+      setCleaningUp(false);
     }
   };
 
@@ -1373,6 +1709,28 @@ export default function AdminPage() {
         >
           <Sparkles className="w-4.5 h-4.5" />
           <span>Chấm công ngoài giờ</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('tables')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'tables'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <LayoutGrid className="w-4.5 h-4.5" />
+          <span>Quản lý Bàn</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('settings')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+            adminTab === 'settings'
+              ? 'bg-coffee-primary text-white shadow'
+              : 'text-coffee-medium hover:bg-coffee-light'
+          }`}
+        >
+          <Settings className="w-4.5 h-4.5" />
+          <span>Cài đặt & Dữ liệu</span>
         </button>
       </div>
 
@@ -2880,6 +3238,13 @@ export default function AdminPage() {
               >
                 📄 Xuất PDF
               </button>
+              <button
+                onClick={handleOpenCreateIngredient}
+                className="px-3 py-2 bg-coffee-primary hover:bg-coffee-dark text-white text-[10px] font-bold rounded-xl transition shadow flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Thêm nguyên liệu</span>
+              </button>
             </div>
           </div>
 
@@ -2901,8 +3266,11 @@ export default function AdminPage() {
                     <th className="p-3.5 min-w-[160px] sm:w-56 font-bold text-red-600 border-r border-coffee-light/60">
                       SL xuất (-)
                     </th>
-                    <th className="p-3.5 w-28 sm:w-40 font-black text-coffee-primary">
+                    <th className="p-3.5 w-28 sm:w-40 font-black text-coffee-primary border-r border-coffee-light/60">
                       Tồn thực tế cuối kỳ
+                    </th>
+                    <th className="p-3.5 w-20 sm:w-24 text-center font-bold text-coffee-medium">
+                      Thao tác
                     </th>
                   </tr>
                 </thead>
@@ -3064,7 +3432,7 @@ export default function AdminPage() {
                             </div>
                           </td>
 
-                          <td className="p-3 text-coffee-primary font-black align-top">
+                          <td className="p-3 text-coffee-primary font-black align-top border-r border-coffee-light/60">
                             <div className="flex items-center space-x-1.5">
                               <span className={isLowStock ? 'text-red-600' : 'text-coffee-primary'}>
                                 {formattedEnding}
@@ -3076,13 +3444,31 @@ export default function AdminPage() {
                               )}
                             </div>
                           </td>
+                          <td className="p-3 text-center align-middle">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditIngredient(ing)}
+                                className="p-1.5 bg-[#FAF6F0] hover:bg-coffee-light text-coffee-dark rounded-xl transition border border-coffee-light shadow-sm"
+                                title="Sửa nguyên liệu"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteIngredient(ing)}
+                                className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition border border-red-200 shadow-sm"
+                                title="Xóa nguyên liệu"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
 
                   {ingredients.filter(ing => ing.name.toLowerCase().includes(invSearchQuery.toLowerCase())).length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-coffee-medium italic">
+                      <td colSpan={6} className="py-8 text-center text-coffee-medium italic">
                         Không tìm thấy nguyên liệu nào phù hợp với từ khóa tìm kiếm.
                       </td>
                     </tr>
@@ -4147,6 +4533,375 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* 9. TAB QUẢN LÝ BÀN & SƠ ĐỒ */}
+      {adminTab === 'tables' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-extrabold text-lg text-coffee-dark flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-coffee-primary" />
+                <span>Quản Lý Sơ Đồ Bàn & Khu Vực</span>
+              </h3>
+              <p className="text-xs text-coffee-medium mt-1">
+                Thêm, sửa tên hoặc sức chứa các bàn. Sơ đồ bàn sẽ được tự động đồng bộ tức thì sang màn hình Bán hàng (POS) và Thanh toán.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenCreateTable}
+              className="px-4 py-3 bg-coffee-primary hover:bg-coffee-dark text-white text-xs font-bold rounded-2xl shadow transition flex items-center justify-center gap-2 self-start sm:self-center shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Thêm bàn mới</span>
+            </button>
+          </div>
+
+          {/* Grid Sơ đồ bàn */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {tables.map((table) => {
+              const isTakeaway = (table.table_name || '').toLowerCase().includes('mang về') || (table.table_name || '').toLowerCase().includes('takeaway');
+              const isOccupied = table.status === 'Đang phục vụ';
+
+              return (
+                <div
+                  key={table.id}
+                  className={`bg-white rounded-3xl p-5 border transition-all duration-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md ${
+                    isOccupied 
+                      ? 'border-amber-300 bg-amber-50/20' 
+                      : 'border-coffee-light hover:border-coffee-accent/60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-base text-coffee-dark tracking-tight">
+                        {table.table_name}
+                      </h4>
+                      <p className="text-xs text-coffee-medium mt-0.5">
+                        Sức chứa: <span className="font-bold text-coffee-dark">{table.capacity || 4} chỗ</span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                        isOccupied 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                          : 'bg-green-100 text-green-900 border border-green-300'
+                      }`}>
+                        {table.status || 'Trống'}
+                      </span>
+                      {isTakeaway && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800">
+                          Bàn Mặc Định
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-coffee-light/60 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleOpenEditTable(table)}
+                      className="px-3 py-1.5 bg-[#FAF6F0] hover:bg-coffee-light text-coffee-dark text-xs font-bold rounded-xl transition border border-coffee-light flex items-center gap-1 shadow-sm"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Sửa</span>
+                    </button>
+                    {!isTakeaway && (
+                      <button
+                        onClick={() => handleDeleteTable(table)}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition border border-red-200 flex items-center gap-1 shadow-sm"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Xóa</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {tables.length === 0 && (
+            <div className="bg-white p-12 rounded-3xl border border-coffee-light text-center text-coffee-medium text-xs">
+              Chưa có dữ liệu bàn nào trong hệ thống. Hãy nhấn "+ Thêm bàn mới" để thiết lập bàn đầu tiên!
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 10. TAB CÀI ĐẶT HỆ THỐNG & SAO LƯU */}
+      {adminTab === 'settings' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-extrabold text-lg text-coffee-dark flex items-center gap-2">
+                <Settings className="w-5 h-5 text-coffee-primary" />
+                <span>Cài Đặt Cửa Hàng & Dữ Liệu Tự Động Hóa 100%</span>
+              </h3>
+              <p className="text-xs text-coffee-medium mt-1">
+                Tự chủ quản lý thông tin thương hiệu in hóa đơn, đổi IP máy in nhiệt LAN/Wi-Fi, và sao lưu/dọn dẹp dữ liệu an toàn trọn đời.
+              </p>
+            </div>
+          </div>
+
+          {/* Grid 2 Cột: Cài đặt Quán & Cài đặt Máy In */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Thẻ 1: Thông tin Hóa đơn & Quán */}
+            <form onSubmit={handleSaveStoreSettings} className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 border-b border-coffee-light pb-3">
+                  <Utensils className="w-5 h-5 text-coffee-primary" />
+                  <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">
+                    Thông tin hiển thị trên Bill Hóa Đơn
+                  </h4>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Tên quán cà phê</label>
+                  <input
+                    type="text"
+                    value={cfgStoreName}
+                    onChange={(e) => setCfgStoreName(e.target.value)}
+                    placeholder="VD: AVA COFFEE"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Địa chỉ quán</label>
+                  <input
+                    type="text"
+                    value={cfgStoreAddress}
+                    onChange={(e) => setCfgStoreAddress(e.target.value)}
+                    placeholder="VD: Hóc Môn, TP. Hồ Chí Minh"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Hotline / Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={cfgStorePhone}
+                    onChange={(e) => setCfgStorePhone(e.target.value)}
+                    placeholder="VD: 0909 123 456"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Lời cảm ơn chân hóa đơn (xuống dòng tùy ý)</label>
+                  <textarea
+                    rows={3}
+                    value={cfgBillFooter}
+                    onChange={(e) => setCfgBillFooter(e.target.value)}
+                    placeholder="VD: AVA COFFEE XIN CẢM ƠN QUÝ KHÁCH !&#10;CHÚC QUÝ KHÁCH NGON MIỆNG"
+                    className="w-full p-3 bg-[#FAF6F0] rounded-xl text-xs font-medium text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-coffee-light/60 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-2"
+                >
+                  {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>Lưu thông tin quán</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Thẻ 2: Cấu hình Máy In Nhiệt LAN/Wi-Fi (ESC/POS) */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-4 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Printer className="w-5 h-5 text-coffee-primary" />
+                    <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">
+                      Cấu hình Máy In Bill Mạng LAN/Wi-Fi
+                    </h4>
+                  </div>
+                  <span className="px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-[10px] font-extrabold flex items-center gap-1">
+                    📱 Dành cho App APK/Máy POS
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-2xl text-[11px] text-blue-900 leading-relaxed">
+                  💡 <strong>Lưu ý vận hành:</strong> Trình duyệt web trên máy tính không hỗ trợ mở cổng socket TCP trực tiếp. Cấu hình IP máy in dưới đây sẽ được lưu trữ tự động trên hệ thống và <strong>áp dụng tức thì khi thu ngân mở App POS trên điện thoại hoặc máy POS Android (bản APK)</strong> để in bill.
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-1">
+                    <label className="text-xs font-bold text-coffee-dark">Địa chỉ IP Máy in</label>
+                    <input
+                      type="text"
+                      value={cfgPrinterIp}
+                      onChange={(e) => setCfgPrinterIp(e.target.value)}
+                      placeholder="VD: 192.168.1.232"
+                      className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-coffee-dark">Port (Cổng)</label>
+                    <input
+                      type="number"
+                      value={cfgPrinterPort}
+                      onChange={(e) => setCfgPrinterPort(e.target.value)}
+                      placeholder="9100"
+                      className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#FAF6F0] rounded-xl border border-coffee-light text-xs text-coffee-medium space-y-1">
+                  <p>• Port mặc định của hầu hết máy in nhiệt K80 (Xprinter, Epson, Birch...) là <strong>9100</strong>.</p>
+                  <p>• Khi quán đổi modem hoặc router nhảy IP, chỉ cần vào đây đổi lại đúng IP mới là xong, không cần can thiệp code.</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-coffee-light/60 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleTestPrinter}
+                  disabled={testingPrinter}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-coffee-dark text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+                >
+                  {testingPrinter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                  <span>In test thử kết nối</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveStoreSettings}
+                  disabled={savingSettings}
+                  className="px-5 py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-2"
+                >
+                  {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>Lưu cấu hình máy in</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Thẻ 3: Sao Lưu & Dọn Dẹp An Toàn 3 Lớp */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light space-y-6">
+            <div className="flex items-center space-x-2 border-b border-coffee-light pb-3">
+              <Database className="w-5 h-5 text-coffee-primary" />
+              <div>
+                <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">
+                  Sao Lưu Toàn Bộ CSDL & Dọn Dẹp Dữ Liệu An Toàn 3 Lớp
+                </h4>
+                <p className="text-xs text-coffee-medium mt-0.5">
+                  Tải bản sao lưu dự phòng 1-click và tối ưu hóa dung lượng cơ sở dữ liệu để vận hành vĩnh viễn không lo đầy bộ nhớ.
+                </p>
+              </div>
+            </div>
+
+            {/* Phân vùng 1: Tải Bản Sao Lưu */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl bg-[#FAF6F0] border border-coffee-light flex flex-col justify-between space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 font-extrabold text-sm text-coffee-dark">
+                    <FileJson className="w-4.5 h-4.5 text-amber-700" />
+                    <span>Sao lưu toàn bộ (Bản JSON Gốc)</span>
+                  </div>
+                  <p className="text-xs text-coffee-medium leading-relaxed">
+                    Bao gồm toàn bộ đơn hàng, chi tiết đơn, nguyên liệu kho, công thức, thực đơn, chấm công, bàn và lịch sử kho nguyên bản phục vụ khôi phục hệ thống khi cần.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadBackupJson}
+                  disabled={exportingJson}
+                  className="w-full py-3 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
+                >
+                  {exportingJson ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span>Tải Full Backup JSON</span>
+                </button>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-[#FAF6F0] border border-coffee-light flex flex-col justify-between space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 font-extrabold text-sm text-coffee-dark">
+                    <FileSpreadsheet className="w-4.5 h-4.5 text-green-700" />
+                    <span>Sao lưu toàn bộ (File Excel .xlsx Đa Sheet)</span>
+                  </div>
+                  <p className="text-xs text-coffee-medium leading-relaxed">
+                    Tạo 1 file Excel gồm 8 trang tính phân loại chi tiết (Đơn hàng, Chi tiết, Kho, Món ăn, Chấm công, Chi phí, Bàn) dễ dàng mở và xem trên Microsoft Excel/Google Sheets.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadBackupExcel}
+                  disabled={exportingExcel}
+                  className="w-full py-3 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
+                >
+                  {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                  <span>Tải Full Backup Excel (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Phân vùng 2: Dọn dẹp dữ liệu cũ an toàn 3 lớp */}
+            <div className="p-5 rounded-2xl border border-red-200 bg-red-50/30 space-y-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 font-extrabold text-sm text-red-900">
+                    <ShieldAlert className="w-5 h-5 text-red-600" />
+                    <span>Dọn Dẹp Dữ Liệu Lịch Sử Cũ (Tối Ưu Hóa Dung Lượng Supabase)</span>
+                  </div>
+                  <p className="text-xs text-red-800 leading-relaxed">
+                    Sau 1 đến 2 năm kinh doanh, hàng trăm nghìn đơn hàng và log kho cũ có thể làm tăng dung lượng CSDL. Bạn có thể chủ động dọn dẹp các dữ liệu cũ đã qua thời gian dài để giữ hệ thống luôn mượt mà và nằm trong gói miễn phí vĩnh viễn.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-white rounded-xl border border-red-200 text-xs text-coffee-dark space-y-2">
+                <div className="font-extrabold text-green-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span>NGUYÊN TẮC BẢO VỆ 100% AN TOÀN TUYỆT ĐỐI:</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-coffee-medium text-[11px] pl-1">
+                  <li><strong>Số lượng tồn kho thực tế hiện tại (so_luong_ton) được giữ nguyên 100%</strong>, tuyệt đối không bị thay đổi.</li>
+                  <li><strong>Thực đơn, danh mục, công thức pha chế, danh sách bàn và tài khoản nhân viên</strong> không bao giờ bị ảnh hưởng.</li>
+                  <li><strong>Không xóa bất kỳ đơn hàng nào chưa thanh toán</strong> của ngày hôm nay.</li>
+                  <li>Hệ thống <strong>tự động tạo bản sao lưu Excel tải về máy</strong> trước khi tiến hành xóa bất kỳ dòng nào.</li>
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs font-bold text-coffee-dark shrink-0">Chọn mốc thời gian dọn dẹp:</span>
+                  <select
+                    value={cleanupHorizon}
+                    onChange={(e: any) => setCleanupHorizon(e.target.value)}
+                    className="h-11 px-3 bg-white border border-coffee-light rounded-xl text-xs font-bold text-coffee-dark focus:ring-1 focus:ring-coffee-primary"
+                  >
+                    <option value="180">Dữ liệu cũ hơn 6 tháng (180 ngày)</option>
+                    <option value="365">Dữ liệu cũ hơn 1 năm (365 ngày)</option>
+                    <option value="548">Dữ liệu cũ hơn 1.5 năm (548 ngày)</option>
+                    <option value="730">Dữ liệu cũ hơn 2 năm (730 ngày)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCleanupConfirmText('');
+                    setIsCleanupModalOpen(true);
+                  }}
+                  className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2 self-start sm:self-auto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Bắt đầu dọn dẹp an toàn</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL XÁC NHẬN 2 LỚP CHẤM CÔNG NGOÀI GIỜ */}
       {isOtConfirmModalOpen && (() => {
         const staff = users.find(u => u.id === otStaffId);
@@ -4806,6 +5561,296 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRUD BÀN & SƠ ĐỒ */}
+      {isTableModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-coffee-light">
+            <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
+              <h3 className="font-extrabold text-base text-coffee-dark flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-coffee-primary" />
+                <span>{editingTable ? 'Chỉnh Sửa Thông Tin Bàn' : 'Thêm Bàn Mới'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsTableModalOpen(false)}
+                className="p-1.5 hover:bg-[#FAF6F0] rounded-full text-coffee-medium transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTable} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-coffee-dark">Tên bàn / Khu vực *</label>
+                <input
+                  type="text"
+                  value={tableName}
+                  onChange={(e) => setTableName(e.target.value)}
+                  placeholder="VD: Bàn 01, Bàn Sân Thượng 02..."
+                  className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-coffee-dark">Sức chứa (số chỗ ngồi)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={tableCapacity}
+                  onChange={(e) => setTableCapacity(e.target.value)}
+                  placeholder="4"
+                  className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                />
+              </div>
+
+              {editingTable && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Trạng thái hiện tại</label>
+                  <select
+                    value={tableStatus}
+                    onChange={(e: any) => setTableStatus(e.target.value)}
+                    className="w-full h-11 px-3 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  >
+                    <option value="Trống">Trống (Sẵn sàng đón khách)</option>
+                    <option value="Đang phục vụ">Đang phục vụ (Có khách)</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsTableModalOpen(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-coffee-dark font-bold text-xs rounded-xl transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTable}
+                  className="flex-1 py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+                >
+                  {savingTable ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>{editingTable ? 'Cập nhật' : 'Tạo bàn'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRUD NGUYÊN LIỆU KHO */}
+      {isIngModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 border border-coffee-light max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
+              <h3 className="font-extrabold text-base text-coffee-dark flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-coffee-primary" />
+                <span>{editingIng ? 'Chỉnh Sửa Nguyên Liệu Kho' : 'Thêm Nguyên Liệu Mới Vào Kho'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsIngModalOpen(false)}
+                className="p-1.5 hover:bg-[#FAF6F0] rounded-full text-coffee-medium transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveIngredient} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-coffee-dark">Tên nguyên liệu *</label>
+                <input
+                  type="text"
+                  value={ingName}
+                  onChange={(e) => setIngName(e.target.value)}
+                  placeholder="VD: Cà phê Robusta Đắk Lắk, Sữa đặc Larosee..."
+                  className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  required
+                />
+              </div>
+
+              {/* Đơn vị tính: chọn nhanh nút + nhập tự do */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-coffee-dark">Đơn vị tính cơ bản *</label>
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {['ml', 'g', 'kg', 'lon', 'hộp', 'bịch', 'chai', 'ly', 'trái', 'bao'].map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => setIngUnit(u)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition border ${
+                        ingUnit === u
+                          ? 'bg-coffee-primary text-white border-coffee-primary shadow-xs'
+                          : 'bg-[#FAF6F0] text-coffee-medium border-coffee-light hover:border-coffee-primary/40'
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={ingUnit}
+                  onChange={(e) => setIngUnit(e.target.value)}
+                  placeholder="Nhập đơn vị khác (vd: gói, cuộn...)"
+                  className="w-full h-10 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-coffee-dark">Quy cách đóng gói (không bắt buộc)</label>
+                <input
+                  type="text"
+                  value={ingQuyCach}
+                  onChange={(e) => setIngQuyCach(e.target.value)}
+                  placeholder="VD: Thùng 24 lon, Chai 700ml, Túi 1kg..."
+                  className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Mức cảnh báo sắp hết</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={ingMinStock}
+                    onChange={(e) => setIngMinStock(e.target.value)}
+                    placeholder="VD: 500 (ml) hoặc 5 (lon)"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+
+                {!editingIng && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-coffee-dark">Số lượng tồn ban đầu</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={ingInitialStock}
+                      onChange={(e) => setIngInitialStock(e.target.value)}
+                      placeholder="0"
+                      className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Đơn giá nhập (VNĐ/đơn vị)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={ingDonGia}
+                    onChange={(e) => setIngDonGia(e.target.value)}
+                    placeholder="VD: 15000"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-coffee-dark">Giá vốn trung bình</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={ingGiaVon}
+                    onChange={(e) => setIngGiaVon(e.target.value)}
+                    placeholder="VD: 15000"
+                    className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-coffee-dark border border-coffee-light/60 focus:ring-1 focus:ring-coffee-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-coffee-light/60 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsIngModalOpen(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-coffee-dark font-bold text-xs rounded-xl transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingIng}
+                  className="flex-1 py-3 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+                >
+                  {savingIng ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>{editingIng ? 'Lưu cập nhật' : 'Thêm nguyên liệu'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DỌN DẸP DỮ LIỆU CŨ AN TOÀN 3 LỚP */}
+      {isCleanupModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-red-200">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center text-red-600 mx-auto">
+                <ShieldAlert className="w-7 h-7" />
+              </div>
+              <h3 className="font-extrabold text-lg text-red-900">
+                Xác Nhận Dọn Dẹp Dữ Liệu Cũ
+              </h3>
+              <p className="text-xs text-coffee-medium leading-relaxed">
+                Thao tác này sẽ dọn dẹp các đơn hàng và lịch sử kho <strong>cũ hơn {cleanupHorizon === '180' ? '6 tháng' : cleanupHorizon === '365' ? '1 năm' : cleanupHorizon === '548' ? '1.5 năm' : '2 năm'}</strong>.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl text-xs text-green-900 space-y-1">
+              <p className="font-extrabold flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4 text-green-700" />
+                <span>Cam kết an toàn tuyệt đối 100%:</span>
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                • <strong>Số lượng tồn kho thực tế hiện tại (so_luong_ton) không bị thay đổi</strong>.<br />
+                • Hệ thống sẽ tự động tải về máy bạn 1 bản sao lưu Excel trước khi dọn dẹp.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-coffee-dark block">
+                Để xác nhận, vui lòng gõ chính xác cụm từ <strong className="text-red-600 font-mono">XAC NHAN XOA</strong>:
+              </label>
+              <input
+                type="text"
+                value={cleanupConfirmText}
+                onChange={(e) => setCleanupConfirmText(e.target.value)}
+                placeholder="XAC NHAN XOA"
+                className="w-full h-11 px-4 bg-[#FAF6F0] rounded-xl text-xs font-bold text-red-600 border border-red-300 focus:ring-2 focus:ring-red-500 font-mono uppercase text-center"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCleanupModalOpen(false)}
+                disabled={cleaningUp}
+                className="py-3 bg-gray-100 hover:bg-gray-200 text-coffee-dark font-bold text-xs rounded-xl transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteCleanup}
+                disabled={cleaningUp || cleanupConfirmText.trim() !== 'XAC NHAN XOA'}
+                className="py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+              >
+                {cleaningUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <span>Dọn dẹp ngay</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

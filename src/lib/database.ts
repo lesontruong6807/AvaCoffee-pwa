@@ -1009,6 +1009,24 @@ const setStorageItem = <T>(key: string, value: T): void => {
   }
 };
 
+export interface StoreSettings {
+  store_name: string;
+  store_address: string;
+  store_phone: string;
+  bill_footer: string;
+  printer_ip: string;
+  printer_port: number;
+}
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+  store_name: 'AVA COFFEE',
+  store_address: 'Hóc Môn, TP. Hồ Chí Minh',
+  store_phone: '0909 123 456',
+  bill_footer: 'AVA COFFEE XIN CẢM ƠN QUÝ KHÁCH !\nCHÚC QUÝ KHÁCH NGON MIỆNG',
+  printer_ip: '192.168.1.232',
+  printer_port: 9100
+};
+
 // Lớp Mock Database lưu trữ qua LocalStorage
 export const mockDb = {
   getUsers: () => getStorageItem('ava_users', MOCK_USERS),
@@ -1042,7 +1060,10 @@ export const mockDb = {
   setRecipes: (recipes: typeof MOCK_RECIPES) => setStorageItem('ava_recipes', recipes),
 
   getInventoryLogs: () => getStorageItem<any[]>('ava_inventory_logs', []),
-  setInventoryLogs: (logs: any[]) => setStorageItem('ava_inventory_logs', logs)
+  setInventoryLogs: (logs: any[]) => setStorageItem('ava_inventory_logs', logs),
+
+  getStoreSettings: () => getStorageItem<StoreSettings>('ava_store_settings', DEFAULT_STORE_SETTINGS),
+  setStoreSettings: (settings: StoreSettings) => setStorageItem('ava_store_settings', settings)
 };
 
 export const getCurrentUser = (): typeof MOCK_USERS[0] | null => {
@@ -1342,30 +1363,116 @@ export const db = {
     return null;
   },
 
-  async createTable(table: any) {
+  async createTable(table: { table_name: string; capacity?: number; status?: 'Trống' | 'Đang phục vụ' }) {
+    const defaultCapacity = Number(table.capacity) || 4;
+    const defaultStatus = table.status || 'Trống';
+    cachedTables = null;
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('danhsachban').insert([{
-        ten_ban: table.table_name,
-        suc_chua: table.capacity,
-        trang_thai: table.status
+        ten_ban: table.table_name.trim(),
+        suc_chua: defaultCapacity,
+        trang_thai: defaultStatus
       }]).select();
-      if (!error && data) return mapTableToClient(data[0]);
+      if (!error && data) {
+        broadcastRealtimeEvent('table_update');
+        return mapTableToClient(data[0]);
+      }
     }
     const tables = mockDb.getTables();
-    const newTable = { id: generateShortId('tb_'), ...table };
+    const newTable = {
+      id: generateShortId('tb_'),
+      table_name: table.table_name.trim(),
+      capacity: defaultCapacity,
+      status: defaultStatus
+    };
     tables.push(newTable);
     mockDb.setTables(tables);
+    broadcastRealtimeEvent('table_update');
     return newTable;
   },
 
-  async deleteTable(id: string) {
+  async updateTable(id: string, data: { table_name?: string; capacity?: number; status?: 'Trống' | 'Đang phục vụ' }) {
+    cachedTables = null;
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('danhsachban').delete().eq('id', id);
-      if (!error) return true;
+      const updatePayload: any = {};
+      if (data.table_name !== undefined) updatePayload.ten_ban = data.table_name.trim();
+      if (data.capacity !== undefined) updatePayload.suc_chua = Number(data.capacity);
+      if (data.status !== undefined) updatePayload.trang_thai = data.status;
+
+      const { data: updated, error } = await supabase.from('danhsachban').update(updatePayload).eq('id', id).select();
+      if (!error && updated && updated.length > 0) {
+        broadcastRealtimeEvent('table_update');
+        return mapTableToClient(updated[0]);
+      }
     }
     const tables = mockDb.getTables();
-    mockDb.setTables(tables.filter(t => t.id !== id));
-    return true;
+    const idx = tables.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      tables[idx] = {
+        ...tables[idx],
+        ...(data.table_name !== undefined ? { table_name: data.table_name.trim() } : {}),
+        ...(data.capacity !== undefined ? { capacity: Number(data.capacity) } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {})
+      };
+      mockDb.setTables(tables);
+      broadcastRealtimeEvent('table_update');
+      return tables[idx];
+    }
+    return null;
+  },
+
+  async deleteTable(id: string): Promise<{ success: boolean; message?: string }> {
+    const tables = await this.getTables();
+    const currentTable = tables.find(t => t.id === id);
+    if (!currentTable) {
+      return { success: false, message: 'Bàn không tồn tại!' };
+    }
+
+    const lowerName = currentTable.table_name.toLowerCase();
+    if (lowerName.includes('mang về') || lowerName.includes('takeaway')) {
+      return { success: false, message: 'Bàn "Khách mang về" là mặc định bắt buộc của hệ thống, không thể xóa!' };
+    }
+
+    if (currentTable.status === 'Đang phục vụ') {
+      return { success: false, message: 'Bàn này đang ở trạng thái "Đang phục vụ". Vui lòng thanh toán hoặc đổi bàn trước khi xóa!' };
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      // 1. Kiểm tra xem bàn có đơn hàng chưa thanh toán không
+      const { data: unpaidOrders } = await supabase
+        .from('hoadon')
+        .select('id, ma_hoa_don')
+        .eq('id_ban', id)
+        .eq('trang_thai', 'Chưa thanh toán')
+        .limit(1);
+
+      if (unpaidOrders && unpaidOrders.length > 0) {
+        return { success: false, message: `Bàn này đang có đơn hàng chưa thanh toán (${unpaidOrders[0].ma_hoa_don}). Vui lòng thanh toán hoặc chuyển bàn trước khi xóa!` };
+      }
+
+      // 2. Kiểm tra xem bàn đã từng có hóa đơn lịch sử chưa (tránh vỡ lịch sử hoặc lỗi foreign key)
+      const { data: pastOrders } = await supabase
+        .from('hoadon')
+        .select('id')
+        .eq('id_ban', id)
+        .limit(1);
+
+      if (pastOrders && pastOrders.length > 0) {
+        return { success: false, message: 'Bàn này đã từng có hóa đơn thanh toán trong quá khứ. Để bảo toàn lịch sử doanh thu và đối soát kho, không thể xóa vĩnh viễn bàn đã có đơn hàng!' };
+      }
+
+      const { error } = await supabase.from('danhsachban').delete().eq('id', id);
+      if (error) {
+        console.error('Lỗi khi xóa bàn:', error);
+        return { success: false, message: `Lỗi CSDL: ${error.message}` };
+      }
+    }
+
+    cachedTables = null;
+    const localTables = mockDb.getTables();
+    mockDb.setTables(localTables.filter(t => t.id !== id));
+    broadcastRealtimeEvent('table_update');
+    return { success: true };
   },
 
   // --- CATEGORIES (danhmuc) ---
@@ -3343,6 +3450,144 @@ export const db = {
     }));
   },
 
+  async createIngredient(data: {
+    name: string;
+    unit: string;
+    quy_cach?: string;
+    min_stock?: number | null;
+    initial_stock?: number;
+    don_gia_nhap?: number;
+    gia_von_trung_binh?: number;
+  }) {
+    const id = generateShortId('ing_');
+    const initialQty = Number(data.initial_stock || 0);
+    const donGia = Number(data.don_gia_nhap || 0);
+    const giaVon = Number(data.gia_von_trung_binh || donGia || 0);
+    const minStock = data.min_stock !== undefined && data.min_stock !== null ? Number(data.min_stock) : null;
+
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from('nguyenlieu')
+        .insert([{
+          id,
+          ten_nguyen_lieu: data.name.trim(),
+          don_vi_tinh: data.unit.trim(),
+          so_luong_ton: initialQty,
+          muc_canh_bao: minStock,
+          quy_cach: data.quy_cach?.trim() || null,
+          don_gia_nhap: donGia,
+          gia_von_trung_binh: giaVon
+        }]);
+
+      if (error) {
+        console.error('Lỗi thêm nguyên liệu trên Supabase:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    const currentList = mockDb.getIngredients();
+    const newIng = {
+      id,
+      name: data.name.trim(),
+      unit: data.unit.trim(),
+      stock_quantity: initialQty,
+      opening_stock: initialQty,
+      min_stock: minStock,
+      quy_cach: data.quy_cach?.trim() || '',
+      don_gia_nhap: donGia,
+      gia_von_trung_binh: giaVon
+    };
+    currentList.push(newIng);
+    mockDb.setIngredients(currentList);
+    broadcastRealtimeEvent('inventory_update');
+    return newIng;
+  },
+
+  async updateIngredient(id: string, data: Partial<{
+    name: string;
+    unit: string;
+    quy_cach: string;
+    min_stock: number | null;
+    don_gia_nhap: number;
+    gia_von_trung_binh: number;
+    stock_quantity: number;
+  }>) {
+    if (isSupabaseConfigured && supabase) {
+      const updatePayload: any = {};
+      if (data.name !== undefined) updatePayload.ten_nguyen_lieu = data.name.trim();
+      if (data.unit !== undefined) updatePayload.don_vi_tinh = data.unit.trim();
+      if (data.quy_cach !== undefined) updatePayload.quy_cach = data.quy_cach.trim() || null;
+      if (data.min_stock !== undefined) updatePayload.muc_canh_bao = data.min_stock;
+      if (data.don_gia_nhap !== undefined) updatePayload.don_gia_nhap = Number(data.don_gia_nhap);
+      if (data.gia_von_trung_binh !== undefined) updatePayload.gia_von_trung_binh = Number(data.gia_von_trung_binh);
+      if (data.stock_quantity !== undefined) updatePayload.so_luong_ton = Number(data.stock_quantity);
+
+      const { error } = await supabase.from('nguyenlieu').update(updatePayload).eq('id', id);
+      if (error) {
+        console.error('Lỗi cập nhật nguyên liệu trên Supabase:', error);
+        throw new Error(error.message);
+      }
+    }
+
+    const currentList = mockDb.getIngredients();
+    const idx = currentList.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      currentList[idx] = {
+        ...currentList[idx],
+        ...data,
+        name: data.name !== undefined ? data.name.trim() : currentList[idx].name,
+        unit: data.unit !== undefined ? data.unit.trim() : currentList[idx].unit,
+        quy_cach: data.quy_cach !== undefined ? data.quy_cach.trim() : currentList[idx].quy_cach,
+        min_stock: data.min_stock !== undefined ? data.min_stock : currentList[idx].min_stock,
+        don_gia_nhap: data.don_gia_nhap !== undefined ? Number(data.don_gia_nhap) : currentList[idx].don_gia_nhap,
+        gia_von_trung_binh: data.gia_von_trung_binh !== undefined ? Number(data.gia_von_trung_binh) : currentList[idx].gia_von_trung_binh
+      };
+      mockDb.setIngredients(currentList);
+    }
+
+    if (data.gia_von_trung_binh !== undefined || data.don_gia_nhap !== undefined) {
+      try {
+        await this.recalculateProductsCostPriceByIngredient(id);
+      } catch (err) {
+        console.error('Lỗi tính lại giá vốn món sau khi sửa nguyên liệu:', err);
+      }
+    }
+
+    broadcastRealtimeEvent('inventory_update');
+    return true;
+  },
+
+  async deleteIngredient(id: string): Promise<{ success: boolean; message?: string }> {
+    // 1. Ràng buộc an toàn: Kiểm tra công thức món ăn
+    const allRecipes = await this.getRecipes();
+    const usedRecipes = allRecipes.filter(r => r.ingredient_id === id);
+    if (usedRecipes.length > 0) {
+      const allProducts = await this.getProducts();
+      const productNames = Array.from(new Set(
+        usedRecipes.map(r => allProducts.find(p => p.id === r.product_id)?.name || 'Món').filter(Boolean)
+      ));
+      return {
+        success: false,
+        message: `Không thể xóa nguyên liệu vì đang được sử dụng trong công thức của: "${productNames.join(', ')}". Vui lòng vào Quản lý đồ uống để gỡ nguyên liệu khỏi công thức món trước khi xóa!`
+      };
+    }
+
+    // 2. Xóa khỏi Supabase
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('nguyenlieu').delete().eq('id', id);
+      if (error) {
+        console.error('Lỗi xóa nguyên liệu trên Supabase:', error);
+        return { success: false, message: `Lỗi CSDL: ${error.message}` };
+      }
+    }
+
+    // 3. Xóa khỏi LocalStorage
+    const currentList = mockDb.getIngredients();
+    mockDb.setIngredients(currentList.filter(i => i.id !== id));
+    broadcastRealtimeEvent('inventory_update');
+    return { success: true };
+  },
+
   async getRecipes() {
     if (cachedRecipes) return cachedRecipes;
     if (isSupabaseConfigured && supabase) {
@@ -4313,6 +4558,192 @@ export const db = {
     setStorageItem('ava_expenses', filtered);
     broadcastRealtimeEvent('report_update');
     return true;
+  },
+
+  // --- STORE SETTINGS (CÀI ĐẶT CỬA HÀNG & MÁY IN) ---
+  getStoreSettingsSync(): StoreSettings {
+    return mockDb.getStoreSettings();
+  },
+
+  async getStoreSettings(): Promise<StoreSettings> {
+    const local = mockDb.getStoreSettings();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('cauhinh').select('*').eq('id', 'store_settings').maybeSingle();
+        if (!error && data && data.gia_tri) {
+          const parsed = typeof data.gia_tri === 'string' ? JSON.parse(data.gia_tri) : data.gia_tri;
+          const merged = { ...DEFAULT_STORE_SETTINGS, ...parsed };
+          mockDb.setStoreSettings(merged);
+          return merged;
+        }
+      } catch (e) {
+        // Fallback gracefully if cauhinh does not exist
+      }
+    }
+    return local || DEFAULT_STORE_SETTINGS;
+  },
+
+  async updateStoreSettings(settings: Partial<StoreSettings>): Promise<StoreSettings> {
+    const current = await this.getStoreSettings();
+    const updated: StoreSettings = {
+      ...current,
+      ...settings,
+      printer_port: Number(settings.printer_port || current.printer_port || 9100)
+    };
+    mockDb.setStoreSettings(updated);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('cauhinh').upsert({
+          id: 'store_settings',
+          khoa: 'store_settings',
+          gia_tri: JSON.stringify(updated),
+          ngay_cap_nhat: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn('Lưu cauhinh lên Supabase chưa khả dụng, đã lưu an toàn vào máy.', e);
+      }
+    }
+
+    return updated;
+  },
+
+  // --- FULL BACKUP & CLEAN-UP AN TOÀN ---
+  async exportFullBackupData() {
+    const backup: any = {
+      version: '1.0',
+      export_date: new Date().toISOString(),
+      store_settings: this.getStoreSettingsSync(),
+      orders: [],
+      order_details: [],
+      ingredients: [],
+      products: [],
+      categories: [],
+      recipes: [],
+      tables: [],
+      time_logs: [],
+      inventory_logs: [],
+      expenses: []
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const [
+          ordersRes,
+          detailsRes,
+          ingredientsRes,
+          productsRes,
+          categoriesRes,
+          recipesRes,
+          tablesRes,
+          timeLogsRes,
+          invLogsRes,
+          expensesRes
+        ] = await Promise.all([
+          supabase.from('hoadon').select('*').order('thoi_gian_tao', { ascending: false }),
+          supabase.from('hoadondetail').select('*'),
+          supabase.from('nguyenlieu').select('*').order('ten_nguyen_lieu', { ascending: true }),
+          supabase.from('sanpham').select('*').order('ten_san_pham', { ascending: true }),
+          supabase.from('danhmuc').select('*'),
+          supabase.from('congthuc').select('*'),
+          supabase.from('danhsachban').select('*').order('ten_ban', { ascending: true }),
+          supabase.from('chamcong').select('*').order('ngay_lam_viec', { ascending: false }),
+          supabase.from('lichsukho').select('*').order('thoi_gian', { ascending: false }),
+          supabase.from('chiphivanhang').select('*').order('ngay_chi', { ascending: false })
+        ]);
+
+        backup.orders = ordersRes.data || [];
+        backup.order_details = detailsRes.data || [];
+        backup.ingredients = ingredientsRes.data || [];
+        backup.products = productsRes.data || [];
+        backup.categories = categoriesRes.data || [];
+        backup.recipes = recipesRes.data || [];
+        backup.tables = tablesRes.data || [];
+        backup.time_logs = timeLogsRes.data || [];
+        backup.inventory_logs = invLogsRes.data || [];
+        backup.expenses = expensesRes.data || [];
+      } catch (e) {
+        console.error('Lỗi khi fetch toàn bộ dữ liệu từ Supabase:', e);
+      }
+    } else {
+      backup.orders = mockDb.getOrders();
+      backup.order_details = mockDb.getOrderItems();
+      backup.ingredients = mockDb.getIngredients();
+      backup.products = mockDb.getProducts();
+      backup.categories = mockDb.getCategories();
+      backup.recipes = mockDb.getRecipes();
+      backup.tables = mockDb.getTables();
+      backup.time_logs = mockDb.getTimeLogs();
+      backup.inventory_logs = mockDb.getInventoryLogs();
+      backup.expenses = getStorageItem<any[]>('ava_expenses', []);
+    }
+
+    return backup;
+  },
+
+  async cleanupOldData(retentionDays: number) {
+    const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    let deletedOrdersCount = 0;
+    let deletedLogsCount = 0;
+
+    if (isSupabaseConfigured && supabase) {
+      // 1. Tìm các đơn hàng cũ hơn cutoffDate mà KHÔNG ở trạng thái 'Chưa thanh toán'
+      const { data: oldOrders } = await supabase
+        .from('hoadon')
+        .select('id')
+        .lt('thoi_gian_tao', cutoffDate)
+        .neq('trang_thai', 'Chưa thanh toán');
+
+      if (oldOrders && oldOrders.length > 0) {
+        const oldIds = oldOrders.map(o => o.id);
+        deletedOrdersCount = oldIds.length;
+
+        // Xóa chi tiết đơn hàng cũ trước (tránh foreign key cascade issue)
+        for (let i = 0; i < oldIds.length; i += 200) {
+          const batch = oldIds.slice(i, i + 200);
+          await supabase.from('hoadondetail').delete().in('id_hoa_don', batch);
+          await supabase.from('hoadon').delete().in('id', batch);
+        }
+      }
+
+      // 2. Xóa lịch sử kho cũ (TUYỆT ĐỐI KHÔNG CHẠM BẢNG nguyenlieu!)
+      const { count: deletedLogs } = await supabase
+        .from('lichsukho')
+        .delete({ count: 'exact' })
+        .lt('thoi_gian', cutoffDate);
+      deletedLogsCount = deletedLogs || 0;
+
+      // 3. Xóa chi phí vận hành cũ hơn cutoffDate
+      await supabase.from('chiphivanhang').delete().lt('ngay_chi', cutoffDate.split('T')[0]);
+
+      // 4. Xóa chấm công cũ hơn cutoffDate
+      await supabase.from('chamcong').delete().lt('ngay_lam_viec', cutoffDate.split('T')[0]);
+
+      broadcastRealtimeEvent('order_update');
+      broadcastRealtimeEvent('report_update');
+    } else {
+      // Fallback LocalStorage
+      const orders = mockDb.getOrders();
+      const keptOrders = orders.filter(o => {
+        const orderDate = new Date(o.created_at || o.thoi_gian_tao).getTime();
+        const cutoffTime = new Date(cutoffDate).getTime();
+        return o.status === 'Chưa thanh toán' || orderDate >= cutoffTime;
+      });
+      deletedOrdersCount = orders.length - keptOrders.length;
+      mockDb.setOrders(keptOrders);
+
+      const logs = mockDb.getInventoryLogs();
+      const keptLogs = logs.filter(l => new Date(l.created_at || l.thoi_gian).getTime() >= new Date(cutoffDate).getTime());
+      deletedLogsCount = logs.length - keptLogs.length;
+      mockDb.setInventoryLogs(keptLogs);
+    }
+
+    return {
+      success: true,
+      deletedOrdersCount,
+      deletedLogsCount,
+      cutoffDate
+    };
   },
 
   // --- SUPABASE REALTIME SUBSCRIPTION HELPERS ---

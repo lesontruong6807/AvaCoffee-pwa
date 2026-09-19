@@ -927,3 +927,173 @@ export function exportProductSalesToPDF(
   doc.save(`BaoCaoBanHang_${startDate}_${endDate}.pdf`);
 }
 
+// === XUẤT FULL SAO LƯU EXCEL ĐA SHEET ===
+export function exportFullDatabaseToExcel(backupData: any) {
+  const wb = XLSX.utils.book_new();
+
+  // 1. Sheet: ThongTinQuan
+  const settings = backupData.store_settings || {};
+  const wsInfoData = [
+    ['THÔNG TIN CỬA HÀNG & BẢN SAO LƯU DỮ LIỆU - AVA COFFEE'],
+    ['Ngày xuất sao lưu', new Date(backupData.export_date || Date.now()).toLocaleString('vi-VN')],
+    ['Tên cửa hàng', settings.store_name || 'AVA COFFEE'],
+    ['Địa chỉ', settings.store_address || 'Hóc Môn, TP. Hồ Chí Minh'],
+    ['Hotline / Điện thoại', settings.store_phone || ''],
+    ['IP Máy in bill', `${settings.printer_ip || '192.168.1.232'}:${settings.printer_port || 9100}`],
+    ['Ghi chú chân bill', settings.bill_footer || '']
+  ];
+  const wsInfo = XLSX.utils.aoa_to_sheet(wsInfoData);
+  wsInfo['!cols'] = [{ wch: 30 }, { wch: 50 }];
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'ThongTinCuaHang');
+
+  // 2. Sheet: DonHang
+  if (Array.isArray(backupData.orders) && backupData.orders.length > 0) {
+    const wsOrdersData = [
+      ['Mã hóa đơn', 'Bàn', 'Thu ngân', 'Thời gian tạo', 'Tổng tiền', 'Giảm giá', 'Tiền thanh toán', 'Hình thức TT', 'Trạng thái', 'Ghi chú']
+    ];
+    backupData.orders.forEach((o: any) => {
+      wsOrdersData.push([
+        o.ma_hoa_don || o.id,
+        o.danhsachban?.ten_ban || o.table_name || o.id_ban || '',
+        o.nguoidung?.ho_ten || o.staff_name || o.id_nhan_vien || '',
+        o.thoi_gian_tao || o.created_at || '',
+        Number(o.tong_tien || o.total_amount || 0),
+        Number(o.giam_gia || o.discount || 0),
+        Number(o.tong_thanh_toan || o.total_amount || 0),
+        o.hinh_thuc_thanh_toan || o.payment_method || '',
+        o.trang_thai || o.status || '',
+        o.ghi_chu || o.notes || ''
+      ]);
+    });
+    const wsOrders = XLSX.utils.aoa_to_sheet(wsOrdersData);
+    wsOrders['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsOrders, 'DonHang');
+  }
+
+  // 3. Sheet: ChiTietDonHang
+  if (Array.isArray(backupData.order_details) && backupData.order_details.length > 0) {
+    const wsDetailsData = [
+      ['ID Hóa đơn', 'Tên sản phẩm', 'Số lượng', 'Đơn giá', 'Thành tiền', 'Ghi chú món']
+    ];
+    backupData.order_details.forEach((d: any) => {
+      wsDetailsData.push([
+        d.id_hoa_don || d.order_id || '',
+        d.sanpham?.ten_san_pham || d.product_name || d.id_san_pham || '',
+        Number(d.so_luong || d.quantity || 0),
+        Number(d.don_gia || d.unit_price || 0),
+        Number(d.thanh_tien || d.subtotal || 0),
+        d.ghi_chu || d.notes || ''
+      ]);
+    });
+    const wsDetails = XLSX.utils.aoa_to_sheet(wsDetailsData);
+    wsDetails['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsDetails, 'ChiTietDonHang');
+  }
+
+  // 4. Sheet: NguyenLieu_Kho
+  if (Array.isArray(backupData.ingredients) && backupData.ingredients.length > 0) {
+    const wsIngData = [
+      ['Mã nguyên liệu', 'Tên nguyên liệu', 'Đơn vị tính', 'Quy cách đóng gói', 'Tồn kho thực tế', 'Mức cảnh báo', 'Đơn giá nhập', 'Giá vốn trung bình']
+    ];
+    backupData.ingredients.forEach((ing: any) => {
+      wsIngData.push([
+        ing.id,
+        ing.ten_nguyen_lieu || ing.name || '',
+        ing.don_vi_tinh || ing.unit || '',
+        ing.quy_cach || '',
+        Number(ing.so_luong_ton !== undefined ? ing.so_luong_ton : ing.stock_quantity || 0),
+        ing.muc_canh_bao !== undefined && ing.muc_canh_bao !== null ? Number(ing.muc_canh_bao) : (ing.min_stock ?? ''),
+        Number(ing.don_gia_nhap || 0),
+        Number(ing.gia_von_trung_binh || ing.don_gia_nhap || 0)
+      ]);
+    });
+    const wsIng = XLSX.utils.aoa_to_sheet(wsIngData);
+    wsIng['!cols'] = [{ wch: 16 }, { wch: 26 }, { wch: 12 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsIng, 'NguyenLieuKho');
+  }
+
+  // 5. Sheet: ThucDon_SanPham
+  if (Array.isArray(backupData.products) && backupData.products.length > 0) {
+    const wsProdData = [
+      ['Mã món', 'Tên đồ uống / Món', 'Danh mục', 'Giá bán (VNĐ)', 'Giá vốn ước tính', 'Trạng thái']
+    ];
+    backupData.products.forEach((p: any) => {
+      wsProdData.push([
+        p.id,
+        p.ten_san_pham || p.name || '',
+        p.danhmuc?.ten_danh_muc || p.category_name || p.id_danh_muc || '',
+        Number(p.gia || p.price || 0),
+        Number(p.gia_von || p.cost_price || 0),
+        p.trang_thai || p.status || 'Còn hàng'
+      ]);
+    });
+    const wsProd = XLSX.utils.aoa_to_sheet(wsProdData);
+    wsProd['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, wsProd, 'ThucDon');
+  }
+
+  // 6. Sheet: DanhSachBan
+  if (Array.isArray(backupData.tables) && backupData.tables.length > 0) {
+    const wsTablesData = [
+      ['Mã bàn', 'Tên bàn', 'Sức chứa (người)', 'Trạng thái']
+    ];
+    backupData.tables.forEach((t: any) => {
+      wsTablesData.push([
+        t.id,
+        t.ten_ban || t.table_name || '',
+        Number(t.suc_chua || t.capacity || 4),
+        t.trang_thai || t.status || 'Trống'
+      ]);
+    });
+    const wsTables = XLSX.utils.aoa_to_sheet(wsTablesData);
+    wsTables['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsTables, 'DanhSachBan');
+  }
+
+  // 7. Sheet: ChamCong
+  if (Array.isArray(backupData.time_logs) && backupData.time_logs.length > 0) {
+    const wsAttData = [
+      ['Mã chấm công', 'Nhân viên', 'Ngày làm việc', 'Ca làm việc', 'Giờ vào', 'Giờ ra', 'Số giờ làm', 'Trạng thái duyệt']
+    ];
+    backupData.time_logs.forEach((att: any) => {
+      wsAttData.push([
+        att.id,
+        att.nguoidung?.ho_ten || att.staff_name || att.id_nhan_vien || '',
+        att.ngay_lam_viec || att.date || '',
+        att.ca_lam_viec || att.shift || '',
+        att.gio_vao || att.clock_in || '',
+        att.gio_ra || att.clock_out || '',
+        Number(att.so_gio_lam || att.hours_worked || 0),
+        att.trang_thai || att.status || ''
+      ]);
+    });
+    const wsAtt = XLSX.utils.aoa_to_sheet(wsAttData);
+    wsAtt['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsAtt, 'ChamCong');
+  }
+
+  // 8. Sheet: ChiPhiVanHang
+  if (Array.isArray(backupData.expenses) && backupData.expenses.length > 0) {
+    const wsExpData = [
+      ['Mã chi phí', 'Tên khoản chi', 'Loại chi phí', 'Số tiền (VNĐ)', 'Ngày chi', 'Người tạo', 'Ghi chú']
+    ];
+    backupData.expenses.forEach((exp: any) => {
+      wsExpData.push([
+        exp.id,
+        exp.ten_chi_phi || exp.name || '',
+        exp.loai_chi_phi === 'co_dinh' ? 'Cố định' : 'Biến động',
+        Number(exp.so_tien || exp.amount || 0),
+        exp.ngay_chi || exp.date || '',
+        exp.nguoidung?.ho_ten || exp.staff_name || exp.id_nhan_vien || '',
+        exp.ghi_chu || exp.notes || ''
+      ]);
+    });
+    const wsExp = XLSX.utils.aoa_to_sheet(wsExpData);
+    wsExp['!cols'] = [{ wch: 16 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsExp, 'ChiPhiVanHang');
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `AVA_COFFEE_FULL_BACKUP_${todayStr}.xlsx`);
+}
+
