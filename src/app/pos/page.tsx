@@ -168,8 +168,11 @@ export default function PosPage() {
     }
     loadData();
 
-    // 2. Realtime listener cho bảng danhsachban
-    const unsubscribe = db.subscribeToTableChanges(() => {
+    // 2. Realtime listener cho cả bàn và đơn hàng
+    const unsubTables = db.subscribeToTableChanges(() => {
+      refreshTables();
+    });
+    const unsubOrders = db.subscribeToOrderChanges(() => {
       refreshTables();
     });
 
@@ -191,7 +194,8 @@ export default function PosPage() {
     }
 
     return () => {
-      unsubscribe();
+      unsubTables();
+      unsubOrders();
       if (typeof window !== 'undefined') {
         window.removeEventListener('visibilitychange', handleWakeup);
         window.removeEventListener('focus', handleWakeup);
@@ -211,6 +215,10 @@ export default function PosPage() {
 
   // --- LÓGIC CART ---
   const addToCart = (product: any) => {
+    if (product.status === 'Hết hàng') {
+      toast.error(`Món "${product.name}" hiện đang tạm hết hàng!`);
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find(item => item.product_id === product.id);
       if (existing) {

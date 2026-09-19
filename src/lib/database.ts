@@ -1578,6 +1578,7 @@ export const db = {
 
   async deleteProduct(id: string) {
     cachedProducts = null;
+    cachedRecipes = null;
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.from('sanpham').delete().eq('id', id);
       if (!error) return true;
@@ -1633,14 +1634,20 @@ export const db = {
 
       // 2. Chèn công thức định lượng nếu có
       if (recipes.length > 0) {
-        const recipeRows = recipes.map(r => ({
-          id: generateShortId('rec_'),
-          id_san_pham: prodId,
-          id_nguyen_lieu: r.ingredient_id,
-          dinh_luong: r.quantity_needed
-        }));
-        await supabase.from('dinhluong').insert(recipeRows);
+        const recipeRows = recipes.map(r => {
+          const ing = ingredients.find(i => i.id === r.ingredient_id);
+          return {
+            id: generateShortId('rec_'),
+            id_san_pham: prodId,
+            id_nguyen_lieu: r.ingredient_id,
+            so_luong_can: r.quantity_needed,
+            don_vi_tinh: (ing as any)?.unit || (ing as any)?.don_vi_tinh || 'g'
+          };
+        });
+        await supabase.from('congthuc').insert(recipeRows);
       }
+      cachedProducts = null;
+      cachedRecipes = null;
 
       broadcastRealtimeEvent('order_update');
       return mapProductToClient(newProd);
@@ -1692,6 +1699,7 @@ export const db = {
     recipes: Array<{ ingredient_id: string; quantity_needed: number }>
   ) {
     cachedProducts = null;
+    cachedRecipes = null;
     const baseCost = Number(productData.base_cost || 0);
     const ingredients = await this.getIngredients();
     let calculatedCost = baseCost;
@@ -1720,16 +1728,20 @@ export const db = {
 
       if (prodErr) throw prodErr;
 
-      // 2. Xóa công thức cũ và chèn công thức mới
-      await supabase.from('dinhluong').delete().eq('id_san_pham', productId);
+      // 2. Xóa công thức cũ và chèn công thức mới vào bảng congthuc
+      await supabase.from('congthuc').delete().eq('id_san_pham', productId);
       if (recipes.length > 0) {
-        const recipeRows = recipes.map(r => ({
-          id: generateShortId('rec_'),
-          id_san_pham: productId,
-          id_nguyen_lieu: r.ingredient_id,
-          dinh_luong: r.quantity_needed
-        }));
-        await supabase.from('dinhluong').insert(recipeRows);
+        const recipeRows = recipes.map(r => {
+          const ing = ingredients.find(i => i.id === r.ingredient_id);
+          return {
+            id: generateShortId('rec_'),
+            id_san_pham: productId,
+            id_nguyen_lieu: r.ingredient_id,
+            so_luong_can: r.quantity_needed,
+            don_vi_tinh: (ing as any)?.unit || (ing as any)?.don_vi_tinh || 'g'
+          };
+        });
+        await supabase.from('congthuc').insert(recipeRows);
       }
 
       broadcastRealtimeEvent('order_update');
