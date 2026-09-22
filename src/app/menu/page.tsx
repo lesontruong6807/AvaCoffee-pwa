@@ -206,9 +206,9 @@ export default function MenuPage() {
 
       {/* RECIPE INSPECTOR MODAL */}
       {selectedProductForRecipe && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-coffee-light space-y-5 animate-scaleIn">
-            <div className="flex justify-between items-start border-b border-coffee-light pb-4">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-coffee-light space-y-4 sm:space-y-5 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex justify-between items-start border-b border-coffee-light">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-2xl overflow-hidden bg-coffee-light shrink-0">
                   <img

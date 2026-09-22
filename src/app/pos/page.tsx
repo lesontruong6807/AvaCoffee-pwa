@@ -1239,8 +1239,8 @@ export default function PosPage() {
 
       {/* DRAWER / MODAL HÓA ĐƠN & THANH TOÁN TRỰC TIẾP TRONG POS */}
       {isQuickPayOpen && existingOrder && (
-        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-coffee-light overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl max-w-lg w-full my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] flex flex-col shadow-2xl border border-coffee-light overflow-hidden animate-scaleIn">
             {/* Header */}
             <div className="p-5 bg-[#FAF6F0] border-b border-coffee-light flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2.5">
@@ -1414,10 +1414,10 @@ export default function PosPage() {
 
       {/* MODAL CHỌN PHƯƠNG THỨC THANH TOÁN TRONG POS */}
       {isPayModalOpen && (
-        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 border border-coffee-accent/40 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">Xác nhận thanh toán</h3>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-6 border border-coffee-accent/40 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark">Xác nhận thanh toán</h3>
               <button 
                 onClick={() => setIsPayModalOpen(false)}
                 className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer"

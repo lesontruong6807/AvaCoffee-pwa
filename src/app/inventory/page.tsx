@@ -867,11 +867,11 @@ export default function InventoryPage() {
 
       {/* MODAL NHẬP THÊM (RESTOCK) */}
       {isRestockOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-coffee-light space-y-5 animate-scaleIn max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark flex items-center space-x-2">
-                <PlusCircle className="w-5 h-5 text-coffee-primary" />
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-coffee-light space-y-4 sm:space-y-5 animate-scaleIn my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex justify-between items-center border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark flex items-center space-x-2">
+                <PlusCircle className="w-5 h-5 text-coffee-primary shrink-0" />
                 <span>Nhập Thêm Nguyên Liệu</span>
               </h3>
               <button
@@ -1017,16 +1017,16 @@ export default function InventoryPage() {
 
       {/* MODAL KIỂM KHO (STOCKTAKE) */}
       {isStocktakeOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-coffee-light space-y-5 animate-scaleIn">
-            <div className="flex justify-between items-center border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark flex items-center space-x-2">
-                <ClipboardCheck className="w-5 h-5 text-coffee-primary" />
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-coffee-light space-y-4 sm:space-y-5 animate-scaleIn my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex justify-between items-center border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark flex items-center space-x-2">
+                <ClipboardCheck className="w-5 h-5 text-coffee-primary shrink-0" />
                 <span>Kiểm Kho Thực Tế (Stocktake)</span>
               </h3>
               <button
                 onClick={() => setIsStocktakeOpen(false)}
-                className="text-coffee-medium font-bold text-xs hover:text-coffee-dark p-1"
+                className="text-coffee-medium font-bold text-xs hover:text-coffee-dark p-1 cursor-pointer"
               >
                 Đóng ✖
               </button>

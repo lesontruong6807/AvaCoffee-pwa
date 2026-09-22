@@ -4237,13 +4237,13 @@ export default function AdminPage() {
 
       {/* POPUP FORM THÊM CHI PHÍ VẬN HÀNH */}
       {isExpModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-5 sm:space-y-6 border border-coffee-accent/40 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark">
                 Ghi nhận Chi phí vận hành mới
               </h3>
-              <button onClick={() => setIsExpModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium">
+              <button onClick={() => setIsExpModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -4955,8 +4955,8 @@ export default function AdminPage() {
         const diffHours = outMinutes > inMinutes ? Math.round(((outMinutes - inMinutes) / 60) * 100) / 100 : 0;
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-coffee-light">
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-5 border border-coffee-light my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
               <div className="text-center space-y-2">
                 <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 mx-auto">
                   <AlertTriangle className="w-7 h-7" />
@@ -5044,11 +5044,11 @@ export default function AdminPage() {
         const profitMargin = Number(prodPrice || 0) > 0 ? Math.round((profit / Number(prodPrice)) * 100) : 0;
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 border border-coffee-accent/40">
-              <div className="flex items-center justify-between border-b border-coffee-light pb-4">
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-2xl w-full my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto shadow-2xl space-y-5 border border-coffee-accent/40 animate-scaleIn">
+              <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
                 <div>
-                  <h3 className="font-extrabold text-lg text-coffee-dark">
+                  <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark">
                     {editingProduct ? 'Cập nhật đồ uống & Định mức' : 'Thêm đồ uống mới'}
                   </h3>
                   <p className="text-xs text-coffee-medium mt-0.5">
@@ -5435,10 +5435,10 @@ export default function AdminPage() {
 
       {/* POPUP FORM CRUD NHÂN VIÊN */}
       {isStaffModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-5 border border-coffee-accent/40 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark">
                 {editingStaff ? 'Cập nhật hồ sơ nhân viên' : 'Thêm nhân viên mới'}
               </h3>
               <button onClick={() => setIsStaffModalOpen(false)} className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium">
@@ -5524,9 +5524,9 @@ export default function AdminPage() {
 
       {/* MODAL SỬA GIÁ NHẬP KHO (FEATURE 3) */}
       {isEditRestockModalOpen && editingRestockLog && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 border border-coffee-accent/40 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-3.5">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-5 border border-coffee-accent/40 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
               <h3 className="font-extrabold text-base text-coffee-dark flex items-center space-x-2">
                 <Edit className="w-4 h-4 text-coffee-primary" />
                 <span>Cập nhật giá nhập kho</span>
@@ -5610,9 +5610,9 @@ export default function AdminPage() {
 
       {/* MODAL CRUD BÀN & SƠ ĐỒ */}
       {isTableModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-coffee-light">
-            <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-5 border border-coffee-light my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light/60">
               <h3 className="font-extrabold text-base text-coffee-dark flex items-center gap-2">
                 <LayoutGrid className="w-5 h-5 text-coffee-primary" />
                 <span>{editingTable ? 'Chỉnh Sửa Thông Tin Bàn' : 'Thêm Bàn Mới'}</span>
@@ -5690,9 +5690,9 @@ export default function AdminPage() {
 
       {/* MODAL CRUD NGUYÊN LIỆU KHO */}
       {isIngModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 border border-coffee-light max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl space-y-4 sm:space-y-5 border border-coffee-light my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light/60">
               <h3 className="font-extrabold text-base text-coffee-dark flex items-center gap-2">
                 <CalendarDays className="w-5 h-5 text-coffee-primary" />
                 <span>{editingIng ? 'Chỉnh Sửa Nguyên Liệu Kho' : 'Thêm Nguyên Liệu Mới Vào Kho'}</span>
@@ -5837,8 +5837,8 @@ export default function AdminPage() {
 
       {/* MODAL DỌN DẸP DỮ LIỆU CŨ AN TOÀN 3 LỚP */}
       {isCleanupModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm animate-fadeIn p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-red-200">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-5 border border-red-200 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
             <div className="text-center space-y-2">
               <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center text-red-600 mx-auto">
                 <ShieldAlert className="w-7 h-7" />
@@ -6116,8 +6116,8 @@ function CalendarDayDetailsModal({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full border border-coffee-light shadow-2xl p-6 flex flex-col max-h-[85vh] overflow-hidden space-y-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+      <div className="bg-white rounded-3xl max-w-md w-full border border-coffee-light shadow-2xl p-5 sm:p-6 flex flex-col my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-hidden space-y-4 animate-scaleIn">
         <div className="flex items-center justify-between border-b border-coffee-light/60 pb-3">
           <div className="space-y-0.5">
             <h4 className="font-extrabold text-sm text-coffee-dark uppercase tracking-wider">

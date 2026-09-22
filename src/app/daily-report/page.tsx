@@ -754,9 +754,9 @@ function ShiftMetricsSection({ metrics, currentUser, onRefresh }: { metrics: any
 
       {/* MODAL YÊU CẦU HỦY HÓA ĐƠN ĐÃ THANH TOÁN (KIỂM DUYỆT 2 CHIỀU) */}
       {cancelModalOrder && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border border-red-200 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-3">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border border-red-200 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
               <h3 className="font-extrabold text-base text-red-600 flex items-center space-x-2">
                 <span>⚠️ Yêu cầu hủy hóa đơn #{cancelModalOrder.id.substring(0, 6)}</span>
               </h3>

@@ -639,13 +639,13 @@ export default function PaymentPage() {
 
       {/* POPUP CHỌN PHƯƠNG THỨC THANH TOÁN */}
       {isPayModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl space-y-6 border border-coffee-accent/40">
-            <div className="flex items-center justify-between border-b border-coffee-light pb-4">
-              <h3 className="font-extrabold text-lg text-coffee-dark">Xác nhận thanh toán</h3>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm overflow-y-auto p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center items-start sm:items-center">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-md w-full shadow-2xl space-y-4 sm:space-y-6 border border-coffee-accent/40 my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white z-10 -mt-1 pt-1 pb-3 flex items-center justify-between border-b border-coffee-light">
+              <h3 className="font-extrabold text-base sm:text-lg text-coffee-dark">Xác nhận thanh toán</h3>
               <button 
                 onClick={() => setIsPayModalOpen(false)}
-                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium"
+                className="p-1 hover:bg-coffee-light rounded-lg text-coffee-medium cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
