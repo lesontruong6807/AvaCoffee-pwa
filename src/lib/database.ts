@@ -3791,18 +3791,46 @@ export const db = {
       note: payload.note || '',
       staff_id: payload.staff_id,
       created_at: new Date().toISOString(),
-      status: 'Chờ duyệt' as const
+      status: 'Đã duyệt' as 'Chờ duyệt' | 'Đã duyệt' | 'Từ chối'
     };
 
     const ingredients = await this.getIngredients();
 
     // 1. Nếu là món có trong danh mục kho -> Cộng tồn kho ngay lập tức
     if (!isCustom && payload.ingredient_id) {
+      const ing = ingredients.find(i => i.id === payload.ingredient_id);
+      const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
+      const v_ton_hien_tai = Number(ing?.stock_quantity || 0);
+      const v_gia_von_cu = Number((ing as any)?.gia_von_trung_binh || (ing as any)?.don_gia_nhap || 0);
+      const newQty = v_ton_hien_tai + payload.change_amount;
+      
+      let newGiaVon = v_gia_von_cu;
+      if (newQty > 0 && payload.cost > 0) {
+        newGiaVon = Math.round(((v_ton_hien_tai * v_gia_von_cu) + payload.cost) / newQty * 100) / 100;
+      } else if (payload.cost > 0) {
+        newGiaVon = donGiaNhap;
+      }
+
+      if (ing) {
+        ing.stock_quantity = newQty;
+        (ing as any).don_gia_nhap = donGiaNhap;
+        (ing as any).gia_von_trung_binh = newGiaVon;
+      }
+
       if (isSupabaseConfigured && supabase) {
-        // Tạo phiếu nhập kho và chi tiết phiếu nhập -> Kích hoạt trigger tự động cập nhật nguyenlieu và gia_von_trung_binh
+        // CẬP NHẬT TỒN KHO THỰC TẾ TRÊN SUPABASE NGAY LẬP TỨC
+        await supabase
+          .from('nguyenlieu')
+          .update({
+            so_luong_ton: newQty,
+            don_gia_nhap: donGiaNhap,
+            gia_von_trung_binh: newGiaVon
+          })
+          .eq('id', payload.ingredient_id);
+
+        // Tạo phiếu nhập kho và chi tiết phiếu nhập
         const phieuId = generateShortId('phieu_');
         const maPhieu = 'PNK-' + generateShortId('').toUpperCase();
-        const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
         
         await supabase.from('phieunhapkho').insert({
           id: phieuId,
@@ -3823,26 +3851,7 @@ export const db = {
           thanh_tien: payload.cost
         });
       } else {
-        const ing = ingredients.find(i => i.id === payload.ingredient_id);
-        const donGiaNhap = payload.change_amount > 0 ? (payload.cost / payload.change_amount) : 0;
-        if (ing) {
-          const v_ton_hien_tai = Number(ing.stock_quantity || 0);
-          const v_gia_von_cu = Number((ing as any).gia_von_trung_binh || (ing as any).don_gia_nhap || 0);
-          const newQty = v_ton_hien_tai + payload.change_amount;
-          
-          let newGiaVon = 0;
-          if (newQty > 0) {
-            newGiaVon = ((v_ton_hien_tai * v_gia_von_cu) + payload.cost) / newQty;
-          } else {
-            newGiaVon = donGiaNhap;
-          }
-          
-          ing.stock_quantity = newQty;
-          (ing as any).don_gia_nhap = donGiaNhap;
-          (ing as any).gia_von_trung_binh = newGiaVon;
-          mockDb.setIngredients(ingredients);
-        }
-
+        mockDb.setIngredients(ingredients);
         // Tự động tính toán lại giá vốn của các sản phẩm sử dụng nguyên liệu này (offline fallback)
         try {
           await this.recalculateProductsCostPriceByIngredient(payload.ingredient_id);
@@ -3862,7 +3871,7 @@ export const db = {
         chi_phi: payload.cost,
         ghi_chu: payload.note || '',
         id_nhan_vien: payload.staff_id,
-        trang_thai: 'Chờ duyệt'
+        trang_thai: 'Đã duyệt'
       }]);
     } else {
       const logs = mockDb.getInventoryLogs();

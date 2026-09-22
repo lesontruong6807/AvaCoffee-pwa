@@ -784,8 +784,11 @@ export default function AdminPage() {
     setEditingOtLog(log);
     setOtStaffId(log.user_id);
     const dStr = new Date(log.check_in_time).toLocaleDateString('en-CA');
-    setOtDate(dStr);
-    setOtShift(log.shift || 'Ca ngoài giờ');
+    if (log.shift?.includes('tối') || log.shift?.includes('chiều') || log.shift?.includes('16:00') || log.shift?.includes('18:00')) {
+      setOtShift('Ca tối (16:00 - 21:00)');
+    } else {
+      setOtShift('Ca sáng (05:30 - 12:00)');
+    }
 
     const inD = new Date(log.check_in_time);
     const inH = String(inD.getHours()).padStart(2, '0');
@@ -4398,21 +4401,15 @@ export default function AdminPage() {
                       if (val.includes('sáng')) {
                         setOtStartTime('05:30');
                         setOtEndTime('12:00');
-                      } else if (val.includes('chiều')) {
-                        setOtStartTime('12:00');
-                        setOtEndTime('18:00');
-                      } else if (val.includes('tối')) {
-                        setOtStartTime('18:00');
-                        setOtEndTime('23:00');
+                      } else {
+                        setOtStartTime('16:00');
+                        setOtEndTime('21:00');
                       }
                     }}
                     className="w-full bg-[#FAF6F0] px-3.5 py-2.5 rounded-2xl border-none focus:ring-2 focus:ring-coffee-accent text-coffee-dark font-medium"
                   >
-                    <option value="Ca sáng (05:30 - 12:00)">Ca sáng (05:30 - 12:00)</option>
-                    <option value="Ca chiều (12:00 - 18:00)">Ca chiều (12:00 - 18:00)</option>
-                    <option value="Ca tối (18:00 - 23:00)">Ca tối (18:00 - 23:00)</option>
-                    <option value="Ngoài giờ / Tăng ca">Ngoài giờ / Tăng ca</option>
-                    <option value="Chấm bù ca làm">Chấm bù ca làm</option>
+                    <option value="Ca sáng (05:30 - 12:00)">Ca sáng (05:30 - 12:00) [5:30am - 12:00pm]</option>
+                    <option value="Ca tối (16:00 - 21:00)">Ca tối (16:00 - 21:00) [4:00pm - 9:00pm]</option>
                   </select>
                 </div>
 
