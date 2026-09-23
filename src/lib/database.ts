@@ -1441,13 +1441,13 @@ export const db = {
       // 1. Kiểm tra xem bàn có đơn hàng chưa thanh toán không
       const { data: unpaidOrders } = await supabase
         .from('hoadon')
-        .select('id, ma_hoa_don')
+        .select('id')
         .eq('id_ban', id)
-        .eq('trang_thai', 'Chưa thanh toán')
+        .eq('trang_thai_thanh_toan', 'Chưa thanh toán')
         .limit(1);
 
       if (unpaidOrders && unpaidOrders.length > 0) {
-        return { success: false, message: `Bàn này đang có đơn hàng chưa thanh toán (${unpaidOrders[0].ma_hoa_don}). Vui lòng thanh toán hoặc chuyển bàn trước khi xóa!` };
+        return { success: false, message: `Bàn này đang có đơn hàng chưa thanh toán (#${unpaidOrders[0].id}). Vui lòng thanh toán hoặc chuyển bàn trước khi xóa!` };
       }
 
       // 2. Kiểm tra xem bàn đã từng có hóa đơn lịch sử chưa (tránh vỡ lịch sử hoặc lỗi foreign key)
@@ -2605,7 +2605,7 @@ export const db = {
                   id: generateShortId('inv_'),
                   id_nguyen_lieu: ing.id,
                   so_luong_thay_doi: -deductQty,
-                  loai_giao_dich: 'Xuất kho',
+                  loai_giao_dich: 'Khác',
                   chi_phi: 0,
                   ghi_chu: `[Từ chối hủy đơn #${orderId}] Thu hồi kho về trạng thái đã bán`,
                   id_nhan_vien: adminId,
@@ -4458,10 +4458,22 @@ export const db = {
     try {
       const dateVN = targetDateVN || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
       
+      const startUtc = new Date(`${dateVN}T00:00:00+07:00`).toISOString();
+      const endUtc = new Date(`${dateVN}T23:59:59.999+07:00`).toISOString();
+      const queryStartUtc = new Date(new Date(startUtc).getTime() - 24 * 3600 * 1000).toISOString();
+      
       const [allOrdersResult, recipesResult, logsResult, ingredientsResult] = await Promise.all([
-        supabase.from('hoadon').select('*, hoadondetail(*)').eq('trang_thai_thanh_toan', 'Đã thanh toán'),
+        supabase.from('hoadon')
+          .select('*, hoadondetail(*)')
+          .eq('trang_thai_thanh_toan', 'Đã thanh toán')
+          .gte('ngay_tao', queryStartUtc)
+          .lte('ngay_tao', endUtc),
         supabase.from('congthuc').select('*'),
-        supabase.from('lichsukho').select('*').eq('loai_giao_dich', 'Bán hàng'),
+        supabase.from('lichsukho')
+          .select('*')
+          .eq('loai_giao_dich', 'Bán hàng')
+          .gte('thoi_gian_tao', startUtc)
+          .lte('thoi_gian_tao', endUtc),
         supabase.from('nguyenlieu').select('*')
       ]);
 
@@ -4722,15 +4734,15 @@ export const db = {
           invLogsRes,
           expensesRes
         ] = await Promise.all([
-          supabase.from('hoadon').select('*').order('thoi_gian_tao', { ascending: false }),
+          supabase.from('hoadon').select('*').order('ngay_tao', { ascending: false }),
           supabase.from('hoadondetail').select('*'),
           supabase.from('nguyenlieu').select('*').order('ten_nguyen_lieu', { ascending: true }),
           supabase.from('sanpham').select('*').order('ten_san_pham', { ascending: true }),
           supabase.from('danhmuc').select('*'),
           supabase.from('congthuc').select('*'),
           supabase.from('danhsachban').select('*').order('ten_ban', { ascending: true }),
-          supabase.from('chamcong').select('*').order('ngay_lam_viec', { ascending: false }),
-          supabase.from('lichsukho').select('*').order('thoi_gian', { ascending: false }),
+          supabase.from('chamcong').select('*').order('gio_vao', { ascending: false }),
+          supabase.from('lichsukho').select('*').order('thoi_gian_tao', { ascending: false }),
           supabase.from('chiphivanhang').select('*').order('ngay_chi', { ascending: false })
         ]);
 
@@ -4773,8 +4785,8 @@ export const db = {
       const { data: oldOrders } = await supabase
         .from('hoadon')
         .select('id')
-        .lt('thoi_gian_tao', cutoffDate)
-        .neq('trang_thai', 'Chưa thanh toán');
+        .lt('ngay_tao', cutoffDate)
+        .neq('trang_thai_thanh_toan', 'Chưa thanh toán');
 
       if (oldOrders && oldOrders.length > 0) {
         const oldIds = oldOrders.map(o => o.id);
@@ -4783,7 +4795,7 @@ export const db = {
         // Xóa chi tiết đơn hàng cũ trước (tránh foreign key cascade issue)
         for (let i = 0; i < oldIds.length; i += 200) {
           const batch = oldIds.slice(i, i + 200);
-          await supabase.from('hoadondetail').delete().in('id_hoa_don', batch);
+          await supabase.from('hoadondetail').delete().in('idhoadon', batch);
           await supabase.from('hoadon').delete().in('id', batch);
         }
       }
@@ -4792,14 +4804,14 @@ export const db = {
       const { count: deletedLogs } = await supabase
         .from('lichsukho')
         .delete({ count: 'exact' })
-        .lt('thoi_gian', cutoffDate);
+        .lt('thoi_gian_tao', cutoffDate);
       deletedLogsCount = deletedLogs || 0;
 
       // 3. Xóa chi phí vận hành cũ hơn cutoffDate
       await supabase.from('chiphivanhang').delete().lt('ngay_chi', cutoffDate.split('T')[0]);
 
       // 4. Xóa chấm công cũ hơn cutoffDate
-      await supabase.from('chamcong').delete().lt('ngay_lam_viec', cutoffDate.split('T')[0]);
+      await supabase.from('chamcong').delete().lt('gio_vao', cutoffDate);
 
       broadcastRealtimeEvent('order_update');
       broadcastRealtimeEvent('report_update');
