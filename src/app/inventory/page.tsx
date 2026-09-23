@@ -420,6 +420,8 @@ export default function InventoryPage() {
   }).length;
 
   const filteredLogs = logs.filter(log => {
+    // Ẩn lịch sử Bán hàng, chỉ hiển thị Nhập kho, Kiểm kho / Hao hụt và Khác
+    if (log.type === 'Bán hàng') return false;
     const t = new Date(log.created_at).getTime();
     return t >= startT && t <= endT;
   });
@@ -783,7 +785,7 @@ export default function InventoryPage() {
         <div className="bg-white rounded-3xl border border-coffee-light p-5 shadow-sm space-y-4">
           <h3 className="font-extrabold text-base text-coffee-dark flex items-center space-x-2">
             <History className="w-5 h-5 text-coffee-primary" />
-            <span>Lịch sử Nhập xuất & Kiểm kho</span>
+            <span>Lịch sử Nhập & Kiểm kho</span>
           </h3>
 
           {/* Bộ lọc ngày */}

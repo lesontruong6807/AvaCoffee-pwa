@@ -1233,7 +1233,7 @@ export default function AdminPage() {
     if (o.payment_status !== 'Đã thanh toán') return false;
     const notes = o.notes || (o as any).ghi_chu || '';
     if (notes.includes('[Chờ duyệt hủy]') && !notes.includes('[Admin từ chối hủy]')) return false;
-    const t = new Date(o.paid_at || o.created_at).getTime();
+    const t = new Date(o.created_at).getTime();
     return t >= repStartT && t <= repEndT;
   });
 
@@ -1298,8 +1298,8 @@ export default function AdminPage() {
     return mins < (14 * 60); // Đơn trước 14:00 tính vào Ca Sáng, từ 14:00 trở đi tính vào Ca Chiều
   };
 
-  const morningPaidOrders = paidOrders.filter(o => isMorningOrder(o.paid_at || o.created_at));
-  const afternoonPaidOrders = paidOrders.filter(o => !isMorningOrder(o.paid_at || o.created_at));
+  const morningPaidOrders = paidOrders.filter(o => isMorningOrder(o.created_at));
+  const afternoonPaidOrders = paidOrders.filter(o => !isMorningOrder(o.created_at));
   const morningRestockLogs = rangeRestockLogs.filter(l => isMorningOrder(l.created_at));
   const afternoonRestockLogs = rangeRestockLogs.filter(l => !isMorningOrder(l.created_at));
 
@@ -1344,8 +1344,7 @@ export default function AdminPage() {
   const dailyReportDict: { [dateStr: string]: DailyReportEntry } = {};
 
   paidOrders.forEach(o => {
-    const orderTime = o.paid_at || o.created_at;
-    const dStr = new Date(orderTime).toLocaleDateString('en-CA');
+    const dStr = new Date(o.created_at).toLocaleDateString('en-CA');
     if (!dailyReportDict[dStr]) {
       dailyReportDict[dStr] = {
         date: dStr,
@@ -1356,7 +1355,7 @@ export default function AdminPage() {
     }
     const day = dailyReportDict[dStr];
     const amt = Number(o.total_amount || 0);
-    const isMorn = isMorningOrder(orderTime);
+    const isMorn = isMorningOrder(o.created_at);
     const isCash = o.payment_method === 'Tiền mặt';
 
     if (isMorn) {
@@ -1404,8 +1403,8 @@ export default function AdminPage() {
 
   // Danh sách đơn hàng đã lọc theo Ca và Phương thức thanh toán
   const filteredPaidOrders = paidOrders.filter(o => {
-    if (repShiftFilter === 'morning' && !isMorningOrder(o.paid_at || o.created_at)) return false;
-    if (repShiftFilter === 'afternoon' && isMorningOrder(o.paid_at || o.created_at)) return false;
+    if (repShiftFilter === 'morning' && !isMorningOrder(o.created_at)) return false;
+    if (repShiftFilter === 'afternoon' && isMorningOrder(o.created_at)) return false;
     if (repPayFilter !== 'all' && o.payment_method !== repPayFilter) return false;
     return true;
   });
@@ -2739,6 +2738,7 @@ export default function AdminPage() {
                     <th className="py-2">Ngày</th>
                     <th className="py-2">Ca</th>
                     <th className="py-2">Nguyên liệu</th>
+                    <th className="py-2 text-right">Số lượng</th>
                     <th className="py-2">Ghi chú/Lý do</th>
                     <th className="py-2 text-right">Chi phí</th>
                     <th className="py-2 text-center w-24">Thao tác</th>
@@ -2747,6 +2747,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-coffee-light/50">
                   {rangeRestockLogs.map((log) => {
                     const isMorn = isMorningOrder(log.created_at);
+                    const qtyStr = log.change_amount ? `+${Number(log.change_amount).toLocaleString('vi-VN')} ${log.ingredient_unit || ''}`.trim() : '-';
                     return (
                       <tr key={log.id} className="hover:bg-coffee-light/10 transition-colors">
                         <td className="py-2.5 text-coffee-medium font-medium">
@@ -2761,6 +2762,9 @@ export default function AdminPage() {
                         </td>
                         <td className="py-2.5 font-bold text-coffee-dark">
                           {log.ingredient_name}
+                        </td>
+                        <td className="py-2.5 text-right font-bold text-emerald-700 font-mono">
+                          {qtyStr}
                         </td>
                         <td className="py-2.5 text-coffee-medium italic">
                           {log.note || 'Nhập kho'}
@@ -2783,7 +2787,7 @@ export default function AdminPage() {
                   })}
                   {rangeRestockLogs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-coffee-medium/60 italic">
+                      <td colSpan={7} className="py-6 text-center text-coffee-medium/60 italic">
                         Không phát sinh chi phí nhập kho nào trong khoảng thời gian này.
                       </td>
                     </tr>
@@ -2857,9 +2861,8 @@ export default function AdminPage() {
                       <tbody className="divide-y divide-coffee-light/50">
                         {repDisplayedOrders.map((order) => {
                           const isExpanded = repExpandedOrderId === order.id;
-                          const orderTime = order.paid_at || order.created_at;
-                          const isMorn = isMorningOrder(orderTime);
-                          const d = new Date(orderTime);
+                          const isMorn = isMorningOrder(order.created_at);
+                          const d = new Date(order.created_at);
                           const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
                           const dateStr = d.toLocaleDateString('vi-VN');
 

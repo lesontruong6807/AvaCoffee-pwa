@@ -227,12 +227,14 @@ export function exportRevenueToExcel(
   if (data.restockLogs && data.restockLogs.length > 0) {
     wsData.push([]);
     wsData.push(['CHI TIẾT TIỀN NHẬP KHO']);
-    wsData.push(['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Ghi chú/Lý do', 'Thành tiền']);
+    wsData.push(['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Số lượng', 'Ghi chú/Lý do', 'Thành tiền']);
     data.restockLogs.forEach((log, idx) => {
+      const qtyStr = log.change_amount ? `+${Number(log.change_amount).toLocaleString('vi-VN')} ${log.ingredient_unit || ''}`.trim() : '-';
       wsData.push([
         idx + 1,
         new Date(log.created_at).toLocaleDateString('vi-VN'),
         log.ingredient_name,
+        qtyStr,
         log.note || 'Nhập kho',
         `-${fmtVND(log.cost)}`
       ]);
@@ -406,21 +408,23 @@ export function exportRevenueToPDF(
       idx + 1,
       new Date(log.created_at).toLocaleDateString('vi-VN'),
       log.ingredient_name,
+      log.change_amount ? `+${Number(log.change_amount).toLocaleString('vi-VN')} ${log.ingredient_unit || ''}`.trim() : '-',
       log.note || 'Nhập kho',
       `-${fmtVND(log.cost)}`
     ]);
 
     autoTable(doc, {
       startY: 24,
-      head: [['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Ghi chú/Lý do', 'Thành tiền']],
+      head: [['STT', 'Ngày', 'Nguyên liệu/Chi phí', 'Số lượng', 'Ghi chú/Lý do', 'Thành tiền']],
       body: restockTableData,
       styles: { font: 'TimesNewRoman', fontSize: 8, cellPadding: 2.5 },
       headStyles: { fillColor: [74, 53, 37], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       columnStyles: {
         0: { cellWidth: 10 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 45 },
-        4: { cellWidth: 35, halign: 'right', textColor: [200, 0, 0], fontStyle: 'bold' }
+        1: { cellWidth: 22 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 25, halign: 'right' },
+        5: { cellWidth: 30, halign: 'right', textColor: [200, 0, 0], fontStyle: 'bold' }
       },
       alternateRowStyles: { fillColor: [250, 246, 240] },
       margin: { left: 14, right: 14 },

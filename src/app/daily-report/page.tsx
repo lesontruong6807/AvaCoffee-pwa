@@ -103,14 +103,14 @@ export default function DailyReportPage() {
   const todayPaidOrders = orders.filter(o => {
     if (o.payment_status !== 'Đã thanh toán') return false;
     if (isOrderPendingCancel(o)) return false;
-    return getVnDate(o.paid_at || o.created_at) === todayVn;
+    return getVnDate(o.created_at) === todayVn;
   });
 
   const todayAllOrders = orders.filter(o => {
     const isPaid = o.payment_status === 'Đã thanh toán';
     const isPending = isOrderPendingCancel(o);
     if (!isPaid && !isPending) return false;
-    return getVnDate(o.paid_at || o.created_at) === todayVn;
+    return getVnDate(o.created_at) === todayVn;
   });
 
   const todayLogs = inventoryLogs.filter(l => {
@@ -119,13 +119,13 @@ export default function DailyReportPage() {
 
   // 2. Phân loại theo Ca làm việc (theo chuẩn giờ Việt Nam)
   // Ca sáng: 05:30 - 12:00 (Tính các order/chi phí tạo trước 14:00 VN)
-  const morningOrders = todayPaidOrders.filter(o => getVnMins(o.paid_at || o.created_at) < (14 * 60));
-  const morningAllOrders = todayAllOrders.filter(o => getVnMins(o.paid_at || o.created_at) < (14 * 60));
+  const morningOrders = todayPaidOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
+  const morningAllOrders = todayAllOrders.filter(o => getVnMins(o.created_at) < (14 * 60));
   const morningLogs = todayLogs.filter(l => getVnMins(l.created_at) < (14 * 60));
 
   // Ca chiều: 16:00 - 21:00 (Tính các order/chi phí tạo từ 14:00 VN trở đi)
-  const afternoonOrders = todayPaidOrders.filter(o => getVnMins(o.paid_at || o.created_at) >= (14 * 60));
-  const afternoonAllOrders = todayAllOrders.filter(o => getVnMins(o.paid_at || o.created_at) >= (14 * 60));
+  const afternoonOrders = todayPaidOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
+  const afternoonAllOrders = todayAllOrders.filter(o => getVnMins(o.created_at) >= (14 * 60));
   const afternoonLogs = todayLogs.filter(l => getVnMins(l.created_at) >= (14 * 60));
 
   // 3. Hàm tính toán các chỉ số cho từng ca
@@ -533,12 +533,15 @@ function ShiftMetricsSection({ metrics, currentUser, onRefresh }: { metrics: any
           {metrics.restockItems.length > 0 ? (
             <div className="space-y-1.5 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
               <span className="text-[10px] text-coffee-medium uppercase font-bold block">Chi tiết chi phí nhập trong ca:</span>
-              {metrics.restockItems.map((log: any) => (
-                <div key={log.id} className="flex justify-between text-[11px] text-red-700 font-semibold">
-                  <span>• {log.note || `Nhập ${log.custom_ingredient_name || 'Nguyên liệu'}`}</span>
-                  <span>-{Number(log.cost || 0).toLocaleString('vi-VN')}đ</span>
-                </div>
-              ))}
+              {metrics.restockItems.map((log: any) => {
+                const qtyStr = log.change_amount ? ` (+${Number(log.change_amount).toLocaleString('vi-VN')} ${log.ingredient_unit || ''})` : '';
+                return (
+                  <div key={log.id} className="flex justify-between text-[11px] text-red-700 font-semibold">
+                    <span>• {log.ingredient_name || log.note || 'Nguyên liệu'}{qtyStr}{log.note ? ` - ${log.note}` : ''}</span>
+                    <span>-{Number(log.cost || 0).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="flex justify-between items-center text-coffee-medium/70 text-[11px] px-1 bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light/45">
@@ -577,7 +580,7 @@ function ShiftMetricsSection({ metrics, currentUser, onRefresh }: { metrics: any
                 return (
                   <>
                     {displayedOrders.map((order: any) => {
-                      const date = new Date(order.paid_at || order.created_at);
+                      const date = new Date(order.created_at);
                       const hh = String(date.getHours()).padStart(2, '0');
                       const mm = String(date.getMinutes()).padStart(2, '0');
                       const dd = String(date.getDate()).padStart(2, '0');
