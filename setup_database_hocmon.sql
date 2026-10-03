@@ -401,15 +401,15 @@ INSERT INTO public.sanpham (id, id_danh_muc, ten_san_pham, don_vi_tinh, don_gia,
 -- 6. ĐỊNH MỨC CÔNG THỨC PHA CHẾ & TRỪ LY
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_2', 'CP001', 'ing_duong', 8.33, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_3', 'CP001', 'ing_lyden', 1, 'cái') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_1', 'CP001', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_4', 'CP002', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_1', 'CP001', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_4', 'CP002', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_5', 'CP002', 'ing_suadac', 30, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_6', 'CP002', 'ing_lytrang', 1, 'cái') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_9', 'CP003', 'ing_suatuoi', 80, 'ml') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_10', 'CP003', 'ing_lyhoavan', 1, 'cái') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_7', 'CP003', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_7', 'CP003', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_8', 'CP003', 'ing_suadac', 30, 'g') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cm48u5d4', 'CP004', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cm48u5d4', 'CP004', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_mrmx8bhw', 'CP004', 'ing_muoibien', 0.67, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_yk2tplpm', 'CP004', 'ing_lytrang', 1, 'cái') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_5r7pui14', 'CP004', 'ing_suadac', 31.33, 'g') ON CONFLICT (id) DO NOTHING;
@@ -418,10 +418,10 @@ INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_18', 'CP005', 'ing_suatuoi', 50, 'ml') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_17', 'CP005', 'ing_suadac', 40, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_19', 'CP005', 'ing_lytrang', 1, 'cái') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_16', 'CP005', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_gt_16', 'CP005', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_muoibien', 'CP006', 'ing_muoibien', 0.67, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_lytrang', 'CP006', 'ing_lytrang', 1, 'cái') ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_caphe', 'CP006', 'ing_caphe', 20, 'g') ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_caphe', 'CP006', 'ing_caphe', 18, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_suadac', 'CP006', 'ing_suadac', 41.33, 'g') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_suatuoi', 'CP006', 'ing_suatuoi', 52, 'ml') ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.congthuc (id, id_san_pham, id_nguyen_lieu, so_luong_can, don_vi_tinh) VALUES ('rec_cp6_kembeo', 'CP006', 'ing_kembeo', 30.27, 'g') ON CONFLICT (id) DO NOTHING;
