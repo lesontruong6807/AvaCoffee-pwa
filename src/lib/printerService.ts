@@ -47,6 +47,30 @@ export function formatRow(left: string, right: string, totalWidth: number = RECE
   return leftClean + ' '.repeat(spacesNeeded) + rightClean;
 }
 
+// Helper to format item row in 3 columns: Ten mon (22 chars) | SL (5 chars) | Gia (13 chars)
+export function formatThreeColumns(
+  name: string,
+  qty: number,
+  subtotal: number,
+  index: number,
+  totalWidth: number = RECEIPT_WIDTH
+): string[] {
+  const nameWidth = totalWidth - 5 - 13; // 40 - 5 - 13 = 22 chars
+  const cleanName = removeDiacritics(`${index}. ${name}`);
+  const qtyStr = String(qty);
+  const priceStr = `${subtotal.toLocaleString('vi-VN')}d`;
+
+  if (cleanName.length <= nameWidth) {
+    const line = cleanName.padEnd(nameWidth) + qtyStr.padStart(5) + priceStr.padStart(13);
+    return [line];
+  } else {
+    // Tên món dài: Dòng 1 in trọn vẹn tên món, dòng 2 in số lượng & giá căn chuẩn theo cột
+    const line1 = cleanName;
+    const line2 = ''.padEnd(nameWidth) + qtyStr.padStart(5) + priceStr.padStart(13);
+    return [line1, line2];
+  }
+}
+
 // ESC/POS Command Builder Class
 class EscPosBuilder {
   private buffer: number[] = [];
@@ -126,6 +150,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   subtotal: number;
+  notes?: string;
 }
 
 export interface OrderData {
@@ -138,14 +163,14 @@ export interface OrderData {
   notes?: string;
 }
 
-// Build compact, paper-saving ESC/POS receipt data (Tiết kiệm tối đa giấy in)
+// Build compact, paper-saving ESC/POS receipt data
 export function buildReceiptBytes(orderData: OrderData, settings?: Partial<StoreSettings>): Uint8Array {
   const builder = new EscPosBuilder();
   const timeFormatted = formatShortReceiptTime(new Date());
   const storeName = settings?.store_name || 'AVA COFFEE';
   const divider = '-'.repeat(RECEIPT_WIDTH);
 
-  // 1. Header quán (Gọn gàng, không feed dòng trống)
+  // 1. Header quán (Bỏ SĐT, dùng địa chỉ mới)
   builder.alignCenter()
     .fontSizeDouble()
     .bold(true)
@@ -153,16 +178,14 @@ export function buildReceiptBytes(orderData: OrderData, settings?: Partial<Store
     .fontSizeNormal()
     .bold(false);
 
-  const contactList: string[] = [];
-  if (settings?.store_address) contactList.push(removeDiacritics(settings.store_address));
-  if (settings?.store_phone) contactList.push(`Hotline: ${settings.store_phone}`);
-  if (contactList.length > 0) {
-    builder.line(contactList.join(' - '));
+  const address = settings?.store_address || 'Le Thi Mai, Xuan Thoi Thuong, Tp. Ho Chi Minh';
+  if (address) {
+    builder.line(removeDiacritics(address));
   }
 
   builder.line(divider);
 
-  // 2. Thông tin Bàn & Giờ (Gộp chung 1 dòng để tiết kiệm giấy)
+  // 2. Thông tin Bàn & Giờ
   builder.alignLeft()
     .bold(true)
     .line(formatRow(`BAN: ${orderData.tableName.toUpperCase()}`, timeFormatted, RECEIPT_WIDTH))
@@ -174,28 +197,20 @@ export function buildReceiptBytes(orderData: OrderData, settings?: Partial<Store
 
   builder.line(divider);
 
-  // 3. Danh sách món (Gộp 1 dòng cho mỗi món để tiết kiệm 50% giấy)
-  orderData.items.forEach((item, index) => {
-    const qtyStr = item.quantity > 1 ? ` x${item.quantity}` : '';
-    const nameWithQty = `${index + 1}. ${item.name}${qtyStr}`;
-    const subtotalStr = `${item.subtotal.toLocaleString('vi-VN')}d`;
+  // 3. Header 3 cột chuẩn: Ten mon | SL | Gia
+  const colHeader = 'Ten mon'.padEnd(22) + 'SL'.padStart(5) + 'Gia'.padStart(13);
+  builder.line(colHeader);
+  builder.line(divider);
 
-    // Nếu tên món vừa vặn trên 1 dòng
-    if (removeDiacritics(nameWithQty).length + subtotalStr.length + 1 <= RECEIPT_WIDTH) {
-      builder.line(formatRow(nameWithQty, subtotalStr, RECEIPT_WIDTH));
-    } else {
-      // Tên món quá dài: Dòng 1 tên món, Dòng 2 số lượng + thành tiền
-      builder.line(`${index + 1}. ${item.name}`);
-      const detailLeft = item.quantity > 1 
-        ? `   x${item.quantity} (${Math.round(item.price / 1000)}k)`
-        : `   x1`;
-      builder.line(formatRow(detailLeft, subtotalStr, RECEIPT_WIDTH));
-    }
+  // 4. Danh sách món (in 3 cột đầy đủ)
+  orderData.items.forEach((item, index) => {
+    const lines = formatThreeColumns(item.name, item.quantity, item.subtotal, index + 1, RECEIPT_WIDTH);
+    lines.forEach(l => builder.line(l));
   });
 
   builder.line(divider);
 
-  // 4. Tổng tiền (Chỉ in các dòng thực sự cần thiết)
+  // 5. Tổng tiền (Chi tiết giảm giá nếu có)
   if (orderData.discount > 0) {
     const totalItemsAmount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0);
     builder.line(formatRow('Tien mon:', `${totalItemsAmount.toLocaleString('vi-VN')}d`, RECEIPT_WIDTH));
@@ -208,7 +223,7 @@ export function buildReceiptBytes(orderData: OrderData, settings?: Partial<Store
     .bold(false)
     .line(divider);
 
-  // 5. Chân trang (1 dòng ngắn gọn, feed 2 dòng vừa khít dao cắt)
+  // 6. Chân trang & Feed đủ khoảng cách tới lưỡi dao cắt (~20mm = feed 5 dòng)
   builder.alignCenter();
   if (settings?.bill_footer && settings.bill_footer.trim()) {
     const lines = settings.bill_footer.split('\n');
@@ -216,10 +231,12 @@ export function buildReceiptBytes(orderData: OrderData, settings?: Partial<Store
       if (l.trim()) builder.line(removeDiacritics(l.trim()));
     });
   } else {
-    builder.line('XIN CAM ON VA HEN GAP LAI!');
+    builder.line('AVA COFFEE XIN CAM ON QUY KHACH !');
+    builder.line('CHUC QUY KHACH NGON MIENG');
   }
 
-  builder.feed(2) // Chỉ feed 2 dòng vừa tới lưỡi dao cắt thay vì 4 dòng
+  // Feed 5 dòng để đẩy trọn vẹn dòng cảm ơn qua khỏi lưỡi dao trước khi cắt
+  builder.feed(5)
     .cut();
 
   return builder.getBuffer();
@@ -314,7 +331,7 @@ export async function printTestTicket(settings?: Partial<StoreSettings>): Promis
     .line('KET NOI THANH CONG 100%!')
     .bold(false)
     .line(divider)
-    .feed(2)
+    .feed(5)
     .cut();
 
   const payload = builder.getBuffer();

@@ -1020,8 +1020,8 @@ export interface StoreSettings {
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   store_name: 'AVA COFFEE',
-  store_address: 'Hóc Môn, TP. Hồ Chí Minh',
-  store_phone: '0909 123 456',
+  store_address: 'Le Thi Mai, Xuan Thoi Thuong, Tp. Ho Chi Minh',
+  store_phone: '',
   bill_footer: 'AVA COFFEE XIN CẢM ƠN QUÝ KHÁCH !\nCHÚC QUÝ KHÁCH NGON MIỆNG',
   printer_ip: '192.168.1.232',
   printer_port: 9100
@@ -1163,6 +1163,8 @@ const mapOrderItemToClient = (oi: any) => oi ? {
   unit_price: Number(oi.don_gia),
   subtotal: Number(oi.thanh_tien),
   ghi_chu: oi.ghi_chu || '',
+  notes: oi.ghi_chu || '',
+  cup_id: oi.cup_id || (oi.ghi_chu && oi.ghi_chu.match(/\[Ly:\s*(ing_ly[a-z]+)\]/)?.[1]) || null,
   cost_price: Number(oi.gia_von || 0),
   products: {
     name: oi.ten_san_pham,
@@ -2021,14 +2023,14 @@ export const db = {
 
         for (let idx = 0; idx < items.length; idx++) {
           const item = items[idx];
-          const matchedDetail = existingDetails.find(d => d.idsp === item.product_id);
-          const dbProd = dbProducts.find(p => p.id === item.product_id);
-          const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
-
           let itemNote = item.notes || '';
           if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
             itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
           }
+
+          const matchedDetail = existingDetails.find(d => d.idsp === item.product_id && (d.ghi_chu || '') === itemNote);
+          const dbProd = dbProducts.find(p => p.id === item.product_id);
+          const costPrice = dbProd ? Number(dbProd.gia_von || 0) : 0;
 
           if (matchedDetail) {
             const newQty = Number(matchedDetail.so_luong || 0) + item.quantity;
@@ -2182,13 +2184,14 @@ export const db = {
         const products = mockDb.getProducts();
 
         items.forEach((item, idx) => {
-          const matchedItem = orderItems.find(
-            oi => oi.order_id === existingOrderId && oi.product_id === item.product_id
-          );
           let itemNote = item.notes || '';
           if (idx === 0 && notes && !itemNote.includes('[Ghi chú đơn: ')) {
             itemNote = itemNote ? `${itemNote} [Ghi chú đơn: ${notes}]` : `[Ghi chú đơn: ${notes}]`;
           }
+
+          const matchedItem = orderItems.find(
+            oi => oi.order_id === existingOrderId && oi.product_id === item.product_id && (oi.ghi_chu || '') === itemNote
+          );
 
           if (matchedItem) {
             matchedItem.quantity = Number(matchedItem.quantity || 0) + item.quantity;
@@ -2275,7 +2278,7 @@ export const db = {
       // 1. Lấy thông tin bàn & chi tiết items cùng lúc
       const [orderResult, itemsResult] = await Promise.all([
         supabase.from('hoadon').select('id, id_ban, trang_thai_thanh_toan, tong_tien, giam_gia, ngay_tao, ngay_thanh_toan, id_nhan_vien').eq('id', orderId).single(),
-        supabase.from('hoadondetail').select('idsp, so_luong').eq('idhoadon', orderId)
+        supabase.from('hoadondetail').select('idsp, so_luong, ghi_chu').eq('idhoadon', orderId)
       ]);
       const order = orderResult.data;
       const items = itemsResult.data;
@@ -2289,7 +2292,11 @@ export const db = {
       // 2. Tối ưu siêu tốc: Chạy song song cập nhật hóa đơn, trả bàn và khấu trừ kho cùng một lúc
       cachedTables = null;
       const stockDeductionPromise = (items && items.length > 0)
-        ? this.deductStockFromOrder(items.map(item => ({ product_id: item.idsp, quantity: item.so_luong })))
+        ? this.deductStockFromOrder(items.map(item => ({ 
+            product_id: item.idsp, 
+            quantity: item.so_luong,
+            notes: item.ghi_chu || ''
+          })))
             .catch(err => console.error('Lỗi khấu trừ kho khi thanh toán:', err))
         : Promise.resolve();
 
@@ -2442,13 +2449,14 @@ export const db = {
         // Lấy chi tiết món để hoàn kho ngay lập tức
         const { data: dbItems } = await supabase
           .from('hoadondetail')
-          .select('idsp, so_luong')
+          .select('idsp, so_luong, ghi_chu')
           .eq('idhoadon', orderId);
 
         if (dbItems && dbItems.length > 0) {
           items = dbItems.map(item => ({
             product_id: item.idsp,
-            quantity: item.so_luong
+            quantity: item.so_luong,
+            notes: item.ghi_chu || ''
           }));
         }
 
@@ -2573,19 +2581,31 @@ export const db = {
           // 2. Thu hồi kho: Trừ ngược lại số lượng nguyên liệu đã hoàn
           const { data: dbItems } = await supabase
             .from('hoadondetail')
-            .select('idsp, so_luong')
+            .select('idsp, so_luong, ghi_chu')
             .eq('idhoadon', orderId);
 
           if (dbItems && dbItems.length > 0) {
             const recipes = await this.getRecipes();
             const ingredients = await this.getIngredients();
             const ingDeductions: { [id: string]: number } = {};
+            const CUP_INGREDIENTS = ['ing_lyden', 'ing_lytrang', 'ing_lyhoavan', 'ing_lytratac'];
 
             for (const item of dbItems) {
+              let customCupId = (item as any).cup_id;
+              const notesStr = item.ghi_chu || '';
+              if (!customCupId && notesStr) {
+                const m = notesStr.match(/\[Ly:\s*(ing_ly[a-z]+)\]/);
+                if (m) customCupId = m[1];
+              }
+
               const itemRecipes = recipes.filter(r => r.product_id === item.idsp);
               for (const rec of itemRecipes) {
+                let targetIngId = rec.ingredient_id;
+                if (CUP_INGREDIENTS.includes(targetIngId) && customCupId && CUP_INGREDIENTS.includes(customCupId)) {
+                  targetIngId = customCupId;
+                }
                 const qty = Number(rec.quantity_needed || 0) * Number(item.so_luong || 0);
-                ingDeductions[rec.ingredient_id] = (ingDeductions[rec.ingredient_id] || 0) + qty;
+                ingDeductions[targetIngId] = (ingDeductions[targetIngId] || 0) + qty;
               }
             }
 
@@ -4190,17 +4210,30 @@ export const db = {
 
       // Group ingredient changes
       const ingChanges: { [id: string]: { restoreQty: number; productIds: string[] } } = {};
+      const CUP_INGREDIENTS = ['ing_lyden', 'ing_lytrang', 'ing_lyhoavan', 'ing_lytratac'];
 
       for (const item of items) {
+        let customCupId = (item as any).cup_id || (item as any).selected_cup_id;
+        const notesStr = (item as any).notes || (item as any).ghi_chu || '';
+        if (!customCupId && notesStr) {
+          const m = notesStr.match(/\[Ly:\s*(ing_ly[a-z]+)\]/);
+          if (m) customCupId = m[1];
+        }
+
         const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
         for (const rec of itemRecipes) {
-          const restoreQty = rec.quantity_needed * item.quantity;
-          if (!ingChanges[rec.ingredient_id]) {
-            ingChanges[rec.ingredient_id] = { restoreQty: 0, productIds: [] };
+          let targetIngId = rec.ingredient_id;
+          if (CUP_INGREDIENTS.includes(targetIngId) && customCupId && CUP_INGREDIENTS.includes(customCupId)) {
+            targetIngId = customCupId;
           }
-          ingChanges[rec.ingredient_id].restoreQty += restoreQty;
-          if (!ingChanges[rec.ingredient_id].productIds.includes(item.product_id)) {
-            ingChanges[rec.ingredient_id].productIds.push(item.product_id);
+
+          const restoreQty = rec.quantity_needed * item.quantity;
+          if (!ingChanges[targetIngId]) {
+            ingChanges[targetIngId] = { restoreQty: 0, productIds: [] };
+          }
+          ingChanges[targetIngId].restoreQty += restoreQty;
+          if (!ingChanges[targetIngId].productIds.includes(item.product_id)) {
+            ingChanges[targetIngId].productIds.push(item.product_id);
           }
         }
       }
@@ -4295,17 +4328,33 @@ export const db = {
 
       let updated = false;
 
+      const CUP_INGREDIENTS = ['ing_lyden', 'ing_lytrang', 'ing_lyhoavan', 'ing_lytratac'];
       const ingChanges: { [id: string]: { deductQty: number; productIds: string[] } } = {};
       for (const item of items) {
+        // Kiểm tra xem món có chọn đổi ly riêng không (từ thuộc tính cup_id hoặc ghi chú [Ly: ing_...])
+        let customCupId = (item as any).cup_id || (item as any).selected_cup_id;
+        const notesStr = (item as any).notes || (item as any).ghi_chu || '';
+        if (!customCupId && notesStr) {
+          const m = notesStr.match(/\[Ly:\s*(ing_ly[a-z]+)\]/);
+          if (m) customCupId = m[1];
+        }
+
         const itemRecipes = recipes.filter(r => r.product_id === item.product_id);
         for (const rec of itemRecipes) {
-          const deductQty = rec.quantity_needed * item.quantity;
-          if (!ingChanges[rec.ingredient_id]) {
-            ingChanges[rec.ingredient_id] = { deductQty: 0, productIds: [] };
+          let targetIngId = rec.ingredient_id;
+
+          // Nếu là nguyên liệu ly và đơn hàng có chỉ định đổi ly riêng (ví dụ cà phê sữa đổi sang ly hoa văn)
+          if (CUP_INGREDIENTS.includes(targetIngId) && customCupId && CUP_INGREDIENTS.includes(customCupId)) {
+            targetIngId = customCupId;
           }
-          ingChanges[rec.ingredient_id].deductQty += deductQty;
-          if (!ingChanges[rec.ingredient_id].productIds.includes(item.product_id)) {
-            ingChanges[rec.ingredient_id].productIds.push(item.product_id);
+
+          const deductQty = rec.quantity_needed * item.quantity;
+          if (!ingChanges[targetIngId]) {
+            ingChanges[targetIngId] = { deductQty: 0, productIds: [] };
+          }
+          ingChanges[targetIngId].deductQty += deductQty;
+          if (!ingChanges[targetIngId].productIds.includes(item.product_id)) {
+            ingChanges[targetIngId].productIds.push(item.product_id);
           }
         }
       }

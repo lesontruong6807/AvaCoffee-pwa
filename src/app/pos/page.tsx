@@ -38,12 +38,40 @@ interface CartItem {
   price: number;
   quantity: number;
   subtotal: number;
+  cup_id?: string;
+  notes?: string;
 }
+
+const CUP_IDS = ['ing_lyden', 'ing_lytrang', 'ing_lyhoavan', 'ing_lytratac'];
+
+const CUP_DEFINITIONS: Record<string, { label: string; icon: string; className: string }> = {
+  ing_lyden: {
+    label: 'Ly Đen',
+    icon: '☕',
+    className: 'bg-[#2D1B10] text-[#EAD8C3] border-[#4A3222] hover:bg-[#3D2517]'
+  },
+  ing_lytrang: {
+    label: 'Ly Trắng',
+    icon: '🥤',
+    className: 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+  },
+  ing_lyhoavan: {
+    label: 'Hoa Văn',
+    icon: '🌸',
+    className: 'bg-[#FFF0F5] text-[#C23B75] border-[#FFC0CB] hover:bg-[#FFE4EE]'
+  },
+  ing_lytratac: {
+    label: 'Ly Trà Tắc',
+    icon: '🍋',
+    className: 'bg-lime-50 text-lime-800 border-lime-300 hover:bg-lime-100'
+  }
+};
 
 export default function PosPage() {
   const [tables, setTables] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [recipes, setRecipes] = useState<any[]>([]);
   const [yesterdaySales, setYesterdaySales] = useState<{ [productId: string]: number }>({});
   const [loading, setLoading] = useState(true);
 
@@ -104,12 +132,14 @@ export default function PosPage() {
         const storedCategories = localStorage.getItem('ava_pos_cache_categories');
         const storedProducts = localStorage.getItem('ava_pos_cache_products');
         const storedUnpaid = localStorage.getItem('ava_pos_cache_unpaid');
+        const storedRecipes = localStorage.getItem('ava_pos_cache_recipes');
         const storedYest = localStorage.getItem(`ava_pos_yest_sales_${todayDateKey}`);
         
         if (storedTables) cachedTables = JSON.parse(storedTables);
         if (storedCategories) cachedCategories = JSON.parse(storedCategories);
         if (storedProducts) cachedProducts = JSON.parse(storedProducts);
         if (storedUnpaid) cachedUnpaid = JSON.parse(storedUnpaid);
+        if (storedRecipes) setRecipes(JSON.parse(storedRecipes));
         if (storedYest) setYesterdaySales(JSON.parse(storedYest));
         
         if (cachedTables && cachedCategories && cachedProducts) {
@@ -124,18 +154,22 @@ export default function PosPage() {
       }
 
       try {
-        // Tải 4 thực thể chính siêu tốc (không bị nghẽn bởi truy vấn doanh số hôm qua)
-        const [tablesData, categoriesData, productsData, unpaidData] = await Promise.all([
+        // Tải các thực thể chính siêu tốc (không bị nghẽn bởi truy vấn doanh số hôm qua)
+        const [tablesData, categoriesData, productsData, unpaidData, recipesData] = await Promise.all([
           db.getTables(),
           db.getCategories(),
           db.getProducts(),
-          db.getUnpaidOrders()
+          db.getUnpaidOrders(),
+          db.getRecipes()
         ]);
         
         setTables(tablesData);
         setCategories(categoriesData);
         setProducts(productsData);
         setUnpaidOrders(unpaidData);
+        if (recipesData) {
+          setRecipes(recipesData);
+        }
         
         // Lưu lại cache mới nhất
         try {
@@ -143,6 +177,9 @@ export default function PosPage() {
           localStorage.setItem('ava_pos_cache_categories', JSON.stringify(categoriesData));
           localStorage.setItem('ava_pos_cache_products', JSON.stringify(productsData));
           localStorage.setItem('ava_pos_cache_unpaid', JSON.stringify(unpaidData));
+          if (recipesData) {
+            localStorage.setItem('ava_pos_cache_recipes', JSON.stringify(recipesData));
+          }
         } catch (saveErr) {
           console.warn('Lỗi lưu cache POS:', saveErr);
         }
@@ -213,17 +250,47 @@ export default function PosPage() {
     );
   }
 
-  // --- LÓGIC CART ---
+  // --- LÓGIC CART & ĐỔI LOẠI LY ---
+  const handleCycleCupType = (index: number) => {
+    setCart((prev) => {
+      const nextCart = [...prev];
+      const item = nextCart[index];
+      if (!item) return prev;
+
+      const currentCupId = item.cup_id || 'ing_lytrang';
+      const currentIdx = CUP_IDS.indexOf(currentCupId);
+      const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % CUP_IDS.length;
+      const nextCupId = CUP_IDS[nextIdx];
+
+      const cupInfo = CUP_DEFINITIONS[nextCupId];
+      if (cupInfo) {
+        toast.info(`Đã đổi: ${item.name} ➔ ${cupInfo.label}`);
+      }
+
+      nextCart[index] = {
+        ...item,
+        cup_id: nextCupId,
+        notes: `[Ly: ${nextCupId}]`
+      };
+      return nextCart;
+    });
+  };
+
   const addToCart = (product: any) => {
     if (product.status === 'Hết hàng') {
       toast.error(`Món "${product.name}" hiện đang tạm hết hàng!`);
       return;
     }
+    // Lấy loại ly mặc định trong công thức món
+    const prodRecipes = recipes.filter(r => r.product_id === product.id);
+    const cupRecipe = prodRecipes.find(r => CUP_IDS.includes(r.ingredient_id));
+    const defaultCupId = cupRecipe ? cupRecipe.ingredient_id : undefined;
+
     setCart((prev) => {
-      const existing = prev.find(item => item.product_id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.product_id === product.id 
+      const existingIdx = prev.findIndex(item => item.product_id === product.id && item.cup_id === defaultCupId);
+      if (existingIdx !== -1) {
+        return prev.map((item, idx) => 
+          idx === existingIdx 
             ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.price }
             : item
         );
@@ -233,29 +300,55 @@ export default function PosPage() {
         name: product.name,
         price: product.price,
         quantity: 1,
-        subtotal: product.price
+        subtotal: product.price,
+        cup_id: defaultCupId,
+        notes: defaultCupId ? `[Ly: ${defaultCupId}]` : ''
       }];
     });
   };
 
-  const updateQuantity = (productId: string, amount: number) => {
+  const updateQuantity = (identifier: string | number, amount: number) => {
     setCart((prev) => {
-      return prev.map(item => {
-        if (item.product_id === productId) {
-          const newQty = Math.max(0, item.quantity + amount);
-          return {
-            ...item,
-            quantity: newQty,
-            subtotal: newQty * item.price
-          };
+      if (typeof identifier === 'number') {
+        const nextCart = [...prev];
+        const item = nextCart[identifier];
+        if (!item) return prev;
+        const newQty = item.quantity + amount;
+        if (newQty <= 0) {
+          return nextCart.filter((_, i) => i !== identifier);
         }
-        return item;
-      }).filter(item => item.quantity > 0);
+        nextCart[identifier] = {
+          ...item,
+          quantity: newQty,
+          subtotal: newQty * item.price
+        };
+        return nextCart;
+      } else {
+        const idx = prev.map(item => item.product_id).lastIndexOf(identifier);
+        if (idx === -1) return prev;
+        const nextCart = [...prev];
+        const item = nextCart[idx];
+        const newQty = item.quantity + amount;
+        if (newQty <= 0) {
+          return nextCart.filter((_, i) => i !== idx);
+        }
+        nextCart[idx] = {
+          ...item,
+          quantity: newQty,
+          subtotal: newQty * item.price
+        };
+        return nextCart;
+      }
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product_id !== productId));
+  const removeFromCart = (identifier: string | number) => {
+    setCart(prev => {
+      if (typeof identifier === 'number') {
+        return prev.filter((_, i) => i !== identifier);
+      }
+      return prev.filter(item => item.product_id !== identifier);
+    });
   };
 
   const clearCart = () => {
@@ -807,17 +900,30 @@ export default function PosPage() {
 
             {/* Danh sách giỏ hàng */}
             <div className="flex-1 overflow-y-auto max-h-[350px] py-4 space-y-4">
-              {cart.map((item) => (
-                <div key={item.product_id} className="flex items-center justify-between text-xs pb-3 border-b border-dashed border-coffee-light/60">
+              {cart.map((item, idx) => (
+                <div key={`${item.product_id}_${idx}`} className="flex items-center justify-between text-xs pb-3 border-b border-dashed border-coffee-light/60">
                   <div className="space-y-1 flex-1 pr-3">
                     <p className="font-bold text-coffee-dark">{item.name}</p>
-                    <p className="text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ / món</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ / món</span>
+                      {item.cup_id && CUP_DEFINITIONS[item.cup_id] && (
+                        <button
+                          type="button"
+                          onClick={() => handleCycleCupType(idx)}
+                          title="Bấm để đổi loại ly (Đen ➔ Trắng ➔ Hoa văn ➔ Ly trà tắc)"
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border shadow-xs transition-all active:scale-95 cursor-pointer ${CUP_DEFINITIONS[item.cup_id].className}`}
+                        >
+                          <span>{CUP_DEFINITIONS[item.cup_id].icon}</span>
+                          <span>{CUP_DEFINITIONS[item.cup_id].label}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     {/* Bộ đếm nhanh */}
                     <div className="flex items-center bg-[#FAF6F0] rounded-lg border border-coffee-light overflow-hidden">
                       <button
-                        onClick={() => updateQuantity(item.product_id, -1)}
+                        onClick={() => updateQuantity(idx, -1)}
                         className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
                       >
                         <Minus className="w-3 h-3" />
@@ -826,7 +932,7 @@ export default function PosPage() {
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => updateQuantity(item.product_id, 1)}
+                        onClick={() => updateQuantity(idx, 1)}
                         className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
                       >
                         <Plus className="w-3 h-3" />
@@ -838,7 +944,7 @@ export default function PosPage() {
                     </span>
                     
                     <button 
-                      onClick={() => removeFromCart(item.product_id)}
+                      onClick={() => removeFromCart(idx)}
                       className="text-red-500 hover:text-red-700 p-1 transition"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1009,16 +1115,29 @@ export default function PosPage() {
               </h3>
 
               <div className="flex-1 overflow-y-auto py-3 space-y-3 my-2">
-                {cart.map((item) => (
-                  <div key={item.product_id} className="flex items-center justify-between text-xs pb-2.5 border-b border-dashed border-coffee-light/60">
+                {cart.map((item, idx) => (
+                  <div key={`${item.product_id}_${idx}`} className="flex items-center justify-between text-xs pb-2.5 border-b border-dashed border-coffee-light/60">
                     <div className="space-y-0.5 flex-1 pr-3">
-                      <p className="font-bold text-coffee-dark">{item.name}</p>
-                      <p className="text-[10px] text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ</p>
+                      <p className="font-bold text-coffee-dark text-[13px]">{item.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] text-coffee-medium">{item.price.toLocaleString('vi-VN')}đ</span>
+                        {item.cup_id && CUP_DEFINITIONS[item.cup_id] && (
+                          <button
+                            type="button"
+                            onClick={() => handleCycleCupType(idx)}
+                            title="Bấm để đổi loại ly (Đen ➔ Trắng ➔ Hoa văn ➔ Ly trà tắc)"
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border shadow-xs transition-all active:scale-95 cursor-pointer ${CUP_DEFINITIONS[item.cup_id].className}`}
+                          >
+                            <span>{CUP_DEFINITIONS[item.cup_id].icon}</span>
+                            <span>{CUP_DEFINITIONS[item.cup_id].label}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2.5">
                       <div className="flex items-center bg-[#FAF6F0] rounded-lg border border-coffee-light overflow-hidden">
                         <button
-                          onClick={() => updateQuantity(item.product_id, -1)}
+                          onClick={() => updateQuantity(idx, -1)}
                           className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
                         >
                           <Minus className="w-3 h-3" />
@@ -1027,7 +1146,7 @@ export default function PosPage() {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.product_id, 1)}
+                          onClick={() => updateQuantity(idx, 1)}
                           className="p-1 hover:bg-coffee-accent/20 text-coffee-primary transition"
                         >
                           <Plus className="w-3 h-3" />
@@ -1037,7 +1156,7 @@ export default function PosPage() {
                         {(item.quantity * item.price).toLocaleString('vi-VN')}đ
                       </span>
                       <button 
-                        onClick={() => removeFromCart(item.product_id)}
+                        onClick={() => removeFromCart(idx)}
                         className="text-red-500 hover:text-red-700 p-1"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1192,11 +1311,19 @@ export default function PosPage() {
 
           {/* Chi tiết món */}
           <div className="border-t border-b border-dashed border-coffee-light py-4 space-y-3">
-            {cart.map((item) => (
-              <div key={item.product_id} className="flex justify-between text-xs">
-                <span className="text-coffee-dark font-medium">
-                  {item.name} <span className="text-coffee-medium font-bold">x {item.quantity}</span>
-                </span>
+            {cart.map((item, idx) => (
+              <div key={`${item.product_id}_${idx}`} className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-coffee-dark font-medium">
+                    {item.name} <span className="text-coffee-medium font-bold">x {item.quantity}</span>
+                  </span>
+                  {item.cup_id && CUP_DEFINITIONS[item.cup_id] && (
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${CUP_DEFINITIONS[item.cup_id].className}`}>
+                      <span>{CUP_DEFINITIONS[item.cup_id].icon}</span>
+                      <span>{CUP_DEFINITIONS[item.cup_id].label}</span>
+                    </span>
+                  )}
+                </div>
                 <strong className="text-coffee-dark">{item.subtotal.toLocaleString('vi-VN')}đ</strong>
               </div>
             ))}
@@ -1304,27 +1431,44 @@ export default function PosPage() {
                   <p className="text-xs text-coffee-medium italic py-2">Không có món ăn trong đơn.</p>
                 ) : (
                   <div className="border border-coffee-light bg-white rounded-2xl overflow-hidden divide-y divide-coffee-light/50">
-                    {existingOrderItems.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center p-3 text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn'}</p>
-                          <p className="text-[10px] text-coffee-medium">
-                            Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ
-                          </p>
-                          {item.ghi_chu && item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim() && (
-                            <p className="text-[10px] text-amber-700 italic font-medium">
-                              📝 {item.ghi_chu.replace(/\[Ghi chú đơn:[^\]]+\]/g, '').trim()}
+                    {existingOrderItems.map((item) => {
+                      const cupMatch = item.ghi_chu?.match(/\[Ly:\s*(ing_ly[a-z]+)\]/);
+                      const itemCupId = cupMatch ? cupMatch[1] : null;
+                      const cleanNote = (item.ghi_chu || '')
+                        .replace(/\[Ly:\s*ing_ly[a-z]+\]/g, '')
+                        .replace(/\[Ghi chú đơn:[^\]]+\]/g, '')
+                        .trim();
+
+                      return (
+                        <div key={item.id} className="flex justify-between items-center p-3 text-xs">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-coffee-dark">{item.products?.name || 'Món ăn'}</p>
+                              {itemCupId && CUP_DEFINITIONS[itemCupId] && (
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${CUP_DEFINITIONS[itemCupId].className}`}>
+                                  <span>{CUP_DEFINITIONS[itemCupId].icon}</span>
+                                  <span>{CUP_DEFINITIONS[itemCupId].label}</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-coffee-medium">
+                              Đơn giá: {item.unit_price?.toLocaleString('vi-VN') || item.products?.price?.toLocaleString('vi-VN')}đ
                             </p>
-                          )}
+                            {cleanNote && (
+                              <p className="text-[10px] text-amber-700 italic font-medium">
+                                📝 {cleanNote}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="font-bold text-coffee-medium text-xs">x {item.quantity}</span>
+                            <span className="font-extrabold text-coffee-dark w-16 text-right">
+                              {Number(item.subtotal || 0).toLocaleString('vi-VN')}đ
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <span className="font-bold text-coffee-medium text-xs">x {item.quantity}</span>
-                          <span className="font-extrabold text-coffee-dark w-16 text-right">
-                            {Number(item.subtotal || 0).toLocaleString('vi-VN')}đ
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1337,10 +1481,18 @@ export default function PosPage() {
                     <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Chưa gửi bếp</span>
                   </h4>
                   <div className="border border-emerald-200 bg-emerald-50/30 rounded-2xl overflow-hidden divide-y divide-emerald-100">
-                    {cart.map((item) => (
-                      <div key={item.product_id} className="flex justify-between items-center p-3 text-xs">
+                    {cart.map((item, idx) => (
+                      <div key={`${item.product_id}_${idx}`} className="flex justify-between items-center p-3 text-xs">
                         <div className="space-y-0.5">
-                          <p className="font-bold text-emerald-950">{item.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-bold text-emerald-950">{item.name}</p>
+                            {item.cup_id && CUP_DEFINITIONS[item.cup_id] && (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${CUP_DEFINITIONS[item.cup_id].className}`}>
+                                <span>{CUP_DEFINITIONS[item.cup_id].icon}</span>
+                                <span>{CUP_DEFINITIONS[item.cup_id].label}</span>
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-emerald-700">Đơn giá: {item.price.toLocaleString('vi-VN')}đ</p>
                         </div>
                         <div className="flex items-center space-x-3">
