@@ -1166,99 +1166,21 @@ export default function PosPage() {
                 ))}
               </div>
 
-              <div className="border-t border-coffee-light pt-3 space-y-3 bg-white shrink-0">
-                {/* Phần ghi chú đơn hàng di động */}
-                <div className="bg-[#FAF6F0] p-3 rounded-xl border border-coffee-light space-y-1.5">
-                  <div className="flex items-center space-x-1.5 text-[9px] font-bold text-coffee-medium uppercase tracking-wider">
-                    <FileText className="w-3 h-3 text-coffee-primary" />
-                    <span>Ghi chú đơn hàng</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: Khách mang về ít đường, thêm ly đá..."
-                    value={orderNotes}
-                    onChange={(e) => setOrderNotes(e.target.value)}
-                    className="w-full h-8 px-2.5 bg-white border border-coffee-light rounded-lg text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition placeholder-coffee-medium/60"
-                  />
+              <div className="border-t border-coffee-light/70 pt-3 space-y-3 bg-white shrink-0">
+                <input
+                  type="text"
+                  placeholder="Ghi chú đơn (ví dụ: ít ngọt, nhiều đá...)"
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  className="w-full h-11 px-3.5 bg-[#FAF6F0] border border-coffee-light rounded-xl text-xs text-coffee-dark outline-none placeholder-coffee-medium/70"
+                />
+
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-sm font-bold text-coffee-dark">Tổng tiền:</span>
+                  <span className="text-2xl font-black text-coffee-dark tracking-tight">{finalTotalAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
 
-                {/* Phần giảm giá di động */}
-                <div className="bg-[#FAF6F0] p-3.5 rounded-xl border border-coffee-light space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-coffee-medium uppercase tracking-wider">Giảm giá</span>
-                    <div className="flex bg-white rounded-lg p-0.5 border border-coffee-light">
-                      <button
-                        type="button"
-                        onClick={() => { setDiscountType('amount'); setDiscountValue(0); }}
-                        className={`px-2 py-0.5 rounded-md text-[8px] font-bold transition-all ${
-                          discountType === 'amount' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
-                        }`}
-                      >
-                        Tiền (đ)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setDiscountType('percent'); setDiscountValue(0); }}
-                        className={`px-2 py-0.5 rounded-md text-[8px] font-bold transition-all ${
-                          discountType === 'percent' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
-                        }`}
-                      >
-                        %
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max={discountType === 'percent' ? 100 : undefined}
-                      placeholder={discountType === 'amount' ? "Số tiền giảm..." : "Phần trăm giảm..."}
-                      value={discountValue || ''}
-                      onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
-                      className="flex-1 h-8 px-2.5 bg-white border border-coffee-light rounded-lg text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition"
-                    />
-                    {discountValue > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setDiscountValue(0)}
-                        className="h-8 px-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs hover:bg-red-50 transition font-bold"
-                      >
-                        Xóa
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-xs text-coffee-medium">
-                  <span>Tiền món:</span>
-                  <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
-                </div>
-
-                {discountAmount > 0 && (
-                  <div className="flex justify-between items-center text-xs text-red-600">
-                    <span>Giảm giá:</span>
-                    <span className="font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center border-t border-coffee-light/50 pt-2">
-                  <span className="text-xs text-coffee-medium font-semibold">Tổng thanh toán:</span>
-                  <span className="text-lg font-extrabold text-coffee-primary">
-                    {finalTotalAmount.toLocaleString('vi-VN')}đ
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pb-2">
-                  <button
-                    onClick={() => {
-                      clearCart();
-                      setIsMobileCartOpen(false);
-                    }}
-                    className="py-2.5 bg-[#FAF6F0] hover:bg-coffee-accent/30 text-coffee-medium font-bold text-xs rounded-xl transition"
-                  >
-                    Hủy tất cả
-                  </button>
+                <div className="grid grid-cols-2 gap-3 pt-1 pb-1">
                   <button
                     onClick={async () => {
                       if (savingOrder) return;
@@ -1266,16 +1188,18 @@ export default function PosPage() {
                       await handleConfirmOrder();
                     }}
                     disabled={savingOrder}
-                    className="py-2.5 bg-coffee-primary hover:bg-coffee-dark text-white font-bold text-xs rounded-xl transition shadow disabled:opacity-50 flex items-center justify-center space-x-1"
+                    className="py-3 bg-[#3d2719] hover:bg-[#2b1b11] active:scale-95 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5 disabled:opacity-50"
                   >
-                    {savingOrder ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Đang lưu...</span>
-                      </>
-                    ) : (
-                      <span>Xác nhận đơn</span>
-                    )}
+                    {savingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Lưu & Gửi bếp</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMobileCartOpen(false);
+                      setIsPayModalOpen(true);
+                    }}
+                    className="py-3 bg-[#fae1c3] hover:bg-[#f6d7b2] active:scale-95 text-[#3d2719] font-black text-sm rounded-xl shadow-xs transition"
+                  >
+                    Thanh toán ngay
                   </button>
                 </div>
               </div>
