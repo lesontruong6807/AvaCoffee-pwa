@@ -311,11 +311,36 @@ export default function AdminPage() {
     const unsubTables = db.subscribeToTableChanges(() => {
       loadAllData();
     });
+    const unsubOrders = db.subscribeToOrderChanges(() => {
+      loadAllData();
+    });
+
+    let lastRefresh = 0;
+    const handleWakeup = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastRefresh < 2500) return;
+        lastRefresh = now;
+        loadAllData();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleWakeup);
+      window.addEventListener('focus', handleWakeup);
+      window.addEventListener('online', handleWakeup);
+    }
 
     return () => {
       unsubInv();
       unsubReport();
       unsubTables();
+      unsubOrders();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleWakeup);
+        window.removeEventListener('focus', handleWakeup);
+        window.removeEventListener('online', handleWakeup);
+      }
     };
   }, []);
 
@@ -1750,6 +1775,25 @@ export default function AdminPage() {
       {/* 1. TAB PHÊ DUYỆT YÊU CẦU */}
       {adminTab === 'approvals' && (
         <div className="space-y-6">
+          {pendingCancelOrders.length > 0 && approvalSubTab !== 'order_cancel' && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl shrink-0">⚠️</span>
+                <div>
+                  <h4 className="font-extrabold text-sm text-red-800">
+                    Có {pendingCancelOrders.length} yêu cầu hủy đơn đã thanh toán cần duyệt!
+                  </h4>
+                  <p className="text-xs text-red-600">Nhân viên vừa gửi yêu cầu hủy đơn. Bấm để kiểm tra và xử lý ngay.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setApprovalSubTab('order_cancel')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow transition shrink-0 self-end sm:self-auto"
+              >
+                Xem & Duyệt ngay
+              </button>
+            </div>
+          )}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-coffee-light flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="font-extrabold text-lg text-coffee-dark">Danh Sách Yêu Cầu Chờ Duyệt</h3>
@@ -2204,6 +2248,62 @@ export default function AdminPage() {
                   <p className="font-bold">Không có yêu cầu hủy đơn nào đang chờ duyệt</p>
                 </div>
               )}
+
+              {/* LỊCH SỬ DUYỆT HỦY GẦN ĐÂY */}
+              {(() => {
+                const processedCancelOrders = orders.filter(o => {
+                  const notes = o.notes || (o as any).ghi_chu || '';
+                  return notes.includes('[Chờ duyệt hủy]') && (notes.includes('[Admin đã duyệt hủy]') || notes.includes('[Admin từ chối hủy]'));
+                }).slice(0, 15);
+
+                if (processedCancelOrders.length === 0) return null;
+
+                return (
+                  <div className="col-span-full mt-4 space-y-4">
+                    <div className="flex items-center justify-between border-t border-coffee-light pt-6">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-coffee-dark flex items-center space-x-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Lịch Sử Yêu Cầu Hủy Đã Xử Lý Gần Đây ({processedCancelOrders.length})</span>
+                        </h4>
+                        <p className="text-[11px] text-coffee-medium">Xem lại danh sách các đơn nhân viên đã yêu cầu hủy và Admin đã phê duyệt/từ chối.</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {processedCancelOrders.map((order: any) => {
+                        const rawNotes = order.notes || (order as any).ghi_chu || '';
+                        const isApproved = rawNotes.includes('[Admin đã duyệt hủy]');
+                        const orderDate = new Date(order.created_at || (order as any).ngay_tao).toLocaleString('vi-VN');
+                        const reasonMatch = rawNotes.match(/\[Chờ duyệt hủy\] Lý do: ([^|]+)/);
+                        const cancelReason = reasonMatch ? reasonMatch[1].trim() : rawNotes;
+
+                        return (
+                          <div key={order.id} className="bg-white p-4 rounded-2xl border border-coffee-light/80 shadow-xs space-y-2.5 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                                isApproved ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {isApproved ? '✓ Đã duyệt hủy' : '✗ Đã từ chối hủy'}
+                              </span>
+                              <span className="font-extrabold text-coffee-dark">
+                                {Number(order.total_amount || (order as any).tong_tien || 0).toLocaleString('vi-VN')}đ
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-coffee-medium text-[11px]">
+                              <span>Mã đơn: #{order.id.slice(0, 8)}</span>
+                              <span>{orderDate}</span>
+                            </div>
+                            <div className="bg-[#FAF6F0] p-2.5 rounded-xl border border-coffee-light/50 text-coffee-dark italic text-[11px]">
+                              Lý do: "{cancelReason}"
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

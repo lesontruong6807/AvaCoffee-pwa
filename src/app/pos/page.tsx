@@ -96,6 +96,7 @@ export default function PosPage() {
   const [isQuickPayOpen, setIsQuickPayOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const isSubmittingPayRef = React.useRef(false);
 
   // Trạng thái giảm giá
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
@@ -287,7 +288,18 @@ export default function PosPage() {
     const defaultCupId = cupRecipe ? cupRecipe.ingredient_id : undefined;
 
     setCart((prev) => {
-      const existingIdx = prev.findIndex(item => item.product_id === product.id && item.cup_id === defaultCupId);
+      // 1. Ưu tiên tìm item đã có cùng product_id VÀ cùng loại ly mặc định
+      let existingIdx = prev.findIndex(item => item.product_id === product.id && item.cup_id === defaultCupId);
+      
+      // 2. Nếu không có ly mặc định nhưng trong giỏ chỉ có đúng 1 dòng của món này (dù đã đổi sang ly khác),
+      // tiếp tục tăng số lượng của dòng đó thay vì tạo ra dòng mới gây loạn và double giá
+      if (existingIdx === -1) {
+        const matches = prev.map((item, idx) => item.product_id === product.id ? idx : -1).filter(idx => idx !== -1);
+        if (matches.length === 1) {
+          existingIdx = matches[0];
+        }
+      }
+
       if (existingIdx !== -1) {
         return prev.map((item, idx) => 
           idx === existingIdx 
@@ -447,7 +459,8 @@ export default function PosPage() {
 
   // Xử lý thanh toán nhanh trực tiếp trong POS
   const handlePayInPos = async (method: 'Tiền mặt' | 'Chuyển khoản') => {
-    if (submittingPayment) return;
+    if (isSubmittingPayRef.current || submittingPayment) return;
+    isSubmittingPayRef.current = true;
     setSubmittingPayment(true);
 
     try {
@@ -495,6 +508,7 @@ export default function PosPage() {
       console.error('Lỗi thanh toán tại POS:', e);
       toast.error('Gặp lỗi khi xử lý thanh toán.');
     } finally {
+      isSubmittingPayRef.current = false;
       setSubmittingPayment(false);
     }
   };
@@ -791,7 +805,7 @@ export default function PosPage() {
             <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-6">
               {filteredProducts.map((prod) => {
                 const isOutOfStock = prod.status === 'Hết hàng';
-                const cartQty = cart.find(item => item.product_id === prod.id)?.quantity || 0;
+                const cartQty = cart.filter(item => item.product_id === prod.id).reduce((sum, item) => sum + item.quantity, 0);
                 
                 return (
                   <div
@@ -1175,15 +1189,75 @@ export default function PosPage() {
                   className="w-full h-11 px-3.5 bg-[#FAF6F0] border border-coffee-light rounded-xl text-xs text-coffee-dark outline-none placeholder-coffee-medium/70"
                 />
 
-                <div className="flex justify-between items-center py-0.5">
-                  <span className="text-sm font-bold text-coffee-dark">Tổng tiền:</span>
-                  <span className="text-2xl font-black text-coffee-dark tracking-tight">{finalTotalAmount.toLocaleString('vi-VN')}đ</span>
+                {/* Phần giảm giá trên Mobile Drawer */}
+                <div className="bg-[#FAF6F0] p-3 rounded-2xl border border-coffee-light space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-coffee-medium uppercase tracking-wider">Giảm giá</span>
+                    <div className="flex bg-white rounded-lg p-0.5 border border-coffee-light">
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('amount'); setDiscountValue(0); }}
+                        className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
+                          discountType === 'amount' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        Số tiền (đ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setDiscountType('percent'); setDiscountValue(0); }}
+                        className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
+                          discountType === 'percent' ? 'bg-coffee-primary text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                        }`}
+                      >
+                        Phần trăm (%)
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percent' ? 100 : undefined}
+                      placeholder={discountType === 'amount' ? "Số tiền giảm (ví dụ: 10000)..." : "Phần trăm giảm (ví dụ: 10)..."}
+                      value={discountValue || ''}
+                      onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))}
+                      className="flex-1 h-9 px-3 bg-white border border-coffee-light rounded-xl text-xs focus:ring-1 focus:ring-coffee-primary text-coffee-dark outline-none transition"
+                    />
+                    {discountValue > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDiscountValue(0)}
+                        className="h-9 px-3 bg-white border border-red-200 text-red-500 rounded-xl text-xs hover:bg-red-50 transition font-bold"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-xs text-coffee-medium">
+                    <span>Tổng tiền món:</span>
+                    <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between items-center text-xs text-red-600 font-bold">
+                      <span>Giảm giá:</span>
+                      <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-0.5 border-t border-coffee-light/40 pt-1">
+                    <span className="text-sm font-bold text-coffee-dark">Tổng cần thu:</span>
+                    <span className="text-2xl font-black text-coffee-dark tracking-tight">{finalTotalAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-1 pb-1">
                   <button
                     onClick={async () => {
-                      if (savingOrder) return;
+                      if (savingOrder || isSavingRef.current) return;
                       setIsMobileCartOpen(false);
                       await handleConfirmOrder();
                     }}
@@ -1523,16 +1597,24 @@ export default function PosPage() {
                   disabled={submittingPayment}
                   className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm disabled:opacity-50 cursor-pointer"
                 >
-                  <DollarSign className="w-8 h-8 text-coffee-primary" />
-                  <span>Tiền mặt</span>
+                  {submittingPayment ? (
+                    <Loader2 className="w-8 h-8 text-coffee-primary animate-spin" />
+                  ) : (
+                    <DollarSign className="w-8 h-8 text-coffee-primary" />
+                  )}
+                  <span>{submittingPayment ? 'Đang xử lý...' : 'Tiền mặt'}</span>
                 </button>
                 <button
                   onClick={() => handlePayInPos('Chuyển khoản')}
                   disabled={submittingPayment}
                   className="p-5 bg-coffee-cream/40 border border-coffee-accent hover:bg-coffee-accent/50 rounded-2xl flex flex-col items-center justify-center space-y-2 transition font-bold text-coffee-dark shadow-sm text-sm disabled:opacity-50 cursor-pointer"
                 >
-                  <ArrowRightLeft className="w-8 h-8 text-coffee-primary" />
-                  <span>Chuyển khoản</span>
+                  {submittingPayment ? (
+                    <Loader2 className="w-8 h-8 text-coffee-primary animate-spin" />
+                  ) : (
+                    <ArrowRightLeft className="w-8 h-8 text-coffee-primary" />
+                  )}
+                  <span>{submittingPayment ? 'Đang xử lý...' : 'Chuyển khoản'}</span>
                 </button>
               </div>
             </div>

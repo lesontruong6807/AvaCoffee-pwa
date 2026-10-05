@@ -175,19 +175,27 @@ export default function DailyReportPage() {
     shiftItems.forEach(item => {
       const prodId = item.product_id;
       const qty = Number(item.quantity || 0);
-      const prodRecipes = recipes.filter(r => r.product_id === prodId);
+      const cupMatch = item.cup_id || (item.ghi_chu && item.ghi_chu.match(/\[Ly:\s*(ing_ly[a-z]+)\]/)?.[1]);
       
-      prodRecipes.forEach(r => {
-        if (r.ingredient_id === 'ing_lyden') {
-          lyDen += Number(r.quantity_needed || 0) * qty;
-        } else if (r.ingredient_id === 'ing_lytrang') {
-          lyTrang += Number(r.quantity_needed || 0) * qty;
-        } else if (r.ingredient_id === 'ing_lyhoavan') {
-          lyHoaVan += Number(r.quantity_needed || 0) * qty;
-        } else if (r.ingredient_id === 'ing_lytratac') {
-          lyTraTac += Number(r.quantity_needed || 0) * qty;
-        }
-      });
+      if (cupMatch) {
+        if (cupMatch === 'ing_lyden') lyDen += qty;
+        else if (cupMatch === 'ing_lytrang') lyTrang += qty;
+        else if (cupMatch === 'ing_lyhoavan') lyHoaVan += qty;
+        else if (cupMatch === 'ing_lytratac') lyTraTac += qty;
+      } else {
+        const prodRecipes = recipes.filter(r => r.product_id === prodId);
+        prodRecipes.forEach(r => {
+          if (r.ingredient_id === 'ing_lyden') {
+            lyDen += Number(r.quantity_needed || 0) * qty;
+          } else if (r.ingredient_id === 'ing_lytrang') {
+            lyTrang += Number(r.quantity_needed || 0) * qty;
+          } else if (r.ingredient_id === 'ing_lyhoavan') {
+            lyHoaVan += Number(r.quantity_needed || 0) * qty;
+          } else if (r.ingredient_id === 'ing_lytratac') {
+            lyTraTac += Number(r.quantity_needed || 0) * qty;
+          }
+        });
+      }
     });
 
     const totalLy = lyDen + lyTrang + lyHoaVan + lyTraTac;
