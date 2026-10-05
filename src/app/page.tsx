@@ -76,12 +76,17 @@ export default function Home() {
         let pendingTime = 0;
         let pendingLeave = 0;
         let pendingInv = 0;
+        let pendingCancel = 0;
 
         if (isAdmin) {
           // Admin: Xem tổng số lượng yêu cầu đang chờ phê duyệt của toàn hệ thống
           pendingTime = (logs || []).filter((l: any) => l.status === 'Chờ duyệt').length;
           pendingLeave = (leaves || []).filter((r: any) => r.status === 'Chờ duyệt').length;
           pendingInv = (pendingInvLogs || []).length;
+          try {
+            const cancelOrders = await db.getPendingCancelOrders();
+            pendingCancel = (cancelOrders || []).length;
+          } catch (_) {}
         } else if (user) {
           // Nhân viên: Chỉ đếm các đơn của MÌNH nộp đang chờ duyệt
           pendingTime = (logs || []).filter((l: any) => l.user_id === user.id && l.status === 'Chờ duyệt').length;
@@ -93,7 +98,7 @@ export default function Home() {
           totalTables: tables.length,
           servingTables: serving,
           unpaidBills: unpaid,
-          pendingApprovals: pendingTime + pendingLeave + pendingInv
+          pendingApprovals: pendingTime + pendingLeave + pendingInv + pendingCancel
         };
 
         setStats(newStats);
@@ -135,6 +140,14 @@ export default function Home() {
       }
     }
     loadStats();
+
+    const unsubOrders = db.subscribeToOrderChanges(() => loadStats());
+    const unsubTables = db.subscribeToTableChanges(() => loadStats());
+
+    return () => {
+      unsubOrders();
+      unsubTables();
+    };
   }, []);
 
   const actionCards = [

@@ -1328,11 +1328,23 @@ export default function PosPage() {
           </div>
 
           {/* Tổng tiền */}
-          <div className="flex justify-between items-center pt-2">
-            <span className="text-base font-bold text-coffee-dark">Tổng thanh toán:</span>
-            <span className="text-2xl font-black text-coffee-primary">
-              {totalCartAmount.toLocaleString('vi-VN')}đ
-            </span>
+          <div className="space-y-1.5 pt-2">
+            <div className="flex justify-between items-center text-xs text-coffee-medium">
+              <span>Tổng tiền món:</span>
+              <span>{totalCartAmount.toLocaleString('vi-VN')}đ</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between items-center text-xs text-red-600 font-bold">
+                <span>Giảm giá:</span>
+                <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center border-t border-coffee-light/50 pt-2">
+              <span className="text-base font-bold text-coffee-dark">Tổng thanh toán:</span>
+              <span className="text-2xl font-black text-coffee-primary">
+                {finalTotalAmount.toLocaleString('vi-VN')}đ
+              </span>
+            </div>
           </div>
 
           {/* Nút hành động */}
