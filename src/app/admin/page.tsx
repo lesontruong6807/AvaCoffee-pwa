@@ -13,6 +13,7 @@ import {
   Users, 
   Check, 
   X, 
+  XCircle,
   MapPin, 
   Plus, 
   Edit, 
@@ -475,6 +476,39 @@ export default function AdminPage() {
       toast.success(`Đã cập nhật trạng thái chấm công thành: ${status}`);
     } catch (e) {
       toast.error('Không thể phê duyệt chấm công.');
+    }
+  };
+
+  const handleCancelActiveTimeLog = async (id: string, staffName?: string) => {
+    const isConfirmed = window.confirm(
+      `Bạn có chắc chắn muốn HỦY lượt chấm công đang trong ca này của ${staffName || 'nhân viên'} không?\n\n• Trạng thái "Đang trong ca" sẽ bị hủy ngay lập tức (không tính công).\n• Nhân viên sẽ được giải phóng trạng thái để chấm công ca mới khi cần, tránh bị tồn đọng.`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await db.approveTimeLog(id, 'Từ chối');
+      confetti({ particleCount: 50, spread: 40 });
+      await loadAllData();
+      toast.success('Đã hủy lượt chấm công thành công!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Không thể hủy lượt chấm công.');
+    }
+  };
+
+  const handleDeleteTimeLog = async (id: string, staffName?: string) => {
+    const isConfirmed = window.confirm(
+      `CẢNH BÁO: Bạn có chắc chắn muốn XÓA VĨNH VIỄN lượt chấm công này của ${staffName || 'nhân viên'} không?\n\nBản ghi này sẽ bị xóa hoàn toàn khỏi hệ thống (thường dùng khi nhân viên chấm công dư hoặc ấn nhầm).`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await db.deleteTimeLog(id);
+      await loadAllData();
+      toast.success('Đã xóa vĩnh viễn lượt chấm công!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Không thể xóa lượt chấm công.');
     }
   };
 
@@ -1981,24 +2015,50 @@ export default function AdminPage() {
 
                     <div className="pt-2">
                       {isWorking ? (
-                        <div className="p-2.5 bg-blue-55 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-center font-bold text-[10px] animate-pulse">
-                          ⚠️ Nhân viên đang trong ca làm. Chỉ phê duyệt sau khi chấm công ra ca.
+                        <div className="space-y-2">
+                          <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-center font-bold text-[10px]">
+                            ⚠️ Nhân viên đang trong ca làm (chưa chấm công ra ca)
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              onClick={() => handleCancelActiveTimeLog(log.id, log.users?.full_name)}
+                              className="py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm shadow-red-600/20"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              <span>Hủy Chấm công</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTimeLog(log.id, log.users?.full_name)}
+                              className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5 border border-gray-300"
+                              title="Xóa vĩnh viễn khỏi database nếu chấm công dư"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <span>Xóa bỏ ca</span>
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleApproveTime(log.id, 'Từ chối')}
-                            className="py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                            className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
                           >
                             <X className="w-4 h-4" />
                             <span>Từ chối</span>
                           </button>
                           <button
                             onClick={() => handleApproveTime(log.id, 'Đã duyệt')}
-                            className="py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
+                            className="flex-1 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1.5"
                           >
                             <Check className="w-4 h-4" />
                             <span>Phê duyệt</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTimeLog(log.id, log.users?.full_name)}
+                            className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-red-600 rounded-xl transition flex items-center justify-center border border-gray-200"
+                            title="Xóa vĩnh viễn lượt chấm này nếu chấm dư"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       )}

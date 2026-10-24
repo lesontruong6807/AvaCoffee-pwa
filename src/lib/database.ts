@@ -3416,6 +3416,18 @@ export const db = {
     broadcastRealtimeEvent('attendance_update');
     return true;
   },
+
+  async deleteTimeLog(id: string) {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('chamcong').delete().eq('id', id);
+      if (error) throw error;
+    } else {
+      const logs = mockDb.getTimeLogs().filter(l => l.id !== id);
+      mockDb.setTimeLogs(logs);
+    }
+    broadcastRealtimeEvent('attendance_update');
+    return true;
+  },
   async getLeaveRequests() {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
@@ -3811,7 +3823,7 @@ export const db = {
       note: payload.note || '',
       staff_id: payload.staff_id,
       created_at: new Date().toISOString(),
-      status: 'Đã duyệt' as 'Chờ duyệt' | 'Đã duyệt' | 'Từ chối'
+      status: 'Chờ duyệt' as 'Chờ duyệt' | 'Đã duyệt' | 'Từ chối'
     };
 
     const ingredients = await this.getIngredients();
@@ -3891,7 +3903,7 @@ export const db = {
         chi_phi: payload.cost,
         ghi_chu: payload.note || '',
         id_nhan_vien: payload.staff_id,
-        trang_thai: 'Đã duyệt'
+        trang_thai: 'Chờ duyệt'
       }]);
     } else {
       const logs = mockDb.getInventoryLogs();
